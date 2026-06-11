@@ -3,134 +3,448 @@
   "version": 1,
   "buildings": {
     "town_center": {
-      "name": "Town Center", "hp": 2750, "buildTime": 60, "age": "archaic",
-      "cost": { "food": 0, "wood": 400, "gold": 200, "favor": 0 },
-      "armor": { "hack": 25, "pierce": 85, "crush": 5 },
-      "popProvided": 15, "los": 24,
-      "attack": { "type": "pierce", "damage": 6, "range": 22, "cooldown": 2.0 },
-      "dropoff": ["food", "wood", "gold"],
-      "trains": ["villager", "scout"],
+      "name": "Town Center",
+      "hp": 2750,
+      "buildTime": 60,
+      "age": "archaic",
+      "cost": {
+        "food": 0,
+        "wood": 400,
+        "gold": 200,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 25,
+        "pierce": 85,
+        "crush": 5
+      },
+      "popProvided": 15,
+      "los": 24,
+      "attack": {
+        "type": "pierce",
+        "damage": 6,
+        "range": 22,
+        "cooldown": 2
+      },
+      "dropoff": [
+        "food",
+        "wood",
+        "gold"
+      ],
+      "trains": [
+        "villager",
+        "scout"
+      ],
       "placement": "settlement_socket",
-      "garrisonCapacity": 20
+      "garrisonCapacity": 20,
+      "size": 4
     },
     "house": {
-      "name": "House", "hp": 350, "buildTime": 15, "age": "archaic",
-      "cost": { "food": 0, "wood": 50, "gold": 0, "favor": 0 },
-      "armor": { "hack": 15, "pierce": 80, "crush": 5 },
-      "popProvided": 10, "buildLimit": 10
+      "name": "House",
+      "hp": 350,
+      "buildTime": 15,
+      "age": "archaic",
+      "cost": {
+        "food": 0,
+        "wood": 50,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 15,
+        "pierce": 80,
+        "crush": 5
+      },
+      "popProvided": 10,
+      "buildLimit": 10,
+      "size": 2
     },
     "farm": {
-      "name": "Farm", "hp": 200, "buildTime": 12, "age": "archaic",
-      "cost": { "food": 0, "wood": 60, "gold": 0, "favor": 0 },
-      "armor": { "hack": 10, "pierce": 80, "crush": 5 },
-      "provides": "infinite_farm_food"
+      "name": "Farm",
+      "hp": 200,
+      "buildTime": 12,
+      "age": "archaic",
+      "cost": {
+        "food": 0,
+        "wood": 60,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 10,
+        "pierce": 80,
+        "crush": 5
+      },
+      "provides": "infinite_farm_food",
+      "size": 2
     },
     "granary": {
-      "name": "Granary", "hp": 350, "buildTime": 15, "age": "archaic",
-      "cost": { "food": 0, "wood": 80, "gold": 0, "favor": 0 },
-      "armor": { "hack": 15, "pierce": 80, "crush": 5 },
-      "dropoff": ["food"]
+      "name": "Granary",
+      "hp": 350,
+      "buildTime": 15,
+      "age": "archaic",
+      "cost": {
+        "food": 0,
+        "wood": 80,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 15,
+        "pierce": 80,
+        "crush": 5
+      },
+      "dropoff": [
+        "food"
+      ],
+      "size": 2
     },
     "storehouse": {
-      "name": "Storehouse", "hp": 350, "buildTime": 15, "age": "archaic",
-      "cost": { "food": 0, "wood": 80, "gold": 0, "favor": 0 },
-      "armor": { "hack": 15, "pierce": 80, "crush": 5 },
-      "dropoff": ["wood", "gold"]
+      "name": "Storehouse",
+      "hp": 350,
+      "buildTime": 15,
+      "age": "archaic",
+      "cost": {
+        "food": 0,
+        "wood": 80,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 15,
+        "pierce": 80,
+        "crush": 5
+      },
+      "dropoff": [
+        "wood",
+        "gold"
+      ],
+      "size": 2
     },
     "temple": {
-      "name": "Temple", "hp": 1200, "buildTime": 30, "age": "archaic",
-      "cost": { "food": 0, "wood": 150, "gold": 100, "favor": 0 },
-      "armor": { "hack": 25, "pierce": 85, "crush": 5 },
-      "trains": ["heroes", "myth_units"],
-      "notes": "Required to advance to Classical. Favor functions per pantheon (see pantheons.json)."
+      "name": "Temple",
+      "hp": 1200,
+      "buildTime": 30,
+      "age": "archaic",
+      "cost": {
+        "food": 0,
+        "wood": 150,
+        "gold": 100,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 25,
+        "pierce": 85,
+        "crush": 5
+      },
+      "trains": [
+        "heroes",
+        "myth_units"
+      ],
+      "notes": "Required to advance to Classical. Favor functions per pantheon (see pantheons.json).",
+      "size": 3
     },
     "barracks": {
-      "name": "Barracks", "hp": 1000, "buildTime": 25, "age": "classical",
-      "cost": { "food": 0, "wood": 150, "gold": 0, "favor": 0 },
-      "armor": { "hack": 25, "pierce": 85, "crush": 5 },
-      "trains": ["infantry_base", "spearman"]
+      "name": "Barracks",
+      "hp": 1000,
+      "buildTime": 25,
+      "age": "classical",
+      "cost": {
+        "food": 0,
+        "wood": 150,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 25,
+        "pierce": 85,
+        "crush": 5
+      },
+      "trains": [
+        "infantry_base",
+        "spearman"
+      ],
+      "size": 3
     },
     "archery_range": {
-      "name": "Archery Range", "hp": 1000, "buildTime": 25, "age": "classical",
-      "cost": { "food": 0, "wood": 150, "gold": 0, "favor": 0 },
-      "armor": { "hack": 25, "pierce": 85, "crush": 5 },
-      "trains": ["archer_base", "skirmisher"]
+      "name": "Archery Range",
+      "hp": 1000,
+      "buildTime": 25,
+      "age": "classical",
+      "cost": {
+        "food": 0,
+        "wood": 150,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 25,
+        "pierce": 85,
+        "crush": 5
+      },
+      "trains": [
+        "archer_base",
+        "skirmisher"
+      ],
+      "size": 3
     },
     "stable": {
-      "name": "Stable", "hp": 1100, "buildTime": 25, "age": "classical",
-      "cost": { "food": 0, "wood": 175, "gold": 0, "favor": 0 },
-      "armor": { "hack": 25, "pierce": 85, "crush": 5 },
-      "trains": ["cavalry_base", "raider_cavalry"]
+      "name": "Stable",
+      "hp": 1100,
+      "buildTime": 25,
+      "age": "classical",
+      "cost": {
+        "food": 0,
+        "wood": 175,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 25,
+        "pierce": 85,
+        "crush": 5
+      },
+      "trains": [
+        "cavalry_base",
+        "raider_cavalry"
+      ],
+      "size": 3
     },
     "armory": {
-      "name": "Armory", "hp": 900, "buildTime": 25, "age": "classical",
-      "cost": { "food": 0, "wood": 125, "gold": 50, "favor": 0 },
-      "armor": { "hack": 25, "pierce": 85, "crush": 5 },
-      "researches": ["weapon_lines", "armor_lines"],
-      "notes": "Required to advance to Heroic."
+      "name": "Armory",
+      "hp": 900,
+      "buildTime": 25,
+      "age": "classical",
+      "cost": {
+        "food": 0,
+        "wood": 125,
+        "gold": 50,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 25,
+        "pierce": 85,
+        "crush": 5
+      },
+      "researches": [
+        "weapon_lines",
+        "armor_lines"
+      ],
+      "notes": "Required to advance to Heroic.",
+      "size": 3
     },
     "market": {
-      "name": "Market", "hp": 900, "buildTime": 25, "age": "heroic",
-      "cost": { "food": 0, "wood": 200, "gold": 0, "favor": 0 },
-      "armor": { "hack": 25, "pierce": 85, "crush": 5 },
-      "trains": ["caravan"],
-      "trade": { "resources": ["food", "wood", "gold"], "favorTradeable": false, "baseRate": 100, "spreadPercent": 15 },
-      "notes": "Required to advance to Mythic. Favor is never tradeable (KICKOFF §6)."
+      "name": "Market",
+      "hp": 900,
+      "buildTime": 25,
+      "age": "heroic",
+      "cost": {
+        "food": 0,
+        "wood": 200,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 25,
+        "pierce": 85,
+        "crush": 5
+      },
+      "trains": [
+        "caravan"
+      ],
+      "trade": {
+        "resources": [
+          "food",
+          "wood",
+          "gold"
+        ],
+        "favorTradeable": false,
+        "baseRate": 100,
+        "spreadPercent": 15
+      },
+      "notes": "Required to advance to Mythic. Favor is never tradeable (KICKOFF §6).",
+      "size": 3
     },
     "dock": {
-      "name": "Dock", "hp": 800, "buildTime": 20, "age": "archaic",
-      "cost": { "food": 0, "wood": 100, "gold": 0, "favor": 0 },
-      "armor": { "hack": 20, "pierce": 80, "crush": 5 },
-      "trains": ["fishing_boat"],
-      "dropoff": ["food"],
-      "placement": "shoreline"
+      "name": "Dock",
+      "hp": 800,
+      "buildTime": 20,
+      "age": "archaic",
+      "cost": {
+        "food": 0,
+        "wood": 100,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 20,
+        "pierce": 80,
+        "crush": 5
+      },
+      "trains": [
+        "fishing_boat"
+      ],
+      "dropoff": [
+        "food"
+      ],
+      "placement": "shoreline",
+      "size": 2
     },
     "tower": {
-      "name": "Watchtower", "hp": 700, "buildTime": 20, "age": "classical",
-      "cost": { "food": 0, "wood": 100, "gold": 80, "favor": 0 },
-      "armor": { "hack": 30, "pierce": 90, "crush": 5 },
-      "attack": { "type": "pierce", "damage": 10, "range": 18, "cooldown": 2.0 },
-      "los": 22, "garrisonCapacity": 5
+      "name": "Watchtower",
+      "hp": 700,
+      "buildTime": 20,
+      "age": "classical",
+      "cost": {
+        "food": 0,
+        "wood": 100,
+        "gold": 80,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 30,
+        "pierce": 90,
+        "crush": 5
+      },
+      "attack": {
+        "type": "pierce",
+        "damage": 10,
+        "range": 18,
+        "cooldown": 2
+      },
+      "los": 22,
+      "garrisonCapacity": 5,
+      "size": 1
     },
     "wall": {
-      "name": "Stone Wall", "hp": 800, "buildTime": 4, "age": "classical",
-      "cost": { "food": 0, "wood": 10, "gold": 0, "favor": 0 },
-      "armor": { "hack": 40, "pierce": 95, "crush": 8 },
-      "placement": "wall_segment"
+      "name": "Stone Wall",
+      "hp": 800,
+      "buildTime": 4,
+      "age": "classical",
+      "cost": {
+        "food": 0,
+        "wood": 10,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 40,
+        "pierce": 95,
+        "crush": 8
+      },
+      "placement": "wall_segment",
+      "size": 1
     },
     "gate": {
-      "name": "Gate", "hp": 900, "buildTime": 8, "age": "classical",
-      "cost": { "food": 0, "wood": 30, "gold": 0, "favor": 0 },
-      "armor": { "hack": 40, "pierce": 95, "crush": 8 },
-      "placement": "wall_segment"
+      "name": "Gate",
+      "hp": 900,
+      "buildTime": 8,
+      "age": "classical",
+      "cost": {
+        "food": 0,
+        "wood": 30,
+        "gold": 0,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 40,
+        "pierce": 95,
+        "crush": 8
+      },
+      "placement": "wall_segment",
+      "size": 1
     },
     "fortress": {
-      "name": "Fortress", "hp": 2400, "buildTime": 50, "age": "heroic",
-      "cost": { "food": 0, "wood": 300, "gold": 200, "favor": 0 },
-      "armor": { "hack": 35, "pierce": 90, "crush": 5 },
-      "attack": { "type": "pierce", "damage": 12, "range": 20, "cooldown": 1.8 },
-      "los": 24, "garrisonCapacity": 15,
-      "trains": ["ram", "catapult"]
+      "name": "Fortress",
+      "hp": 2400,
+      "buildTime": 50,
+      "age": "heroic",
+      "cost": {
+        "food": 0,
+        "wood": 300,
+        "gold": 200,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 35,
+        "pierce": 90,
+        "crush": 5
+      },
+      "attack": {
+        "type": "pierce",
+        "damage": 12,
+        "range": 20,
+        "cooldown": 1.8
+      },
+      "los": 24,
+      "garrisonCapacity": 15,
+      "trains": [
+        "ram",
+        "catapult"
+      ],
+      "size": 4
     },
     "wonder": {
-      "name": "Wonder", "hp": 5000, "buildTime": 240, "age": "mythic",
-      "cost": { "food": 1000, "wood": 1000, "gold": 1000, "favor": 0 },
-      "armor": { "hack": 30, "pierce": 90, "crush": 5 },
-      "victory": { "countdownSeconds": 600 }
+      "name": "Wonder",
+      "hp": 5000,
+      "buildTime": 240,
+      "age": "mythic",
+      "cost": {
+        "food": 1000,
+        "wood": 1000,
+        "gold": 1000,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 30,
+        "pierce": 90,
+        "crush": 5
+      },
+      "victory": {
+        "countdownSeconds": 600
+      },
+      "size": 5
     },
     "sun_altar": {
-      "name": "Sun-Altar", "hp": 600, "buildTime": 20, "age": "archaic",
-      "cost": { "food": 0, "wood": 100, "gold": 50, "favor": 0 },
-      "armor": { "hack": 20, "pierce": 80, "crush": 5 },
-      "buildLimit": 5, "pantheon": "auryan_dawn",
-      "notes": "Devotion Pyres favor source — escalating passive favor per altar (see pantheons.json)."
+      "name": "Sun-Altar",
+      "hp": 600,
+      "buildTime": 20,
+      "age": "archaic",
+      "cost": {
+        "food": 0,
+        "wood": 100,
+        "gold": 50,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 20,
+        "pierce": 80,
+        "crush": 5
+      },
+      "buildLimit": 5,
+      "pantheon": "auryan_dawn",
+      "notes": "Devotion Pyres favor source — escalating passive favor per altar (see pantheons.json).",
+      "size": 2
     },
     "sky_temple": {
-      "name": "Sky-Temple", "hp": 800, "buildTime": 25, "age": "archaic",
-      "cost": { "food": 0, "wood": 120, "gold": 60, "favor": 0 },
-      "armor": { "hack": 20, "pierce": 80, "crush": 5 },
+      "name": "Sky-Temple",
+      "hp": 800,
+      "buildTime": 25,
+      "age": "archaic",
+      "cost": {
+        "food": 0,
+        "wood": 120,
+        "gold": 60,
+        "favor": 0
+      },
+      "armor": {
+        "hack": 20,
+        "pierce": 80,
+        "crush": 5
+      },
       "pantheon": "storm_concord",
-      "notes": "Skyward Chants prayer site — villagers task here to pray (see pantheons.json)."
+      "notes": "Skyward Chants prayer site — villagers task here to pray (see pantheons.json).",
+      "size": 2
     }
   }
 }

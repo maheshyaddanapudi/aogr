@@ -12,6 +12,20 @@ import { DEFAULT_TERRAIN_CONFIG, generateTerrain, type Terrain, type TerrainConf
 import { buildNavGrid, isPassable, type NavGrid } from "./path/grid";
 import { computeFlowField, flowDirAt, flowDistAt, UNREACHABLE, type FlowField } from "./path/flowfield";
 import { getUnitStats, getUnitStatsByIndex, type UnitStats } from "./unitdata";
+import { getBuildingStatsByIndex } from "./buildingdata";
+// eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
+import {
+  createPlayers,
+  spawnBuilding,
+  spawnResourceNode,
+  economySystem,
+  handleEconomyCommand,
+  hashEconomy,
+  recomputePop,
+  setupSkirmish,
+  type PlayerState,
+  type TrainEntry,
+} from "./economy";
 
 export const TICK_RATE = 15;
 export const MS_PER_TICK = 1000 / TICK_RATE; // render-side pacing only; sim counts ticks
@@ -43,6 +57,23 @@ interface Stores {
     fieldKey: Int32Array;
     stallTicks: Int32Array;
   };
+  ResourceNode: { resType: Int32Array; amountMilli: Int32Array };
+  Building: {
+    typeIndex: Int32Array;
+    progress: Int32Array;
+    total: Int32Array;
+    active: Int32Array;
+    tileX: Int32Array;
+    tileY: Int32Array;
+  };
+  GatherTask: {
+    phase: Int32Array;
+    nodeEid: Int32Array;
+    dropEid: Int32Array;
+    carriedMilli: Int32Array;
+    carriedType: Int32Array;
+    carryMicro: Int32Array;
+  };
 }
 
 function createStores(): Stores {
@@ -58,7 +89,29 @@ function createStores(): Stores {
       fieldKey: new Int32Array(MAX_ENTITIES),
       stallTicks: new Int32Array(MAX_ENTITIES),
     },
+    ResourceNode: { resType: new Int32Array(MAX_ENTITIES), amountMilli: new Int32Array(MAX_ENTITIES) },
+    Building: {
+      typeIndex: new Int32Array(MAX_ENTITIES),
+      progress: new Int32Array(MAX_ENTITIES),
+      total: new Int32Array(MAX_ENTITIES),
+      active: new Int32Array(MAX_ENTITIES),
+      tileX: new Int32Array(MAX_ENTITIES),
+      tileY: new Int32Array(MAX_ENTITIES),
+    },
+    GatherTask: {
+      phase: new Int32Array(MAX_ENTITIES),
+      nodeEid: new Int32Array(MAX_ENTITIES),
+      dropEid: new Int32Array(MAX_ENTITIES),
+      carriedMilli: new Int32Array(MAX_ENTITIES),
+      carriedType: new Int32Array(MAX_ENTITIES),
+      carryMicro: new Int32Array(MAX_ENTITIES),
+    },
   };
+}
+
+export interface MatchOptions {
+  players: number;
+  skirmish: boolean;
 }
 
 export interface Sim {
@@ -70,12 +123,21 @@ export interface Sim {
   readonly navGrid: NavGrid;
   /** Flow fields cached by target tile key; derived data, never serialized. */
   readonly flowFields: Map<number, FlowField>;
+  readonly players: PlayerState[];
+  readonly trainQueues: Map<number, TrainEntry[]>;
+  readonly matchOptions: MatchOptions;
   tick: number;
   unitRadiusFp(eid: number): number;
   unitStats(eid: number): UnitStats;
 }
 
-export function createSim(seed: number, terrainConfig: TerrainConfig = DEFAULT_TERRAIN_CONFIG): Sim {
+const DEFAULT_MATCH: MatchOptions = { players: 2, skirmish: false };
+
+export function createSim(
+  seed: number,
+  terrainConfig: TerrainConfig = DEFAULT_TERRAIN_CONFIG,
+  matchOptions: MatchOptions = DEFAULT_MATCH,
+): Sim {
   const terrain = generateTerrain(new Prng((seed ^ TERRAIN_SEED_SALT) >>> 0), terrainConfig);
   const stores = createStores();
   const sim: Sim = {
@@ -86,6 +148,9 @@ export function createSim(seed: number, terrainConfig: TerrainConfig = DEFAULT_T
     terrain,
     navGrid: buildNavGrid(terrain),
     flowFields: new Map(),
+    players: createPlayers(matchOptions.players),
+    trainQueues: new Map(),
+    matchOptions,
     tick: 0,
     unitRadiusFp(eid: number): number {
       return getUnitStatsByIndex(stores.UnitRef.typeIndex[eid]!).radiusFp;
@@ -94,7 +159,22 @@ export function createSim(seed: number, terrainConfig: TerrainConfig = DEFAULT_T
       return getUnitStatsByIndex(stores.UnitRef.typeIndex[eid]!);
     },
   };
+  if (matchOptions.skirmish) {
+    setupSkirmish(sim);
+    recomputePop(sim);
+  }
   return sim;
+}
+
+/** Point a unit's MoveState at a world position (commands & economy use this). */
+export function setMoveTarget(sim: Sim, eid: number, xFp: number, yFp: number): void {
+  const { MoveState } = sim.stores;
+  const tile = nearestPassableTile(sim, Math.trunc(xFp / 1000), Math.trunc(yFp / 1000));
+  MoveState.active[eid] = 1;
+  MoveState.targetX[eid] = tile.x * 1000 + 500;
+  MoveState.targetY[eid] = tile.y * 1000 + 500;
+  MoveState.fieldKey[eid] = tile.y * sim.navGrid.size + tile.x;
+  MoveState.stallTicks[eid] = 0;
 }
 
 function tileKey(sim: Sim, tx: number, ty: number): number {
@@ -141,7 +221,7 @@ function spawnDebugEntity(sim: Sim, playerId: number, x: number, y: number, vx: 
 
 export function spawnUnitEntity(sim: Sim, playerId: number, unitId: string, x: number, y: number): number {
   const stats = getUnitStats(unitId);
-  const { UnitRef, MoveState } = sim.stores;
+  const { UnitRef, MoveState, GatherTask } = sim.stores;
   const eid = spawnDebugEntity(sim, playerId, x, y, 0, 0);
   addComponent(sim.world, eid, UnitRef);
   addComponent(sim.world, eid, MoveState);
@@ -151,10 +231,20 @@ export function spawnUnitEntity(sim: Sim, playerId: number, unitId: string, x: n
   MoveState.targetY[eid] = y | 0;
   MoveState.fieldKey[eid] = -1;
   MoveState.stallTicks[eid] = 0;
+  if (stats.gatherMicroPerTick) {
+    addComponent(sim.world, eid, GatherTask);
+    GatherTask.phase[eid] = 0;
+    GatherTask.nodeEid[eid] = -1;
+    GatherTask.dropEid[eid] = -1;
+    GatherTask.carriedMilli[eid] = 0;
+    GatherTask.carriedType[eid] = 0;
+    GatherTask.carryMicro[eid] = 0;
+  }
   return eid;
 }
 
 function applyCommand(sim: Sim, cmd: Command): void {
+  if (handleEconomyCommand(sim, cmd)) return;
   switch (cmd.type) {
     case "noop":
       return;
@@ -378,6 +468,7 @@ function unitMovementSystem(sim: Sim): void {
 /** Advance exactly one tick. Commands must already be deterministically ordered. */
 export function stepSim(sim: Sim, commands: readonly Command[]): void {
   for (const cmd of commands) applyCommand(sim, cmd);
+  economySystem(sim);
   unitMovementSystem(sim);
   wanderSystem(sim);
   sim.tick++;
@@ -410,15 +501,17 @@ export function simChecksum(sim: Sim): number {
       c.addI32(MoveState.stallTicks[eid]!);
     }
   }
+  hashEconomy(sim, c);
   return c.digest();
 }
 
 interface EntitySnapshot {
+  eid: number;
   x: number;
   y: number;
-  vx: number;
-  vy: number;
-  playerId: number;
+  vx?: number;
+  vy?: number;
+  playerId?: number;
   unit?: {
     typeIndex: number;
     active: number;
@@ -427,36 +520,72 @@ interface EntitySnapshot {
     fieldKey: number;
     stallTicks: number;
   };
+  gather?: {
+    phase: number;
+    nodeEid: number;
+    dropEid: number;
+    carriedMilli: number;
+    carriedType: number;
+    carryMicro: number;
+  };
+  node?: { resType: number; amountMilli: number };
+  building?: { typeIndex: number; progress: number; total: number; active: number; tileX: number; tileY: number };
 }
 
 interface SimSnapshot {
-  version: 1;
+  version: 2;
   seed: number;
   tick: number;
   prngState: number;
   terrainConfig: TerrainConfig;
+  matchOptions: MatchOptions;
+  players: PlayerState[];
+  trainQueues: Array<[number, TrainEntry[]]>;
   entities: EntitySnapshot[];
 }
 
 export function serializeSim(sim: Sim): string {
-  const { Position, Velocity, Owner, UnitRef, MoveState } = sim.stores;
-  const eids = Array.from(query(sim.world, [Position, Velocity, Owner])).sort((a, b) => a - b);
-  const units = new Set(query(sim.world, [UnitRef]));
+  const { Position, Velocity, Owner, UnitRef, MoveState, GatherTask, ResourceNode, Building } = sim.stores;
+  const all = new Set<number>();
+  for (const e of query(sim.world, [Position])) all.add(e);
+  const eids = Array.from(all).sort((a, b) => a - b);
+  const isUnit = new Set(query(sim.world, [UnitRef]));
+  const isNode = new Set(query(sim.world, [ResourceNode]));
+  const isBuilding = new Set(query(sim.world, [Building]));
+  const hasGather = new Set(query(sim.world, [GatherTask]));
+
   const snapshot: SimSnapshot = {
-    version: 1,
+    version: 2,
     seed: sim.seed,
     tick: sim.tick,
     prngState: sim.prng.getState(),
     terrainConfig: sim.terrain.config,
+    matchOptions: { ...sim.matchOptions, skirmish: false }, // content is in the snapshot
+    players: sim.players.map((p) => ({ ...p })),
+    trainQueues: Array.from(sim.trainQueues.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([k, v]) => [k, v.map((e) => ({ ...e }))]),
     entities: eids.map((eid) => {
-      const e: EntitySnapshot = {
-        x: Position.x[eid]!,
-        y: Position.y[eid]!,
-        vx: Velocity.x[eid]!,
-        vy: Velocity.y[eid]!,
-        playerId: Owner.playerId[eid]!,
-      };
-      if (units.has(eid)) {
+      const e: EntitySnapshot = { eid, x: Position.x[eid]!, y: Position.y[eid]! };
+      if (isNode.has(eid)) {
+        e.node = { resType: ResourceNode.resType[eid]!, amountMilli: ResourceNode.amountMilli[eid]! };
+        return e;
+      }
+      e.playerId = Owner.playerId[eid]!;
+      if (isBuilding.has(eid)) {
+        e.building = {
+          typeIndex: Building.typeIndex[eid]!,
+          progress: Building.progress[eid]!,
+          total: Building.total[eid]!,
+          active: Building.active[eid]!,
+          tileX: Building.tileX[eid]!,
+          tileY: Building.tileY[eid]!,
+        };
+        return e;
+      }
+      e.vx = Velocity.x[eid]!;
+      e.vy = Velocity.y[eid]!;
+      if (isUnit.has(eid)) {
         e.unit = {
           typeIndex: UnitRef.typeIndex[eid]!,
           active: MoveState.active[eid]!,
@@ -465,6 +594,16 @@ export function serializeSim(sim: Sim): string {
           fieldKey: MoveState.fieldKey[eid]!,
           stallTicks: MoveState.stallTicks[eid]!,
         };
+        if (hasGather.has(eid)) {
+          e.gather = {
+            phase: GatherTask.phase[eid]!,
+            nodeEid: GatherTask.nodeEid[eid]!,
+            dropEid: GatherTask.dropEid[eid]!,
+            carriedMilli: GatherTask.carriedMilli[eid]!,
+            carriedType: GatherTask.carriedType[eid]!,
+            carryMicro: GatherTask.carryMicro[eid]!,
+          };
+        }
       }
       return e;
     }),
@@ -474,26 +613,61 @@ export function serializeSim(sim: Sim): string {
 
 export function deserializeSim(json: string): Sim {
   const snapshot = JSON.parse(json) as SimSnapshot;
-  const sim = createSim(snapshot.seed, snapshot.terrainConfig);
+  const sim = createSim(snapshot.seed, snapshot.terrainConfig, snapshot.matchOptions);
   sim.tick = snapshot.tick;
   sim.prng.setState(snapshot.prngState);
-  const { Position, Velocity, UnitRef, MoveState } = sim.stores;
+  const { Position, Velocity, UnitRef, MoveState, GatherTask } = sim.stores;
+
+  // first pass: recreate entities in original ascending-eid order, build remap
+  const remap = new Map<number, number>();
   for (const e of snapshot.entities) {
-    if (e.unit) {
-      const eid = spawnUnitEntity(sim, e.playerId, getUnitStatsByIndex(e.unit.typeIndex).id, e.x, e.y);
+    if (e.node) {
+      const eid = spawnResourceNode(sim, (["food", "wood", "gold"] as const)[e.node.resType]!, 0, 0, e.node.amountMilli);
       Position.x[eid] = e.x;
       Position.y[eid] = e.y;
-      Velocity.x[eid] = e.vx;
-      Velocity.y[eid] = e.vy;
-      UnitRef.typeIndex[eid] = e.unit.typeIndex;
+      sim.stores.ResourceNode.resType[eid] = e.node.resType;
+      remap.set(e.eid, eid);
+    } else if (e.building) {
+      const stats = getBuildingStatsByIndex(e.building.typeIndex);
+      const eid = spawnBuilding(sim, e.playerId!, stats.id, e.building.tileX, e.building.tileY, e.building.active === 1);
+      sim.stores.Building.progress[eid] = e.building.progress;
+      sim.stores.Building.total[eid] = e.building.total;
+      sim.stores.Building.active[eid] = e.building.active;
+      remap.set(e.eid, eid);
+    } else if (e.unit) {
+      const eid = spawnUnitEntity(sim, e.playerId!, getUnitStatsByIndex(e.unit.typeIndex).id, e.x, e.y);
+      Position.x[eid] = e.x;
+      Position.y[eid] = e.y;
+      Velocity.x[eid] = e.vx!;
+      Velocity.y[eid] = e.vy!;
       MoveState.active[eid] = e.unit.active;
       MoveState.targetX[eid] = e.unit.targetX;
       MoveState.targetY[eid] = e.unit.targetY;
       MoveState.fieldKey[eid] = e.unit.fieldKey;
       MoveState.stallTicks[eid] = e.unit.stallTicks;
+      UnitRef.typeIndex[eid] = e.unit.typeIndex;
+      remap.set(e.eid, eid);
     } else {
-      spawnDebugEntity(sim, e.playerId, e.x, e.y, e.vx, e.vy);
+      const eid = spawnDebugEntity(sim, e.playerId!, e.x, e.y, e.vx!, e.vy!);
+      remap.set(e.eid, eid);
     }
   }
+
+  // second pass: restore gather tasks + remap entity references
+  const r = (old: number): number => (old < 0 ? old : (remap.get(old) ?? -1));
+  for (const e of snapshot.entities) {
+    if (!e.gather) continue;
+    const eid = remap.get(e.eid)!;
+    GatherTask.phase[eid] = e.gather.phase;
+    GatherTask.nodeEid[eid] = r(e.gather.nodeEid);
+    GatherTask.dropEid[eid] = r(e.gather.dropEid);
+    GatherTask.carriedMilli[eid] = e.gather.carriedMilli;
+    GatherTask.carriedType[eid] = e.gather.carriedType;
+    GatherTask.carryMicro[eid] = e.gather.carryMicro;
+  }
+  sim.players.length = 0;
+  for (const p of snapshot.players) sim.players.push({ ...p, townCenterEid: r(p.townCenterEid) });
+  sim.trainQueues.clear();
+  for (const [k, v] of snapshot.trainQueues) sim.trainQueues.set(r(k), v.map((t) => ({ ...t })));
   return sim;
 }

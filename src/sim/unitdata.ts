@@ -21,6 +21,14 @@ interface RawUnit {
   attack?: { type: string; damage: number; crushDamage?: number; range: number; minRange?: number; splashRadius?: number; cooldown: number };
   multipliers?: Record<string, number>;
   flying?: boolean;
+  gatherRates?: {
+    huntFoodPerSec?: number;
+    forageFoodPerSec?: number;
+    farmFoodPerSec?: number;
+    fishFoodPerSec?: number;
+    woodPerSec?: number;
+    goldPerSec?: number;
+  };
 }
 
 export interface UnitStats {
@@ -47,6 +55,8 @@ export interface UnitStats {
   } | null;
   multipliers1000: Record<string, number>;
   flying: boolean;
+  /** micro-resource per tick by node kind index (0 food/forage, 1 wood, 2 gold); null = can't gather */
+  gatherMicroPerTick: [number, number, number] | null;
 }
 
 const RADIUS_BY_CLASS: Record<string, number> = {
@@ -99,6 +109,13 @@ function load(): Map<string, UnitStats> {
         Object.entries(raw.multipliers ?? {}).map(([k, v]) => [k, Math.round(v * 1000)]),
       ),
       flying: raw.flying ?? false,
+      gatherMicroPerTick: raw.gatherRates
+        ? [
+            Math.trunc(((raw.gatherRates.forageFoodPerSec ?? 0) * 1_000_000) / TICK_RATE),
+            Math.trunc(((raw.gatherRates.woodPerSec ?? 0) * 1_000_000) / TICK_RATE),
+            Math.trunc(((raw.gatherRates.goldPerSec ?? 0) * 1_000_000) / TICK_RATE),
+          ]
+        : null,
     });
   }
   return cache;

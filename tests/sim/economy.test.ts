@@ -90,10 +90,12 @@ describe("PHASE 3 GATE — economy", () => {
     const vills = ownVillagers(sim, 0);
     stepSim(sim, [{ type: "build", playerId: 0, eids: [vills[0]!, vills[1]!], building: "market", x: -1, y: -1 }]);
     run(sim, 15 * 90);
+    // NOTE: the market itself costs 200 wood (all of the starting stock), so the
+    // trade exercise sells food — the mechanic under test is identical.
     const before = { ...getPlayer(sim, 0) };
-    stepSim(sim, [{ type: "trade", playerId: 0, sell: "wood", buy: "gold", amountMilli: 100_000 }]);
+    stepSim(sim, [{ type: "trade", playerId: 0, sell: "food", buy: "gold", amountMilli: 100_000 }]);
     const after = getPlayer(sim, 0);
-    expect(after.woodMilli).toBe(before.woodMilli - 100_000);
+    expect(after.foodMilli).toBe(before.foodMilli - 100_000);
     expect(after.goldMilli).toBe(before.goldMilli + 85_000); // 15% spread
     // favor trade is rejected
     stepSim(sim, [{ type: "trade", playerId: 0, sell: "favor", buy: "gold", amountMilli: 1_000 }]);
