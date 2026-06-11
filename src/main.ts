@@ -10,8 +10,30 @@ import { loadGame, loadSettings, saveSettings } from "./platform/storage";
 
 const params = new URLSearchParams(location.search);
 
+// Menu music: starts on the first interaction (autoplay rules), lazily pulling
+// in Howler so the initial chunk stays small. The game's own audio system
+// takes over at boot.
+let menuMusic: { stop: () => void } | null = null;
+let menuMusicWanted = true;
+function armMenuMusic(): void {
+  const start = () => {
+    window.removeEventListener("pointerdown", start);
+    const vol = loadSettings().musicVol;
+    if (!menuMusicWanted || vol <= 0) return;
+    void import("howler").then(({ Howl }) => {
+      if (!menuMusicWanted) return;
+      const h = new Howl({ src: [`${import.meta.env.BASE_URL}audio/music_main.mp3`], loop: true, volume: vol });
+      h.play();
+      menuMusic = h;
+    });
+  };
+  window.addEventListener("pointerdown", start);
+}
+
 async function startGame(config: Parameters<typeof import("./game").boot>[0]): Promise<void> {
   document.getElementById("main-menu")?.remove();
+  menuMusicWanted = false;
+  menuMusic?.stop();
   const loading = document.createElement("div");
   loading.className = "loading-overlay";
   loading.id = "loading-overlay";
@@ -20,9 +42,18 @@ async function startGame(config: Parameters<typeof import("./game").boot>[0]): P
     <h2>Forging the world…</h2>
     <p>First load downloads the gods, beasts, and terrain — give it a moment.</p>`;
   document.body.appendChild(loading);
-  const { boot } = await import("./game");
-  await boot(config);
-  loading.remove();
+  try {
+    const { boot } = await import("./game");
+    await boot(config);
+    loading.remove();
+  } catch (err) {
+    loading.innerHTML = `
+      <h2>The forge went cold</h2>
+      <p>${err instanceof Error ? err.message : "The world failed to load."}</p>
+      <button class="age-up-btn" id="boot-retry">Return to menu</button>`;
+    loading.querySelector("#boot-retry")!.addEventListener("click", () => location.assign(location.pathname));
+    throw err;
+  }
 }
 
 function renderMenu(): void {
@@ -109,4 +140,5 @@ if (params.has("skipmenu") || params.has("seed")) {
   void startGame(undefined);
 } else {
   renderMenu();
+  armMenuMusic();
 }

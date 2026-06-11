@@ -63,6 +63,8 @@ export function createAudioSystem(): AudioSystem {
     if (!debug.musicStarted) {
       debug.musicStarted = true;
       music.play();
+      // iOS: if the tap didn't unlock the context yet, retry once it does
+      music.once("playerror", () => music.once("unlock", () => music.play()));
     }
     window.removeEventListener("pointerdown", startMusic);
   };
