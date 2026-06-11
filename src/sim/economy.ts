@@ -116,6 +116,8 @@ export function spawnBuilding(sim: Sim, playerId: number, buildingId: string, ti
   Building.active[eid] = completed ? 1 : 0;
   Building.tileX[eid] = tileX;
   Building.tileY[eid] = tileY;
+  addComponent(sim.world, eid, sim.stores.Health);
+  sim.stores.Health.hp100[eid] = stats.hp100;
   blockFootprint(sim, tileX, tileY, stats.size);
   return eid;
 }

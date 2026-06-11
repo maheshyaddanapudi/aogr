@@ -13,7 +13,8 @@ export type Command =
   | { type: "build"; playerId: number; eids: number[]; building: string; x: number; y: number }
   | { type: "train"; playerId: number; buildingEid: number; unit: string }
   | { type: "trade"; playerId: number; sell: string; buy: string; amountMilli: number }
-  | { type: "pray"; playerId: number; eids: number[] };
+  | { type: "pray"; playerId: number; eids: number[] }
+  | { type: "attack"; playerId: number; eids: number[]; targetEid: number };
 
 interface Pending {
   tick: number;

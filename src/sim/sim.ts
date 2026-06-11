@@ -26,6 +26,8 @@ import {
   type PlayerState,
   type TrainEntry,
 } from "./economy";
+// eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
+import { combatSystem, emptyEvents, handleCombatCommand, hashCombat, targetAliveAndValid, type SimEvents } from "./combat";
 
 export const TICK_RATE = 15;
 export const MS_PER_TICK = 1000 / TICK_RATE; // render-side pacing only; sim counts ticks
@@ -74,6 +76,8 @@ interface Stores {
     carriedType: Int32Array;
     carryMicro: Int32Array;
   };
+  Health: { hp100: Int32Array };
+  CombatState: { targetEid: Int32Array; cooldown: Int32Array; aggressive: Int32Array };
 }
 
 function createStores(): Stores {
@@ -106,6 +110,12 @@ function createStores(): Stores {
       carriedType: new Int32Array(MAX_ENTITIES),
       carryMicro: new Int32Array(MAX_ENTITIES),
     },
+    Health: { hp100: new Int32Array(MAX_ENTITIES) },
+    CombatState: {
+      targetEid: new Int32Array(MAX_ENTITIES),
+      cooldown: new Int32Array(MAX_ENTITIES),
+      aggressive: new Int32Array(MAX_ENTITIES),
+    },
   };
 }
 
@@ -126,6 +136,8 @@ export interface Sim {
   readonly players: PlayerState[];
   readonly trainQueues: Map<number, TrainEntry[]>;
   readonly matchOptions: MatchOptions;
+  /** transient per-tick outputs for the render layer; never hashed/serialized */
+  events: SimEvents;
   tick: number;
   unitRadiusFp(eid: number): number;
   unitStats(eid: number): UnitStats;
@@ -151,6 +163,7 @@ export function createSim(
     players: createPlayers(matchOptions.players),
     trainQueues: new Map(),
     matchOptions,
+    events: emptyEvents(),
     tick: 0,
     unitRadiusFp(eid: number): number {
       return getUnitStatsByIndex(stores.UnitRef.typeIndex[eid]!).radiusFp;
@@ -231,6 +244,16 @@ export function spawnUnitEntity(sim: Sim, playerId: number, unitId: string, x: n
   MoveState.targetY[eid] = y | 0;
   MoveState.fieldKey[eid] = -1;
   MoveState.stallTicks[eid] = 0;
+  const { Health, CombatState } = sim.stores;
+  addComponent(sim.world, eid, Health);
+  Health.hp100[eid] = stats.hp100;
+  if (stats.attack) {
+    addComponent(sim.world, eid, CombatState);
+    CombatState.targetEid[eid] = -1;
+    CombatState.cooldown[eid] = 0;
+    const passive = stats.unitClass === "villager" || stats.unitClass === "scout" || stats.unitClass === "caravan" || stats.unitClass === "ship";
+    CombatState.aggressive[eid] = passive ? 0 : 1;
+  }
   if (stats.gatherMicroPerTick) {
     addComponent(sim.world, eid, GatherTask);
     GatherTask.phase[eid] = 0;
@@ -244,6 +267,7 @@ export function spawnUnitEntity(sim: Sim, playerId: number, unitId: string, x: n
 }
 
 function applyCommand(sim: Sim, cmd: Command): void {
+  if (handleCombatCommand(sim, cmd)) return;
   if (handleEconomyCommand(sim, cmd)) return;
   switch (cmd.type) {
     case "noop":
@@ -335,10 +359,31 @@ function unitMovementSystem(sim: Sim): void {
   // desired velocities
   const desiredX = new Map<number, number>();
   const desiredY = new Map<number, number>();
+  const { CombatState, Health } = sim.stores;
   for (const eid of units) {
     let vx = 0;
     let vy = 0;
-    if (MoveState.active[eid] === 1) {
+    // combat chase: aggressive units with a live out-of-reach target steer directly
+    let chasing = false;
+    if (hasComponent(sim.world, eid, CombatState) && CombatState.aggressive[eid] === 1) {
+      const target = CombatState.targetEid[eid]!;
+      if (targetAliveAndValid(sim, target)) {
+        const stats = getUnitStatsByIndex(UnitRef.typeIndex[eid]!);
+        const dxT = Position.x[target]! - Position.x[eid]!;
+        const dyT = Position.y[target]! - Position.y[eid]!;
+        const dT = isqrt(dxT * dxT + dyT * dyT);
+        const targetRadius = hasComponent(sim.world, target, sim.stores.Building)
+          ? getBuildingStatsByIndex(sim.stores.Building.typeIndex[target]!).size * 710
+          : getUnitStatsByIndex(UnitRef.typeIndex[target]!).radiusFp;
+        const reach = stats.attack!.rangeFp > 0 ? stats.attack!.rangeFp + targetRadius : stats.radiusFp + targetRadius + 250;
+        if (dT > reach) {
+          chasing = true;
+          vx = Math.trunc((dxT * stats.speedFpPerTick) / (dT || 1));
+          vy = Math.trunc((dyT * stats.speedFpPerTick) / (dT || 1));
+        }
+      }
+    }
+    if (!chasing && MoveState.active[eid] === 1) {
       const stats = getUnitStatsByIndex(UnitRef.typeIndex[eid]!);
       const speed = stats.speedFpPerTick;
       const px = Position.x[eid]!;
@@ -373,6 +418,7 @@ function unitMovementSystem(sim: Sim): void {
     }
     desiredX.set(eid, vx);
     desiredY.set(eid, vy);
+    void Health;
   }
 
   // reciprocal separation (each overlapping pair pushes both members apart)
@@ -467,7 +513,9 @@ function unitMovementSystem(sim: Sim): void {
 
 /** Advance exactly one tick. Commands must already be deterministically ordered. */
 export function stepSim(sim: Sim, commands: readonly Command[]): void {
+  sim.events = emptyEvents();
   for (const cmd of commands) applyCommand(sim, cmd);
+  combatSystem(sim);
   economySystem(sim);
   unitMovementSystem(sim);
   wanderSystem(sim);
@@ -502,6 +550,7 @@ export function simChecksum(sim: Sim): number {
     }
   }
   hashEconomy(sim, c);
+  hashCombat(sim, c);
   return c.digest();
 }
 
@@ -529,7 +578,9 @@ interface EntitySnapshot {
     carryMicro: number;
   };
   node?: { resType: number; amountMilli: number };
-  building?: { typeIndex: number; progress: number; total: number; active: number; tileX: number; tileY: number };
+  building?: { typeIndex: number; progress: number; total: number; active: number; tileX: number; tileY: number; hp100: number };
+  hp100?: number;
+  combat?: { targetEid: number; cooldown: number; aggressive: number };
 }
 
 interface SimSnapshot {
@@ -553,6 +604,9 @@ export function serializeSim(sim: Sim): string {
   const isNode = new Set(query(sim.world, [ResourceNode]));
   const isBuilding = new Set(query(sim.world, [Building]));
   const hasGather = new Set(query(sim.world, [GatherTask]));
+  const { Health, CombatState } = sim.stores;
+  const hasHealth = new Set(query(sim.world, [Health]));
+  const hasCombat = new Set(query(sim.world, [CombatState]));
 
   const snapshot: SimSnapshot = {
     version: 2,
@@ -580,6 +634,7 @@ export function serializeSim(sim: Sim): string {
           active: Building.active[eid]!,
           tileX: Building.tileX[eid]!,
           tileY: Building.tileY[eid]!,
+          hp100: Health.hp100[eid]!,
         };
         return e;
       }
@@ -594,6 +649,14 @@ export function serializeSim(sim: Sim): string {
           fieldKey: MoveState.fieldKey[eid]!,
           stallTicks: MoveState.stallTicks[eid]!,
         };
+        if (hasHealth.has(eid)) e.hp100 = Health.hp100[eid]!;
+        if (hasCombat.has(eid)) {
+          e.combat = {
+            targetEid: CombatState.targetEid[eid]!,
+            cooldown: CombatState.cooldown[eid]!,
+            aggressive: CombatState.aggressive[eid]!,
+          };
+        }
         if (hasGather.has(eid)) {
           e.gather = {
             phase: GatherTask.phase[eid]!,
@@ -633,6 +696,7 @@ export function deserializeSim(json: string): Sim {
       sim.stores.Building.progress[eid] = e.building.progress;
       sim.stores.Building.total[eid] = e.building.total;
       sim.stores.Building.active[eid] = e.building.active;
+      sim.stores.Health.hp100[eid] = e.building.hp100;
       remap.set(e.eid, eid);
     } else if (e.unit) {
       const eid = spawnUnitEntity(sim, e.playerId!, getUnitStatsByIndex(e.unit.typeIndex).id, e.x, e.y);
@@ -646,6 +710,7 @@ export function deserializeSim(json: string): Sim {
       MoveState.fieldKey[eid] = e.unit.fieldKey;
       MoveState.stallTicks[eid] = e.unit.stallTicks;
       UnitRef.typeIndex[eid] = e.unit.typeIndex;
+      if (e.hp100 !== undefined) sim.stores.Health.hp100[eid] = e.hp100;
       remap.set(e.eid, eid);
     } else {
       const eid = spawnDebugEntity(sim, e.playerId!, e.x, e.y, e.vx!, e.vy!);
@@ -656,6 +721,12 @@ export function deserializeSim(json: string): Sim {
   // second pass: restore gather tasks + remap entity references
   const r = (old: number): number => (old < 0 ? old : (remap.get(old) ?? -1));
   for (const e of snapshot.entities) {
+    if (e.combat) {
+      const eid = remap.get(e.eid)!;
+      sim.stores.CombatState.targetEid[eid] = r(e.combat.targetEid);
+      sim.stores.CombatState.cooldown[eid] = e.combat.cooldown;
+      sim.stores.CombatState.aggressive[eid] = e.combat.aggressive;
+    }
     if (!e.gather) continue;
     const eid = remap.get(e.eid)!;
     GatherTask.phase[eid] = e.gather.phase;
