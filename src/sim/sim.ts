@@ -8,13 +8,14 @@ import { Checksum } from "./checksum";
 import type { Command } from "./commands";
 import { fpFromInt } from "./fixed";
 import { Prng } from "./prng";
+import { DEFAULT_TERRAIN_CONFIG, generateTerrain, type Terrain, type TerrainConfig } from "./terrain";
 
 export const TICK_RATE = 15;
 export const MS_PER_TICK = 1000 / TICK_RATE; // render-side pacing only; sim counts ticks
 export const MAX_ENTITIES = 4096;
 
-/** Map edge in millitiles (200-tile map, Phase 0 placeholder). */
-const MAP_EDGE_FP = fpFromInt(200);
+/** Terrain gets its own PRNG stream so worldgen never perturbs gameplay rolls. */
+const TERRAIN_SEED_SALT = 0x9e3779b9;
 
 /** Phase 0 debug wander speed: up to ±133 millitiles/tick ≈ 2 tiles/s at 15 Hz. */
 const WANDER_SPREAD = 267;
@@ -39,15 +40,17 @@ export interface Sim {
   readonly stores: Stores;
   readonly prng: Prng;
   readonly seed: number;
+  readonly terrain: Terrain;
   tick: number;
 }
 
-export function createSim(seed: number): Sim {
+export function createSim(seed: number, terrainConfig: TerrainConfig = DEFAULT_TERRAIN_CONFIG): Sim {
   return {
     world: createWorld(),
     stores: createStores(),
     prng: new Prng(seed),
     seed: seed >>> 0,
+    terrain: generateTerrain(new Prng((seed ^ TERRAIN_SEED_SALT) >>> 0), terrainConfig),
     tick: 0,
   };
 }
@@ -80,6 +83,7 @@ function applyCommand(sim: Sim, cmd: Command): void {
 
 /** Phase 0 system: integer wander with edge bounce, exercising ECS + PRNG state. */
 function movementSystem(sim: Sim): void {
+  const MAP_EDGE_FP = fpFromInt(sim.terrain.size);
   const { Position, Velocity } = sim.stores;
   for (const eid of query(sim.world, [Position, Velocity])) {
     let x = Position.x[eid]! + Velocity.x[eid]!;
@@ -119,6 +123,7 @@ export function simChecksum(sim: Sim): number {
   const c = new Checksum();
   c.addU32(sim.tick);
   c.addU32(sim.prng.getState());
+  c.addU32(sim.terrain.checksum);
   const { Position, Velocity, Owner } = sim.stores;
   const eids = Array.from(query(sim.world, [Position, Velocity, Owner])).sort((a, b) => a - b);
   for (const eid of eids) {
@@ -144,6 +149,7 @@ interface SimSnapshot {
   seed: number;
   tick: number;
   prngState: number;
+  terrainConfig: TerrainConfig;
   entities: EntitySnapshot[];
 }
 
@@ -155,6 +161,7 @@ export function serializeSim(sim: Sim): string {
     seed: sim.seed,
     tick: sim.tick,
     prngState: sim.prng.getState(),
+    terrainConfig: sim.terrain.config,
     entities: eids.map((eid) => ({
       x: Position.x[eid]!,
       y: Position.y[eid]!,
@@ -168,7 +175,7 @@ export function serializeSim(sim: Sim): string {
 
 export function deserializeSim(json: string): Sim {
   const snapshot = JSON.parse(json) as SimSnapshot;
-  const sim = createSim(snapshot.seed);
+  const sim = createSim(snapshot.seed, snapshot.terrainConfig);
   sim.tick = snapshot.tick;
   sim.prng.setState(snapshot.prngState);
   for (const e of snapshot.entities) {
