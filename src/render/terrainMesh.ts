@@ -97,6 +97,10 @@ export function buildTerrainMesh(scene: Scene, terrain: Terrain): TerrainView {
       const slope = Math.max(Math.abs(hx - h), Math.abs(hz - h));
       let sand = Math.max(0, 1 - Math.max(0, (h - waterY) / 0.45));
       let rock = Math.min(1, Math.max(0, (h - 1.3) / 0.8) + Math.max(0, (slope - 0.35) / 0.3));
+      // low-frequency meadow variation: blend a touch of sand/rock into the grass
+      const n = Math.sin(x * 0.13 + h * 7.3) * Math.sin(z * 0.11 - h * 5.1);
+      if (n > 0.35) sand = Math.min(1, sand + (n - 0.35) * 0.35);
+      else if (n < -0.45) rock = Math.min(1, rock + (-n - 0.45) * 0.3);
       let grass = Math.max(0, 1 - sand - rock);
       const sum = sand + grass + rock || 1;
       sand /= sum;

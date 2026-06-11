@@ -102,3 +102,23 @@ creating new visual types, THEN capture. Also: the rAF loop races slow
 captures — a single background frame with multi-second dt disposes
 short-lived FX before the screenshot compositor runs. Use `?paused` (never
 start the loop) for ALL gate captures with transient FX.
+
+
+## 11. White-material syndrome + dead ParticleSystems (added visual-upgrade pass)
+
+- **Frozen-defines texture race:** a material's effect can compile BEFORE its
+  texture finishes decoding and never re-specialize — mesh renders flat white
+  while `material.isReady()`, `texture.isReady()`, and `loadingError:false`
+  all look healthy. Per-session random. Fix: re-mark materials dirty a few
+  times after boot (`material.markAsDirty(63)` at ~1.5s/4s/9s/16s) — cheap,
+  no-op when already specialized. Also serialize concurrent GLB imports
+  through a promise queue (parallel imports aggravate the race).
+- **ParticleSystem emits nothing** on this GL stack (`getActiveCount()===0`
+  forever, started + positioned correctly). All gameplay-critical FX must be
+  MESH-based (emissive spheres/tori/cylinders, optional ALPHA_ADD) — the
+  powerFx pattern. Keep particles only as progressive enhancement.
+- Quaternius animal gltf files color via per-part MATERIALS (no textures):
+  tint by CLONING each part's own material and multiplying albedo — replacing
+  materials wholesale turns the model white.
+- Billboarded textured quads can corrupt the frame on this stack; avoid for
+  required visuals.

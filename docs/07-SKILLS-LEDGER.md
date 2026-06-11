@@ -40,6 +40,8 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 | 2026-06-11 | Session 1 / Phase 10 | deterministic-sim-testing | (vendored) | authored in-repo | Final release gate: victory-state lanes hashed+serialized; browser-level save/load equality proof reused the harness discipline (compare sealed checksums, not vibes) | The 0x3CCE7C55 = 0x3CCE7C55 proof | tests/sim/victory.test.ts, src/sim/victory.ts, src/platform/storage.ts |
 | 2026-06-11 | Session 1 / Phase 10 | frontend-design | (vendored) | Anthropic skill | Main menu: hero-as-thesis (the four pantheons ARE the choice), restraint elsewhere; credits line carries the CC-BY obligation | Menu passed the bar on first capture | src/main.ts, hud.css |
 
+| 2026-06-11 | Session 1 / Visual upgrade pass | babylon-integration-pitfalls | (vendored) | authored in-repo | Three new hard-won lessons while raising visuals to the 8.5 bar: frozen-defines texture race (white-material syndrome) + markAsDirty fix, ParticleSystem renders nothing on this stack (mesh FX only), Quaternius per-part material tinting — skill UPDATED with §11 | Root-caused the white-wash across 6 bisection runs; damage states rebuilt mesh-based | src/render/units.ts, buildings.ts, game.ts, SKILL.md §11 |
+
 ## SESSION 1 FINAL ROLLUP (Phases 0–10 complete)
 
 **Skills used:** frontend-design (4 uses), deterministic-sim-testing (authored Phase 2; used at every gate after), babylon-integration-pitfalls (authored Phase 1; used + updated through Phase 9), docx + deep-research (pre-repo provenance).

@@ -110,3 +110,18 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 - [ ] Live URL = playable release — completes when this branch merges to `main` (deploy workflow is test-gated and ready)
 
 **Gate status: PASSED 2026-06-11** (two explicitly flagged human items above — nothing silently skipped).
+
+
+---
+
+## Visual upgrade pass (post-Phase-10, target ≥8.5/10 per axis)
+
+- [x] Distinct models for EVERY unit type: KayKit Barbarian/Mage/Rogue-Hooded/Skeletons + Quaternius Bull/Horse/Wolf/Stag/Donkey (all CC0) — cavalry ride horses, the Emberbull is a bull, all 16 myth units have unique silhouette × pantheon-tint × glow; lazy per-type pools (queued imports); team-solid cape/shield parts
+- [x] World dressing: scatter rocks/stumps (seeded, clear of gameplay objects), low-frequency meadow variation in the splat map
+- [x] Fog of war draped over the terrain mesh (floating-plane artifact gone)
+- [x] Building damage states (charter §4): smoke <50% HP, fire <25% — mesh-based FX (ParticleSystem is dead on some GL stacks; see skill §11)
+- [x] Real fletched arrow model for projectiles (KayKit, with glowing-bolt fallback)
+- [x] Robustness: import queue + timed material re-specialization fix the per-session white-material race
+- Captures: `v2-*` screenshots in docs/screenshots/
+
+Verified: 111/111 tests green, sim purity clean, AI match runs 6 game-minutes headless with zero errors.

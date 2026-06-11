@@ -23,7 +23,7 @@ const MELEE_REACH_PAD_FP = 250;
 export interface SimEvents {
   fired: Array<{ from: number; to: number; fromX: number; fromY: number; toX: number; toY: number; ranged: boolean }>;
   hits: Array<{ x: number; y: number }>;
-  deaths: Array<{ eid: number; x: number; y: number; playerId: number; unitClass: string | null }>;
+  deaths: Array<{ eid: number; x: number; y: number; playerId: number; unitClass: string | null; unitId: string | null }>;
   powerCasts: Array<{ power: string; playerId: number; x: number; y: number }>;
 }
 
@@ -188,12 +188,14 @@ export function combatSystem(sim: Sim): void {
 export function killEntity(sim: Sim, eid: number): void {
   const { Position, Owner, UnitRef, Building } = sim.stores;
   const isBuilding = hasComponent(sim.world, eid, Building);
+  const isUnit = hasComponent(sim.world, eid, UnitRef);
   sim.events.deaths.push({
     eid,
     x: Position.x[eid]!,
     y: Position.y[eid]!,
     playerId: Owner.playerId[eid]!,
-    unitClass: hasComponent(sim.world, eid, UnitRef) ? sim.unitStats(eid).unitClass : null,
+    unitClass: isUnit ? sim.unitStats(eid).unitClass : null,
+    unitId: isUnit ? sim.unitStats(eid).id : null,
   });
   if (isBuilding) {
     // unblock the footprint

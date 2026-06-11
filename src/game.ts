@@ -107,9 +107,22 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const world = createWorldScene(engine, canvas, sim.terrain);
   const unitRenderer = await createUnitRenderer(world.scene, world.shadows);
   const objects = await createWorldObjectsRenderer(world.scene, world.shadows);
+  // cosmetic scatter (rocks/stumps) on open land, clear of resources and bases
+  {
+    const { Position, ResourceNode, Building } = sim.stores;
+    const blocked: Array<{ x: number; z: number; r: number }> = [];
+    for (const eid of query(sim.world, [ResourceNode])) blocked.push({ x: Position.x[eid]! / FP_ONE, z: Position.y[eid]! / FP_ONE, r: 3 });
+    for (const eid of query(sim.world, [Building])) blocked.push({ x: Position.x[eid]! / FP_ONE, z: Position.y[eid]! / FP_ONE, r: 14 });
+    objects.scatter(
+      world.groundHeightAt,
+      (x, z) => tilePassable(sim.navGrid, Math.trunc(x), Math.trunc(z)) && !blocked.some((b) => (x - b.x) ** 2 + (z - b.z) ** 2 < b.r * b.r),
+      sim.terrain.size,
+      seed ^ 0x5ca77e2,
+    );
+  }
   const combatFx = await createCombatFx(world.scene);
   const powerFx = createPowerFx(world.scene);
-  const fog = createFogRenderer(world.scene, sim.terrain.size);
+  const fog = createFogRenderer(world.scene, sim.terrain.size, sim.terrain);
   const audio = createAudioSystem();
   const pathService = createPathService(sim);
   const aiChoice = config?.aiDifficulty ?? ((params.get("ai") ?? "medium") as "easy" | "medium" | "hard" | "off");
@@ -147,6 +160,8 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     vz: number;
     playerId: number;
     unitClass: string;
+    unitId: string;
+    pantheon: string;
     anim: UnitAnimState;
   };
   const unitView: UnitView[] = [];
@@ -160,6 +175,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     progress: number;
     total: number;
     active: boolean;
+    hpFrac: number;
   }[] = [];
   const nodeView: { eid: number; resType: number; x: number; z: number; depleted: boolean }[] = [];
 
@@ -170,6 +186,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       const phase = GatherTask.phase[eid] ?? 0;
       const anim: UnitAnimState =
         phase === 2 || phase === 4 || phase === 5 ? "work" : MoveState.active[eid] === 1 ? "walk" : "idle";
+      const stats = sim.unitStats(eid);
       unitView.push({
         eid,
         x: Position.x[eid]! / FP_ONE,
@@ -177,7 +194,9 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
         vx: Velocity.x[eid]! / FP_ONE,
         vz: Velocity.y[eid]! / FP_ONE,
         playerId: Owner.playerId[eid]!,
-        unitClass: sim.unitStats(eid).unitClass,
+        unitClass: stats.unitClass,
+        unitId: stats.id,
+        pantheon: sim.players[Owner.playerId[eid]!]?.pantheon ?? "storm_concord",
         anim,
       });
     }
@@ -194,6 +213,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
         progress: Building.progress[eid]!,
         total: Building.total[eid]!,
         active: Building.active[eid] === 1,
+        hpFrac: Math.max(0, Math.min(1, (sim.stores.Health.hp100[eid] ?? 0) / Math.max(1, stats.hp100))),
       });
     }
     nodeView.length = 0;
@@ -328,6 +348,22 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   if (params.has("paused")) renderFrame();
 
   window.addEventListener("resize", () => engine.resize());
+
+  // Texture-decode race guard: effects can compile before their textures
+  // finish decoding and never re-specialize (white-material syndrome on slow
+  // stacks). Re-mark materials dirty a few times after boot — cheap, and a
+  // no-op when everything was already specialized correctly.
+  const remat = () => {
+    for (const m of world.scene.materials) {
+      try {
+        m.markAsDirty(63 /* AllDirtyFlag */);
+      } catch {
+        /* some material types don't support it */
+      }
+    }
+  };
+  for (const t of [1500, 4000, 9000, 16000]) setTimeout(remat, t);
+  (window as unknown as Record<string, unknown>).__remat = remat;
 
   // victory / defeat overlay
   let endShown = false;
