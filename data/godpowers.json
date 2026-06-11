@@ -1,0 +1,153 @@
+{
+  "$comment": "SOURCE OF TRUTH for god powers. All powers are reusable: first cast free, then baseFavorCost, ramping +costRampPercent% per recast (KICKOFF §6). Durations/cooldowns in seconds, radii/ranges in tiles, damage in human-readable points (divine ignores armor).",
+  "version": 1,
+  "powers": {
+    "solar_lance": {
+      "name": "Solar Lance", "pantheon": "auryan_dawn", "grantedBy": "helior", "age": "classical",
+      "type": "target_point", "firstCastFree": true, "baseFavorCost": 20, "costRampPercent": 50, "cooldownSeconds": 90,
+      "params": { "damage": 120, "damageType": "divine", "radius": 2 },
+      "description": "A spear of concentrated sunlight strikes a point, dealing divine damage in a small radius."
+    },
+    "golden_flood": {
+      "name": "Golden Flood", "pantheon": "auryan_dawn", "grantedBy": "anshara", "age": "classical",
+      "type": "global", "firstCastFree": true, "baseFavorCost": 25, "costRampPercent": 50, "cooldownSeconds": 180,
+      "params": { "durationSeconds": 30, "farmRateMultiplier": 2.0 },
+      "description": "Ripened light floods the fields: farm and forage income doubled for the duration."
+    },
+    "pyre_storm": {
+      "name": "Pyre Storm", "pantheon": "auryan_dawn", "grantedBy": "mithrun", "age": "heroic",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 35, "costRampPercent": 50, "cooldownSeconds": 150,
+      "params": { "radius": 6, "durationSeconds": 8, "damagePerSecond": 25, "damageType": "divine" },
+      "description": "A storm of falling embers scours an area for several seconds."
+    },
+    "searing_mirage": {
+      "name": "Searing Mirage", "pantheon": "auryan_dawn", "grantedBy": "ravas", "age": "heroic",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 30, "costRampPercent": 50, "cooldownSeconds": 120,
+      "params": { "radius": 8, "durationSeconds": 12, "enemyAccuracyMultiplier": 0.5, "enemyLosMultiplier": 0.5 },
+      "description": "Heat-haze blinds enemies in the area: their range units miss half their shots and lose half their sight."
+    },
+    "risen_champion": {
+      "name": "Risen Champion", "pantheon": "auryan_dawn", "grantedBy": "aurion", "age": "mythic",
+      "type": "target_point", "firstCastFree": true, "baseFavorCost": 45, "costRampPercent": 50, "cooldownSeconds": 240,
+      "params": { "summons": "radiant_champion", "count": 1, "bonusHpMultiplier": 1.5, "durationSeconds": 60 },
+      "description": "Summons an empowered Radiant Champion from the pyre-light for a limited time."
+    },
+    "aegis_of_dawn": {
+      "name": "Aegis of Dawn", "pantheon": "auryan_dawn", "grantedBy": "kaelios", "age": "mythic",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 40, "costRampPercent": 50, "cooldownSeconds": 210,
+      "params": { "radius": 10, "durationSeconds": 20, "buildingDamageMultiplier": 0 },
+      "description": "A golden shield of first light renders buildings in the area invulnerable for the duration."
+    },
+
+    "lure_of_tides": {
+      "name": "Lure of Tides", "pantheon": "verdant_deep", "grantedBy": "nereon", "age": "classical",
+      "type": "target_point", "firstCastFree": true, "baseFavorCost": 20, "costRampPercent": 50, "cooldownSeconds": 120,
+      "params": { "durationSeconds": 60, "attractsHuntables": true, "spawnsFish": 4 },
+      "description": "Places a shimmering lure: nearby game drifts toward it and fish school in adjacent waters."
+    },
+    "cleansing_rain": {
+      "name": "Cleansing Rain", "pantheon": "verdant_deep", "grantedBy": "lirassa", "age": "classical",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 25, "costRampPercent": 50, "cooldownSeconds": 120,
+      "params": { "radius": 8, "durationSeconds": 10, "healPerSecond": 8, "curesDebuffs": true },
+      "description": "Soft rain heals friendly units in the area and washes away burns and petrification."
+    },
+    "floodsurge": {
+      "name": "Floodsurge", "pantheon": "verdant_deep", "grantedBy": "thalor", "age": "heroic",
+      "type": "target_line", "firstCastFree": true, "baseFavorCost": 35, "costRampPercent": 50, "cooldownSeconds": 150,
+      "params": { "length": 12, "width": 4, "damage": 80, "damageType": "crush", "knockback": true },
+      "description": "A wall of water surges down a line, dealing crush damage and scattering formations."
+    },
+    "mistveil": {
+      "name": "Mistveil", "pantheon": "verdant_deep", "grantedBy": "undvara", "age": "heroic",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 30, "costRampPercent": 50, "cooldownSeconds": 120,
+      "params": { "radius": 10, "durationSeconds": 20, "hidesFriendlyUnits": true },
+      "description": "Dense sea-mist conceals friendly units in the area from enemy sight."
+    },
+    "maelstrom": {
+      "name": "Maelstrom", "pantheon": "verdant_deep", "grantedBy": "okeanor", "age": "mythic",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 50, "costRampPercent": 50, "cooldownSeconds": 240,
+      "params": { "radius": 7, "durationSeconds": 10, "damagePerSecond": 30, "damageType": "divine", "pullsUnits": true },
+      "description": "A churning vortex drags enemies inward, grinding them with divine damage."
+    },
+    "kelpward": {
+      "name": "Kelpward", "pantheon": "verdant_deep", "grantedBy": "sirath", "age": "mythic",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 40, "costRampPercent": 50, "cooldownSeconds": 180,
+      "params": { "radius": 8, "durationSeconds": 15, "rootsEnemies": true, "rootedSpeedMultiplier": 0 },
+      "description": "Grasping kelp erupts from the earth, rooting enemy units in place."
+    },
+
+    "ironhide": {
+      "name": "Ironhide", "pantheon": "ashen_forge", "grantedBy": "hesmir", "age": "classical",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 20, "costRampPercent": 50, "cooldownSeconds": 120,
+      "params": { "radius": 8, "durationSeconds": 20, "armorBonus": 15 },
+      "description": "Skin turns to tempered iron: friendly units in the area gain +15% to all armor."
+    },
+    "flaming_weapons": {
+      "name": "Flaming Weapons", "pantheon": "ashen_forge", "grantedBy": "brandvar", "age": "classical",
+      "type": "global", "firstCastFree": true, "baseFavorCost": 25, "costRampPercent": 50, "cooldownSeconds": 180,
+      "params": { "durationSeconds": 20, "bonusDivineDamage": 3 },
+      "description": "Every friendly soldier's weapon ignites, adding divine damage to each strike."
+    },
+    "vajra_bolt": {
+      "name": "Vajra Bolt", "pantheon": "ashen_forge", "grantedBy": "tarkun", "age": "heroic",
+      "type": "target_unit", "firstCastFree": true, "baseFavorCost": 35, "costRampPercent": 50, "cooldownSeconds": 150,
+      "params": { "damage": 250, "damageType": "divine", "chainTargets": 3, "chainDamage": 60 },
+      "description": "A forged thunderbolt annihilates a single target and arcs to nearby enemies."
+    },
+    "forge_quake": {
+      "name": "Forge-Quake", "pantheon": "ashen_forge", "grantedBy": "velgar", "age": "heroic",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 40, "costRampPercent": 50, "cooldownSeconds": 210,
+      "params": { "radius": 8, "durationSeconds": 6, "damagePerSecond": 20, "damageType": "crush", "buildingDamageMultiplier": 3 },
+      "description": "The ground hammers like an anvil: heavy crush damage, devastating to buildings."
+    },
+    "call_of_the_last_war": {
+      "name": "Call of the Last War", "pantheon": "ashen_forge", "grantedBy": "morvath", "age": "mythic",
+      "type": "global", "firstCastFree": true, "baseFavorCost": 60, "costRampPercent": 50, "cooldownSeconds": 300,
+      "params": { "convertsVillagersToHeroes": true, "maxConverted": 15, "durationSeconds": 45 },
+      "description": "Villagers take up ancestral arms, fighting as Forgeborn heroes for the duration."
+    },
+    "molten_rampart": {
+      "name": "Molten Rampart", "pantheon": "ashen_forge", "grantedBy": "khaldun", "age": "mythic",
+      "type": "target_line", "firstCastFree": true, "baseFavorCost": 45, "costRampPercent": 50, "cooldownSeconds": 240,
+      "params": { "length": 14, "durationSeconds": 30, "wallHp": 1000, "contactDamagePerSecond": 10 },
+      "description": "A rampart of cooling magma rises along a line, burning anything that touches it."
+    },
+
+    "clarity": {
+      "name": "Clarity", "pantheon": "storm_concord", "grantedBy": "zephyrion", "age": "classical",
+      "type": "global", "firstCastFree": true, "baseFavorCost": 15, "costRampPercent": 50, "cooldownSeconds": 120,
+      "params": { "durationSeconds": 15, "revealsMap": true },
+      "description": "The clouds part: the entire map is revealed for the duration."
+    },
+    "crosswinds": {
+      "name": "Crosswinds", "pantheon": "storm_concord", "grantedBy": "anila", "age": "classical",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 20, "costRampPercent": 50, "cooldownSeconds": 120,
+      "params": { "radius": 10, "durationSeconds": 15, "speedMultiplier": 1.5 },
+      "description": "A following wind fills friendly banners: units in the area move half again as fast."
+    },
+    "tempest": {
+      "name": "Tempest", "pantheon": "storm_concord", "grantedBy": "maruth", "age": "heroic",
+      "type": "target_area", "firstCastFree": true, "baseFavorCost": 40, "costRampPercent": 50, "cooldownSeconds": 180,
+      "params": { "radius": 8, "durationSeconds": 10, "damagePerSecond": 18, "damageType": "pierce", "slowsEnemies": 0.5 },
+      "description": "Driving hail and gale-force wind batter an area, slowing and shredding enemies."
+    },
+    "mirrored_skies": {
+      "name": "Mirrored Skies", "pantheon": "storm_concord", "grantedBy": "vrithra", "age": "heroic",
+      "type": "target_point", "firstCastFree": true, "baseFavorCost": 30, "costRampPercent": 50, "cooldownSeconds": 150,
+      "params": { "durationSeconds": 30, "mirrorsSelectedArmy": true, "decoyDamageMultiplier": 0 },
+      "description": "Conjures an illusory mirror of a selected army — convincing, but harmless."
+    },
+    "tricksters_gift": {
+      "name": "Trickster's Gift", "pantheon": "storm_concord", "grantedBy": "kethran", "age": "mythic",
+      "type": "target_unit", "firstCastFree": true, "baseFavorCost": 50, "costRampPercent": 50, "cooldownSeconds": 240,
+      "params": { "convertsEnemyUnit": true, "excludes": ["hero", "titan"] },
+      "description": "A whispered bargain turns one enemy unit to your banner, permanently."
+    },
+    "sovereign_bolt": {
+      "name": "Sovereign Bolt", "pantheon": "storm_concord", "grantedBy": "ashvayu", "age": "mythic",
+      "type": "target_unit", "firstCastFree": true, "baseFavorCost": 55, "costRampPercent": 50, "cooldownSeconds": 270,
+      "params": { "damage": 400, "damageType": "divine", "stunsAreaSeconds": 3, "stunRadius": 4 },
+      "description": "The king-bolt of the high sky executes a single target and staggers everything nearby."
+    }
+  }
+}
