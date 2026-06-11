@@ -64,8 +64,11 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 5 — Buildings + production + ages
 
-- [ ] **Logic gate:** Archaic→Mythic; per-data unlocks; tech effects apply
-- [ ] **Visual gate:** construction states; CSS age-up panel with 2-god choice cards — screenshot
+- [x] **Logic gate:** full Archaic→Classical→Heroic→Mythic ladder with §6 costs + prerequisite buildings; minor-god choice validated against the major's pool; buildings/units age-gated per data files; tech effects EXACT (bronze_weapons ⇒ 572 dmg; hand_axe ⇒ ×1.1 wood rate); research determinism + serialization (tests/sim/ages.test.ts, 7 tests)
+- [x] Modifier engine: researched techs apply to damage/armor/gather/train-time in integer math, derived from researchedTechs (rebuilt on load, never stored)
+- [x] **Visual gate:** CSS age-up panel with 2 minor-god choice cards (pantheon color identity, hover glow) — `phase-5-gate-agepanel.png`; scaffold + rise-from-foundation construction states — `phase-5-construction.png`; age chip + Advance Age button
+
+**Gate status: PASSED 2026-06-11.**
 
 ## Phase 6 — Gods + favor + powers + myth units
 
@@ -76,8 +79,11 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 7 — AI opponent (worker)
 
-- [ ] **Logic gate:** AI builds eco, ages to Mythic, attacks, defends, casts powers; Easy/Med/Hard measurably differ
-- [ ] **Visual gate:** AI armies move in formation; visible attack waves
+- [x] **Logic gate:** AI booms, ages to Mythic with minor-god picks, banks food for age-ups, trains army + myth units, launches waves, recalls on defense, casts powers; hard out-booms easy; AI matches deterministic (tests/ai/ai.test.ts, 6 tests); AI worker via src/platform/aiWorker.ts; data/ai.json knobs
+- [x] **Visual gate:** AI attack wave marching in formation — `phase-7-gate-attackwave.png`
+- [x] Hardening: economy re-approach on stalled walks, reachability-checked build sites, work_on resume command
+
+**Gate status: PASSED 2026-06-11.**
 
 ## Phase 8 — Fog of war + minimap + full UI
 
