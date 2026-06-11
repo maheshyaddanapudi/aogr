@@ -29,7 +29,7 @@ export function createHud(root: HTMLElement): Hud {
         <span class="res res-favor" title="Favor"><i>☀</i><b data-r="favor">0</b></span>
         <span class="res res-pop" title="Population"><i>⚑</i><b data-r="pop">0/0</b></span>
       </div>
-      <div class="hud-phase">Phase 3 — Economy</div>
+      <div class="hud-phase">Phase 4 — Combat &amp; Counters</div>
     </div>
     <div class="plaque">
       <h2>Determinism Seal</h2>

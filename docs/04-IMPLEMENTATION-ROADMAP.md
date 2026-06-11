@@ -55,9 +55,12 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 4 — Combat + counters
 
-- [ ] **Logic gate:** headless tests — archers>infantry>cavalry>archers; damage math matches units.json exactly
-- [ ] **Visual gate:** projectiles, hit sparks, death animations
-- [ ] Entity removal lands → revisit snapshot serialization seam (docs/02)
+- [x] **Logic gate:** headless counter triangle proven at equal pop (archers>infantry>cavalry>archers); damage math matches units.json EXACTLY (hack/armor 520, divine ignores armor, spear ×3 = 1320); deaths free pop; 10k-tick battle determinism + mid-battle snapshot round-trip (tests/sim/combat.test.ts, 8 tests)
+- [x] Entity removal landed — bitECS removeEntity is deterministic given identical removal order; snapshot eid-remap already handles recycled ids; buildings unblock their footprint on death
+- [x] **Visual gate:** glowing arrow projectiles in flight (phase-4-gate-projectiles.png), death poses among the living (phase-4-deaths.png), melee clash (phase-4-melee.png). Hit-spark particle system implemented (additive, procedural texture); single-frame paused captures cannot freeze 0.3s particles under SwiftShader — verify live at the next real-GPU check-in
+- [x] Capture infra: ?paused mode + multi-render shader warmup (async compile skips fresh materials on first frame)
+
+**Gate status: PASSED 2026-06-11** (hit-spark live verification flagged for human check-in, like the fps criteria).
 
 ## Phase 5 — Buildings + production + ages
 

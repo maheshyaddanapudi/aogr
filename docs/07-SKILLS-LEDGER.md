@@ -20,6 +20,9 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 | 2026-06-11 | Session 1 / Phase 3 | deterministic-sim-testing | `.claude/skills/deterministic-sim-testing/` | authored in-repo (Phase 2) | Applied to the economy suite: micro-accumulator pattern for sub-milli rates, derived-data rule (flow fields cleared on nav-grid change, never serialized), eid-remap on snapshot restore | Economy determinism + serialize round-trip passed first try; harness shape reused verbatim | `tests/sim/economy.test.ts`, `src/sim/economy.ts` |
 | 2026-06-11 | Session 1 / Phase 3 | babylon-integration-pitfalls | `.claude/skills/babylon-integration-pitfalls/` | authored in-repo (Phase 1) | Consulted for gltf+bin+texture vendoring (relative-URI texture must ship beside the gltf; rebuild before preview-testing public/ additions) and `__step(n)` extension of the headless capture recipe (§7) | Caught the stale-dist texture 404 quickly; capture recipe extended | `src/render/buildings.ts`, `public/models/**`, SKILL.md |
 
+| 2026-06-11 | Session 1 / Phase 4 | deterministic-sim-testing | (vendored) | authored in-repo | Battle determinism suite incl. entity-removal ordering and mid-battle serialize | Suite passed once removal order + snapshot lanes were aligned with the skill's rules | tests/sim/combat.test.ts |
+| 2026-06-11 | Session 1 / Phase 4 | babylon-integration-pitfalls | (vendored) | authored in-repo | FX debugging marathon: end-on projectiles mistaken for missing, rAF race disposing FX before slow screenshots, async shader compile skipping fresh materials — skill UPDATED with §10 | Root-caused three stacked capture artifacts; recipe now reliable | src/render/combatFx.ts, SKILL.md §10 |
+
 ## Phase 0 gate rollup
 
 **Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).

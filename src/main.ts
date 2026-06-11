@@ -12,11 +12,13 @@ import {
   FP_ONE,
 } from "./sim";
 import { findResourceNodes, getPlayer } from "./sim/economy";
+import { spawnUnitEntity } from "./sim";
 import { getBuildingStatsByIndex } from "./sim/buildingdata";
 import { query } from "bitecs";
 import { createEngine, createWorldScene } from "./render/scene";
 import { createUnitRenderer, type UnitAnimState } from "./render/units";
 import { createWorldObjectsRenderer } from "./render/buildings";
+import { createCombatFx } from "./render/combatFx";
 import { setupSelection } from "./render/selection";
 import { createPathService } from "./platform/pathService";
 import { startLoop } from "./platform/loop";
@@ -63,12 +65,20 @@ async function boot(): Promise<void> {
     queue.enqueue(300, { type: "build", playerId: 0, eids: [vills[3]!], building: "house", x: -1, y: -1 });
     queue.enqueue(900, { type: "build", playerId: 0, eids: [vills[2]!], building: "temple", x: -1, y: -1 });
     queue.enqueue(2200, { type: "pray", playerId: 0, eids: [vills[2]!, vills[3]!] });
+    // Phase 4 combat demo: two battle lines clash on the central plain
+    const mid = Math.trunc(sim.terrain.size / 2);
+    for (let i = 0; i < 6; i++) {
+      queue.enqueue(60, { type: "spawn_unit", playerId: 0, unit: "infantry_base", x: (mid - 6 + i * 2) * FP_ONE, y: (mid - 4) * FP_ONE });
+      queue.enqueue(60, { type: "spawn_unit", playerId: 1, unit: i % 2 ? "archer_base" : "infantry_base", x: (mid - 6 + i * 2) * FP_ONE, y: (mid + 4) * FP_ONE });
+    }
+    // military spawns aggressive: the lines auto-acquire each other (LOS 12 > 8-tile gap)
   }
 
   const engine = await createEngine(canvas);
   const world = createWorldScene(engine, canvas, sim.terrain);
   const unitRenderer = await createUnitRenderer(world.scene, world.shadows);
   const objects = await createWorldObjectsRenderer(world.scene, world.shadows);
+  const combatFx = await createCombatFx(world.scene);
   const pathService = createPathService(sim);
   const hud = createHud(hudRoot);
   const backend = engine.constructor.name === "WebGPUEngine" ? "WebGPU" : "WebGL2";
@@ -184,23 +194,32 @@ async function boot(): Promise<void> {
     });
   };
 
-  startLoop({
+  // ?paused: gate-capture mode — sim/render driven only via __step/__forceFrame
+  if (!params.has("paused")) startLoop({
     onTick: () => {
       stepSim(sim, queue.drain(sim.tick));
+      combatFx.collect(sim.events, world.groundHeightAt);
       if (sim.tick % 15 === 0) checksum = simChecksum(sim);
     },
-    onFrame: renderFrame,
+    onFrame: (alpha, dtMs) => {
+      combatFx.update(dtMs);
+      renderFrame();
+    },
   });
+  if (params.has("paused")) renderFrame();
 
   window.addEventListener("resize", () => engine.resize());
   // Debug handles for headless gate probes (harmless in production).
   (window as unknown as Record<string, unknown>).__scene = world.scene;
   (window as unknown as Record<string, unknown>).__sim = sim;
   (window as unknown as Record<string, unknown>).__selection = selection;
-  (window as unknown as Record<string, unknown>).__forceFrame = renderFrame;
+  (window as unknown as Record<string, unknown>).__forceFrame = () => { combatFx.update(120); renderFrame(); };
+  (window as unknown as Record<string, unknown>).__spawn = (playerId: number, unit: string, x: number, y: number) =>
+    spawnUnitEntity(sim, playerId, unit, x * FP_ONE, y * FP_ONE);
   (window as unknown as Record<string, unknown>).__step = (n: number) => {
     for (let i = 0; i < n; i++) {
       stepSim(sim, queue.drain(sim.tick));
+      if (i >= n - 3) combatFx.collect(sim.events, world.groundHeightAt); // only recent FX
     }
     checksum = simChecksum(sim);
   };

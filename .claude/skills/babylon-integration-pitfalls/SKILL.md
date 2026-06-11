@@ -91,3 +91,14 @@ Capture the GLTF material's `albedoTexture` BEFORE overriding materials.
 - For sim-time-dependent gate captures, expose `window.__step(n)` that runs
   `stepSim` synchronously n times — never wait wall-clock for rAF-throttled
   sim progress.
+
+## 10. Async shader compile vs single-frame captures (added Phase 4)
+
+Materials/effects compile ASYNC (KHR_parallel_shader_compile): the first
+render after creating a mesh with a never-rendered material SKIPS it from
+active meshes. In paused capture mode (one render per `__forceFrame`), new
+visuals are invisible. Recipe: render 3–5 times with ~250ms sleeps after
+creating new visual types, THEN capture. Also: the rAF loop races slow
+captures — a single background frame with multi-second dt disposes
+short-lived FX before the screenshot compositor runs. Use `?paused` (never
+start the loop) for ALL gate captures with transient FX.
