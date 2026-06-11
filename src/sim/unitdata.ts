@@ -37,6 +37,7 @@ export interface UnitStats {
   name: string;
   unitClass: string;
   pantheon: string;
+  age: string;
   hp100: number;
   speedFpPerTick: number;
   losFp: number;
@@ -57,6 +58,8 @@ export interface UnitStats {
   flying: boolean;
   /** micro-resource per tick by node kind index (0 food/forage, 1 wood, 2 gold); null = can't gather */
   gatherMicroPerTick: [number, number, number] | null;
+  /** micro-resource per SECOND (modifiers apply here, then ÷ TICK_RATE) */
+  gatherMicroPerSec: [number, number, number] | null;
 }
 
 const RADIUS_BY_CLASS: Record<string, number> = {
@@ -88,6 +91,7 @@ function load(): Map<string, UnitStats> {
       name: raw.name,
       unitClass: raw.class,
       pantheon: raw.pantheon,
+      age: raw.age,
       hp100: Math.round(raw.hp * 100),
       speedFpPerTick: Math.round((raw.speed * 1000) / TICK_RATE),
       losFp: Math.round(raw.los * 1000),
@@ -114,6 +118,13 @@ function load(): Map<string, UnitStats> {
             Math.trunc(((raw.gatherRates.forageFoodPerSec ?? 0) * 1_000_000) / TICK_RATE),
             Math.trunc(((raw.gatherRates.woodPerSec ?? 0) * 1_000_000) / TICK_RATE),
             Math.trunc(((raw.gatherRates.goldPerSec ?? 0) * 1_000_000) / TICK_RATE),
+          ]
+        : null,
+      gatherMicroPerSec: raw.gatherRates
+        ? [
+            Math.round((raw.gatherRates.forageFoodPerSec ?? 0) * 1_000_000),
+            Math.round((raw.gatherRates.woodPerSec ?? 0) * 1_000_000),
+            Math.round((raw.gatherRates.goldPerSec ?? 0) * 1_000_000),
           ]
         : null,
     });

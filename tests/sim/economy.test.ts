@@ -88,7 +88,24 @@ describe("PHASE 3 GATE — economy", () => {
   it("market trade converts wood to gold with the configured spread; favor is never tradeable", () => {
     const sim = createSim(42, undefined, SKIRMISH);
     const vills = ownVillagers(sim, 0);
-    stepSim(sim, [{ type: "build", playerId: 0, eids: [vills[0]!, vills[1]!], building: "market", x: -1, y: -1 }]);
+    // The market is a Heroic-age building (data/buildings.json), so climb the ladder first.
+    const p = getPlayer(sim, 0);
+    p.foodMilli = 5_000_000;
+    p.woodMilli = 5_000_000;
+    p.goldMilli = 5_000_000;
+    stepSim(sim, [{ type: "build", playerId: 0, eids: vills, building: "temple", x: -1, y: -1 }]);
+    run(sim, 15 * 90);
+    stepSim(sim, [{ type: "research", playerId: 0, tech: "age_classical", minorGod: "zephyrion" }]);
+    run(sim, 15 * 70);
+    stepSim(sim, [{ type: "build", playerId: 0, eids: vills, building: "armory", x: -1, y: -1 }]);
+    run(sim, 15 * 90);
+    stepSim(sim, [{ type: "research", playerId: 0, tech: "age_heroic", minorGod: "maruth" }]);
+    run(sim, 15 * 85);
+    expect(getPlayer(sim, 0).age).toBe(2);
+    p.foodMilli = 200_000;
+    p.woodMilli = 300_000;
+    p.goldMilli = 100_000;
+    stepSim(sim, [{ type: "build", playerId: 0, eids: vills, building: "market", x: -1, y: -1 }]);
     run(sim, 15 * 90);
     // NOTE: the market itself costs 200 wood (all of the starting stock), so the
     // trade exercise sells food — the mechanic under test is identical.

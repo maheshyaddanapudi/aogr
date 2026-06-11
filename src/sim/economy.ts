@@ -12,6 +12,8 @@ import { getBuildingStats, getBuildingStatsByIndex, type BuildingStats } from ".
 import { getUnitStats } from "./unitdata";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
 import { nearestPassableTile, setMoveTarget, spawnUnitEntity, type Sim } from "./sim";
+// eslint-disable-next-line import/no-cycle -- runtime-safe
+import { AGE_INDEX, effectiveGatherMicroPerTick, effectiveTrainTicks, type ResearchEntry } from "./research";
 
 export const POP_CAP_ABSOLUTE = 300;
 export const CARRY_CAPACITY_MILLI = 10_000;
@@ -32,6 +34,11 @@ export interface PlayerState {
   popUsed: number;
   townCenterEid: number;
   pantheon: string;
+  age: number;
+  majorGod: string;
+  minorGods: string[];
+  researchedTechs: string[];
+  researchQueue: ResearchEntry[];
 }
 
 export interface TrainEntry {
@@ -51,6 +58,11 @@ export function createPlayers(count: number): PlayerState[] {
     popUsed: 0,
     townCenterEid: -1,
     pantheon: "storm_concord",
+    age: 0,
+    majorGod: "indravan",
+    minorGods: [],
+    researchedTechs: [],
+    researchQueue: [],
   }));
 }
 
@@ -261,6 +273,7 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
     case "build": {
       const p = getPlayer(sim, cmd.playerId);
       const stats = getBuildingStats(cmd.building);
+      if ((AGE_INDEX[stats.age] ?? 0) > p.age) return true;
       if (!canAfford(p, stats.cost)) return true;
       if (stats.buildLimit > 0) {
         const existing = buildingsOf(sim, cmd.playerId, (s) => s.id === stats.id, false).length;
@@ -295,10 +308,17 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
       if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
       if (Building.active[beid] !== 1) return true;
       const ustats = getUnitStats(cmd.unit);
+      if ((AGE_INDEX[ustats.age] ?? 0) > p.age) return true;
+      const bstats = getBuildingStatsByIndex(Building.typeIndex[beid]!);
+      const trainable =
+        bstats.trains.includes(ustats.id) ||
+        (bstats.trains.includes("heroes") && ustats.unitClass === "hero") ||
+        (bstats.trains.includes("myth_units") && ustats.unitClass === "myth");
+      if (!trainable) return true;
       if (!canAfford(p, ustats.cost) || p.popUsed + ustats.pop > Math.min(p.popCap, POP_CAP_ABSOLUTE)) return true;
       payCost(p, ustats.cost);
       const q = sim.trainQueues.get(beid) ?? [];
-      q.push({ typeIndex: ustats.typeIndex, unitId: ustats.id, ticksLeft: ustats.trainTicks });
+      q.push({ typeIndex: ustats.typeIndex, unitId: ustats.id, ticksLeft: effectiveTrainTicks(sim, cmd.playerId, ustats.unitClass, ustats.id, ustats.trainTicks) });
       sim.trainQueues.set(beid, q);
       return true;
     }
@@ -378,8 +398,7 @@ export function economySystem(sim: Sim): void {
         else retargetNode(sim, eid);
         continue;
       }
-      const stats = sim.unitStats(eid);
-      const rate = stats.gatherMicroPerTick?.[GatherTask.carriedType[eid]!] ?? 0;
+      const rate = effectiveGatherMicroPerTick(sim, eid, GatherTask.carriedType[eid]!);
       if (rate === 0) {
         GatherTask.phase[eid] = 0;
         continue;

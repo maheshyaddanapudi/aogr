@@ -28,6 +28,8 @@ import {
 } from "./economy";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
 import { combatSystem, emptyEvents, handleCombatCommand, hashCombat, targetAliveAndValid, type SimEvents } from "./combat";
+// eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
+import { effectiveGatherMicroPerTick, handleResearchCommand, hashResearch, researchSystem } from "./research";
 
 export const TICK_RATE = 15;
 export const MS_PER_TICK = 1000 / TICK_RATE; // render-side pacing only; sim counts ticks
@@ -141,6 +143,7 @@ export interface Sim {
   tick: number;
   unitRadiusFp(eid: number): number;
   unitStats(eid: number): UnitStats;
+  effectiveGatherMicroPerTick(eid: number, resType: number): number;
 }
 
 const DEFAULT_MATCH: MatchOptions = { players: 2, skirmish: false };
@@ -170,6 +173,9 @@ export function createSim(
     },
     unitStats(eid: number): UnitStats {
       return getUnitStatsByIndex(stores.UnitRef.typeIndex[eid]!);
+    },
+    effectiveGatherMicroPerTick(eid: number, resType: number): number {
+      return effectiveGatherMicroPerTick(sim, eid, resType);
     },
   };
   if (matchOptions.skirmish) {
@@ -267,6 +273,7 @@ export function spawnUnitEntity(sim: Sim, playerId: number, unitId: string, x: n
 }
 
 function applyCommand(sim: Sim, cmd: Command): void {
+  if (handleResearchCommand(sim, cmd)) return;
   if (handleCombatCommand(sim, cmd)) return;
   if (handleEconomyCommand(sim, cmd)) return;
   switch (cmd.type) {
@@ -516,6 +523,7 @@ export function stepSim(sim: Sim, commands: readonly Command[]): void {
   sim.events = emptyEvents();
   for (const cmd of commands) applyCommand(sim, cmd);
   combatSystem(sim);
+  researchSystem(sim);
   economySystem(sim);
   unitMovementSystem(sim);
   wanderSystem(sim);
@@ -551,6 +559,7 @@ export function simChecksum(sim: Sim): number {
   }
   hashEconomy(sim, c);
   hashCombat(sim, c);
+  hashResearch(sim, c);
   return c.digest();
 }
 

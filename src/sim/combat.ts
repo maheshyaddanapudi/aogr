@@ -12,6 +12,8 @@ import { getBuildingStatsByIndex } from "./buildingdata";
 import type { UnitStats } from "./unitdata";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
 import { type Sim } from "./sim";
+// eslint-disable-next-line import/no-cycle -- runtime-safe
+import { applyModifiers, effectiveArmor } from "./research";
 
 const MELEE_REACH_PAD_FP = 250;
 /** chase re-acquisition scan interval is every tick but capped by LOS */
@@ -63,12 +65,25 @@ function multiplierFor(stats: UnitStats, sim: Sim, target: number): number {
 export function computeDamage100(sim: Sim, attacker: number, target: number): number {
   const stats = sim.unitStats(attacker);
   const atk = stats.attack!;
-  const armor = armorOf(sim, target);
+  const { Building, Owner } = sim.stores;
+  const isBuildingTarget = hasComponent(sim.world, target, Building);
+  const baseArmor = armorOf(sim, target);
+  // researched modifiers: attacker damage, defender armor (units only)
+  const attackerPid = Owner.playerId[attacker]!;
+  const damage100 = applyModifiers(sim, attackerPid, [stats.unitClass, stats.id], "attack.damage", atk.damage100);
+  const armor = isBuildingTarget
+    ? baseArmor
+    : {
+        hack: effectiveArmor(sim, target, "hack", baseArmor.hack),
+        pierce: effectiveArmor(sim, target, "pierce", baseArmor.pierce),
+        crush: effectiveArmor(sim, target, "crush", baseArmor.crush),
+      };
   const mult = multiplierFor(stats, sim, target);
   const mainRed = atk.type === "divine" ? 0 : armor[atk.type];
-  let dmg = Math.trunc((Math.trunc((atk.damage100 * mult) / 1000) * (100 - mainRed)) / 100);
+  let dmg = Math.trunc((Math.trunc((damage100 * mult) / 1000) * (100 - mainRed)) / 100);
   if (atk.crushDamage100 > 0) {
-    dmg += Math.trunc((Math.trunc((atk.crushDamage100 * mult) / 1000) * (100 - armor.crush)) / 100);
+    const crush100 = applyModifiers(sim, attackerPid, [stats.unitClass, stats.id], "attack.crushDamage", atk.crushDamage100);
+    dmg += Math.trunc((Math.trunc((crush100 * mult) / 1000) * (100 - armor.crush)) / 100);
   }
   return Math.max(1, dmg);
 }

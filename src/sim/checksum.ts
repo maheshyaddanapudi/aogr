@@ -24,6 +24,12 @@ export class Checksum {
     this.h = h;
   }
 
+  /** Hash a short string (length + char codes). */
+  addString(s: string): void {
+    this.addU32(s.length);
+    for (let i = 0; i < s.length; i++) this.addU32(s.charCodeAt(i));
+  }
+
   digest(): number {
     return this.h >>> 0;
   }
