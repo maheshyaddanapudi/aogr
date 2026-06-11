@@ -147,6 +147,18 @@ export function handlePowerCommand(sim: Sim, cmd: Command): boolean {
       pool: Math.round(prm.healPerSecond * prm.durationSeconds * 100),
     });
   }
+  // timed aura components (reveal, buffs) — persist with no per-tick pool
+  if (typeof prm.durationSeconds === "number" && prm.revealsMap === true) {
+    sim.activeEffects.push({
+      powerId: cmd.power,
+      playerId: cmd.playerId,
+      x: cmd.x,
+      y: cmd.y,
+      endTick: sim.tick + Math.round(prm.durationSeconds * TICK_RATE),
+      data: 0,
+      pool: 0,
+    });
+  }
   // summon component
   if (typeof prm.summons === "string") {
     const eid = spawnUnitEntity(sim, cmd.playerId, prm.summons, cmd.x, cmd.y);
@@ -179,7 +191,8 @@ export function powerSystem(sim: Sim): void {
       healArea(sim, fx.x, fx.y, radiusFp, amount, fx.playerId);
       fx.pool -= amount;
     }
-    if (sim.tick >= fx.endTick || (fx.pool <= 0 && typeof power.params.summons !== "string")) {
+    const isAura = fx.data === 0 && fx.pool === 0;
+    if (sim.tick >= fx.endTick || (!isAura && fx.pool <= 0 && typeof power.params.summons !== "string")) {
       // summons with a duration expire
       if (typeof power.params.summons === "string" && fx.data > 0) {
         const { Health } = sim.stores;

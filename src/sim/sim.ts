@@ -32,6 +32,8 @@ import { combatSystem, emptyEvents, handleCombatCommand, hashCombat, targetAlive
 import { effectiveGatherMicroPerTick, handleResearchCommand, hashResearch, researchSystem } from "./research";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
 import { getPower, handlePowerCommand, hashPowers, powerSystem, type ActiveEffect } from "./powers";
+// eslint-disable-next-line import/no-cycle -- runtime-safe
+import { visibilitySystem } from "./visibility";
 
 export { TICK_RATE } from "./fixed";
 import { TICK_RATE } from "./fixed";
@@ -72,6 +74,8 @@ interface Stores {
     active: Int32Array;
     tileX: Int32Array;
     tileY: Int32Array;
+    rallyX: Int32Array;
+    rallyY: Int32Array;
   };
   GatherTask: {
     phase: Int32Array;
@@ -106,6 +110,8 @@ function createStores(): Stores {
       active: new Int32Array(MAX_ENTITIES),
       tileX: new Int32Array(MAX_ENTITIES),
       tileY: new Int32Array(MAX_ENTITIES),
+      rallyX: new Int32Array(MAX_ENTITIES),
+      rallyY: new Int32Array(MAX_ENTITIES),
     },
     GatherTask: {
       phase: new Int32Array(MAX_ENTITIES),
@@ -144,6 +150,8 @@ export interface Sim {
   /** transient per-tick outputs for the render layer; never hashed/serialized */
   events: SimEvents;
   readonly activeEffects: ActiveEffect[];
+  /** per-player fog grids — DERIVED, never hashed/serialized */
+  readonly visibility: Uint8Array[];
   tick: number;
   unitRadiusFp(eid: number): number;
   unitStats(eid: number): UnitStats;
@@ -181,6 +189,7 @@ export function createSim(
     matchOptions,
     events: emptyEvents(),
     activeEffects: [],
+    visibility: [],
     tick: 0,
     unitRadiusFp(eid: number): number {
       return getUnitStatsByIndex(stores.UnitRef.typeIndex[eid]!).radiusFp;
@@ -546,6 +555,7 @@ export function stepSim(sim: Sim, commands: readonly Command[]): void {
   economySystem(sim);
   unitMovementSystem(sim);
   wanderSystem(sim);
+  visibilitySystem(sim);
   sim.tick++;
 }
 
@@ -607,7 +617,7 @@ interface EntitySnapshot {
     carryMicro: number;
   };
   node?: { resType: number; amountMilli: number };
-  building?: { typeIndex: number; progress: number; total: number; active: number; tileX: number; tileY: number; hp100: number };
+  building?: { typeIndex: number; progress: number; total: number; active: number; tileX: number; tileY: number; hp100: number; rallyX?: number; rallyY?: number };
   hp100?: number;
   combat?: { targetEid: number; cooldown: number; aggressive: number };
 }
@@ -666,6 +676,8 @@ export function serializeSim(sim: Sim): string {
           tileX: Building.tileX[eid]!,
           tileY: Building.tileY[eid]!,
           hp100: Health.hp100[eid]!,
+          rallyX: Building.rallyX[eid]!,
+          rallyY: Building.rallyY[eid]!,
         };
         return e;
       }
@@ -728,6 +740,8 @@ export function deserializeSim(json: string): Sim {
       sim.stores.Building.total[eid] = e.building.total;
       sim.stores.Building.active[eid] = e.building.active;
       sim.stores.Health.hp100[eid] = e.building.hp100;
+      sim.stores.Building.rallyX[eid] = e.building.rallyX ?? 0;
+      sim.stores.Building.rallyY[eid] = e.building.rallyY ?? 0;
       remap.set(e.eid, eid);
     } else if (e.unit) {
       const eid = spawnUnitEntity(sim, e.playerId!, getUnitStatsByIndex(e.unit.typeIndex).id, e.x, e.y);

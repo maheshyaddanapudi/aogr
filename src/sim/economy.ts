@@ -366,6 +366,13 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
       stockAdd(p, buy, Math.trunc((amount * (100 - spread)) / 100));
       return true;
     }
+    case "rally": {
+      const beid = cmd.buildingEid;
+      if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
+      Building.rallyX[beid] = cmd.x | 0;
+      Building.rallyY[beid] = cmd.y | 0;
+      return true;
+    }
     case "work_on": {
       const beid = cmd.buildingEid;
       if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
@@ -532,7 +539,10 @@ export function economySystem(sim: Sim): void {
       const by = Math.trunc(Position.y[beid]! / 1000);
       const size = getBuildingStatsByIndex(Building.typeIndex[beid]!).size;
       const t = nearestPassableTile(sim, bx, by + Math.trunc(size / 2) + 1);
-      spawnUnitEntity(sim, Owner.playerId[beid]!, head.unitId, t.x * 1000 + 500, t.y * 1000 + 500);
+      const eid = spawnUnitEntity(sim, Owner.playerId[beid]!, head.unitId, t.x * 1000 + 500, t.y * 1000 + 500);
+      if (Building.rallyX[beid] !== 0 || Building.rallyY[beid] !== 0) {
+        setMoveTarget(sim, eid, Building.rallyX[beid]!, Building.rallyY[beid]!);
+      }
     }
   }
 
@@ -622,6 +632,8 @@ export function hashEconomy(sim: Sim, c: Checksum): void {
     c.addI32(Building.active[eid]!);
     c.addI32(Building.tileX[eid]!);
     c.addI32(Building.tileY[eid]!);
+    c.addI32(Building.rallyX[eid]!);
+    c.addI32(Building.rallyY[eid]!);
   }
   for (const eid of Array.from(query(sim.world, [GatherTask])).sort((a, b) => a - b)) {
     c.addI32(GatherTask.phase[eid]!);
