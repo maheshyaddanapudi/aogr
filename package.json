@@ -1,0 +1,34 @@
+{
+  "name": "aogr",
+  "version": "0.1.0",
+  "description": "Pantheons: Age of the Reforged Gods — browser-playable single-player RTS",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:determinism-rules": "node scripts/check-sim-purity.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:41207/git/maheshyaddanapudi/aogr"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/howler": "^2.2.13",
+    "@types/node": "^25.9.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^9.11.0",
+    "bitecs": "^0.4.0",
+    "howler": "^2.2.4"
+  },
+  "private": true,
+  "type": "module"
+}
