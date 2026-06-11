@@ -1,0 +1,164 @@
+{
+  "$comment": "SOURCE OF TRUTH for pantheons: majors, minor-god pools per age-up, favor mechanic parameters (calibrated to KICKOFF §7), and pantheon flavor names for shared unit archetypes. Favor rates in favor/minute.",
+  "version": 1,
+  "pantheons": {
+    "auryan_dawn": {
+      "name": "The Auryan Dawn", "theme": "solar / order", "colorIdentity": "#e8a83c",
+      "favorMechanic": {
+        "type": "devotion_pyres",
+        "description": "Up to 5 escalating Sun-Altars radiate favor passively; a Radiant hero can kindle one for a temporary boost.",
+        "maxAltars": 5,
+        "ratesPerAltarPerMinute": [2.0, 3.6, 5.2, 7.4, 10.4],
+        "ratePerMinuteAllBuilt": 28.6,
+        "kindleBoost": { "multiplier": 2.0, "durationSeconds": 30, "requiresHero": "radiant_champion" }
+      },
+      "hero": "radiant_champion",
+      "favorBuilding": "sun_altar",
+      "unitNames": { "infantry_base": "Dawnblade", "spearman": "Sun Spear", "archer_base": "Ray Archer", "skirmisher": "Ember Slinger", "cavalry_base": "Gold Lancer", "raider_cavalry": "Daybreak Rider" },
+      "majors": [
+        {
+          "id": "suryan", "name": "Suryan", "title": "The Unsetting Sun", "domain": "sun, kingship",
+          "passives": ["Sun-Altars cost -25%", "Villagers +5% gather rate in friendly Sun-Altar radius"],
+          "minorPool": { "classical": ["helior", "anshara"], "heroic": ["mithrun", "ravas"], "mythic": ["aurion", "kaelios"] }
+        },
+        {
+          "id": "khorath", "name": "Khorath", "title": "The Iron Decree", "domain": "order, war",
+          "passives": ["Infantry +10% HP", "Towers and walls build 25% faster"],
+          "minorPool": { "classical": ["helior", "anshara"], "heroic": ["mithrun", "ravas"], "mythic": ["aurion", "kaelios"] }
+        },
+        {
+          "id": "vaishtar", "name": "Vaishtar", "title": "The First Light", "domain": "dawn, renewal",
+          "passives": ["Heroes regenerate slowly", "Age-up research 15% faster"],
+          "minorPool": { "classical": ["helior", "anshara"], "heroic": ["mithrun", "ravas"], "mythic": ["aurion", "kaelios"] }
+        }
+      ],
+      "minors": [
+        { "id": "helior", "name": "Helior", "title": "The Sun-Forger", "age": "classical", "grants": { "mythUnits": ["sunhawk"], "techs": ["gilded_quivers"], "power": "solar_lance" } },
+        { "id": "anshara", "name": "Anshara", "title": "Lady of the Harvest Dawn", "age": "classical", "grants": { "mythUnits": ["sandlion"], "techs": ["golden_harvest"], "power": "golden_flood" } },
+        { "id": "mithrun", "name": "Mithrun", "title": "Keeper of the Pyres", "age": "heroic", "grants": { "mythUnits": ["emberbull"], "techs": ["pyre_brands"], "power": "pyre_storm" } },
+        { "id": "ravas", "name": "Ravas", "title": "The Burning Zeal", "age": "heroic", "grants": { "mythUnits": [], "techs": ["searing_zeal"], "power": "searing_mirage" } },
+        { "id": "aurion", "name": "Aurion", "title": "The Twice-Risen", "age": "mythic", "grants": { "mythUnits": ["ashen_phoenix"], "techs": ["eternal_flame"], "power": "risen_champion" } },
+        { "id": "kaelios", "name": "Kaelios", "title": "Warden of the Meridian", "age": "mythic", "grants": { "mythUnits": [], "techs": ["meridian_order"], "power": "aegis_of_dawn" } }
+      ]
+    },
+
+    "verdant_deep": {
+      "name": "The Verdant Deep", "theme": "water / storm / nature", "colorIdentity": "#2e8f7a",
+      "favorMechanic": {
+        "type": "tidal_oracles",
+        "description": "Stationary Tide-Seers generate favor scaling with line-of-sight radius; overlapping radii don't stack.",
+        "ratePerMinuteAtBaseLos": 5.5,
+        "baseLosRadius": 18,
+        "scalesWithStat": "los",
+        "overlappingRadiiStack": false
+      },
+      "hero": "tide_seer",
+      "favorBuilding": null,
+      "unitNames": { "infantry_base": "Tidewarden", "spearman": "Reef Pike", "archer_base": "Current Archer", "skirmisher": "Spray Slinger", "cavalry_base": "Wave Rider", "raider_cavalry": "Brine Raider" },
+      "majors": [
+        {
+          "id": "varendra", "name": "Varendra", "title": "The Worldriver", "domain": "rivers, growth",
+          "passives": ["Farms cost -20%", "Fishing boats +10% gather rate"],
+          "minorPool": { "classical": ["nereon", "lirassa"], "heroic": ["thalor", "undvara"], "mythic": ["okeanor", "sirath"] }
+        },
+        {
+          "id": "oyandi", "name": "Oyandi", "title": "The Stormcaller", "domain": "storms, sea-war",
+          "passives": ["Myth units +10% speed", "God powers recharge 10% faster"],
+          "minorPool": { "classical": ["nereon", "lirassa"], "heroic": ["thalor", "undvara"], "mythic": ["okeanor", "sirath"] }
+        },
+        {
+          "id": "oshara", "name": "Oshara", "title": "The Deep Mother", "domain": "depths, secrets",
+          "passives": ["Tide-Seers +4 LOS (more favor)", "Enemy units in your territory are revealed"],
+          "minorPool": { "classical": ["nereon", "lirassa"], "heroic": ["thalor", "undvara"], "mythic": ["okeanor", "sirath"] }
+        }
+      ],
+      "minors": [
+        { "id": "nereon", "name": "Nereon", "title": "Herald of Tides", "age": "classical", "grants": { "mythUnits": ["rivermaw"], "techs": ["tidal_bounty"], "power": "lure_of_tides" } },
+        { "id": "lirassa", "name": "Lirassa", "title": "Lady of Springs", "age": "classical", "grants": { "mythUnits": [], "techs": ["spring_blessing"], "power": "cleansing_rain" } },
+        { "id": "thalor", "name": "Thalor", "title": "The Breaking Wave", "age": "heroic", "grants": { "mythUnits": ["stormserpent"], "techs": ["storm_coils"], "power": "floodsurge" } },
+        { "id": "undvara", "name": "Undvara", "title": "The Veiled Mist", "age": "heroic", "grants": { "mythUnits": ["deepcaller_naiad"], "techs": ["veiled_currents"], "power": "mistveil" } },
+        { "id": "okeanor", "name": "Okeanor", "title": "The Abyss Below", "age": "mythic", "grants": { "mythUnits": ["coral_golem"], "techs": ["abyssal_plate"], "power": "maelstrom" } },
+        { "id": "sirath", "name": "Sirath", "title": "The Kelp-Binder", "age": "mythic", "grants": { "mythUnits": [], "techs": ["hydra_heads"], "power": "kelpward" } }
+      ]
+    },
+
+    "ashen_forge": {
+      "name": "The Ashen Forge", "theme": "fire / earth / craft / war", "colorIdentity": "#b8472e",
+      "favorMechanic": {
+        "type": "forge_wrath",
+        "description": "Favor earned from combat damage dealt; a Forgeborn hero trickles favor passively and doubles combat favor when upgraded.",
+        "favorPerDamage": 0.012,
+        "forgebornTricklePerMinute": 1.8,
+        "combatFavorMultiplier": 1.0,
+        "upgradeTech": "forgeborn_ascendant"
+      },
+      "hero": "forgeborn",
+      "favorBuilding": null,
+      "unitNames": { "infantry_base": "Forgeguard", "spearman": "Cinder Pike", "archer_base": "Slag Archer", "skirmisher": "Ash Slinger", "cavalry_base": "Anvil Rider", "raider_cavalry": "Coal Raider" },
+      "majors": [
+        {
+          "id": "ogarun", "name": "Ogarun", "title": "The Worldsmith", "domain": "forge, craft",
+          "passives": ["Armory techs cost -20%", "Siege units +10% HP"],
+          "minorPool": { "classical": ["hesmir", "brandvar"], "heroic": ["tarkun", "velgar"], "mythic": ["morvath", "khaldun"] }
+        },
+        {
+          "id": "shangor", "name": "Shangor", "title": "The War-Anvil", "domain": "war, fury",
+          "passives": ["Combat favor +15%", "Barracks units train 10% faster"],
+          "minorPool": { "classical": ["hesmir", "brandvar"], "heroic": ["tarkun", "velgar"], "mythic": ["morvath", "khaldun"] }
+        },
+        {
+          "id": "drauvik", "name": "Drauvik", "title": "The Mountain's Root", "domain": "earth, endurance",
+          "passives": ["Buildings +15% HP", "Gold miners +5% gather rate"],
+          "minorPool": { "classical": ["hesmir", "brandvar"], "heroic": ["tarkun", "velgar"], "mythic": ["morvath", "khaldun"] }
+        }
+      ],
+      "minors": [
+        { "id": "hesmir", "name": "Hesmir", "title": "Keeper of the Hearth", "age": "classical", "grants": { "mythUnits": ["forgehound"], "techs": ["hearth_iron"], "power": "ironhide" } },
+        { "id": "brandvar", "name": "Brandvar", "title": "The First Flame", "age": "classical", "grants": { "mythUnits": [], "techs": ["smelters_creed"], "power": "flaming_weapons" } },
+        { "id": "tarkun", "name": "Tarkun", "title": "The Thunder-Smith", "age": "heroic", "grants": { "mythUnits": ["thunder_jotun"], "techs": ["storm_anvils"], "power": "vajra_bolt" } },
+        { "id": "velgar", "name": "Velgar", "title": "The Quaking Fist", "age": "heroic", "grants": { "mythUnits": ["cyclorn"], "techs": ["quake_fists"], "power": "forge_quake" } },
+        { "id": "morvath", "name": "Morvath", "title": "Herald of the Last War", "age": "mythic", "grants": { "mythUnits": [], "techs": ["forgeborn_ascendant"], "power": "call_of_the_last_war" } },
+        { "id": "khaldun", "name": "Khaldun", "title": "The Bronze Tide", "age": "mythic", "grants": { "mythUnits": ["bronze_colossus"], "techs": ["living_bronze"], "power": "molten_rampart" } }
+      ]
+    },
+
+    "storm_concord": {
+      "name": "The Storm Concord", "theme": "sky / heavens / trickster", "colorIdentity": "#5a6fc7",
+      "favorMechanic": {
+        "type": "skyward_chants",
+        "description": "Villagers pray at Sky-Temples with diminishing returns per additional worshipper.",
+        "firstVillagerRatePerMinute": 6,
+        "diminishingFactor": 0.85,
+        "maxWorshippers": 10
+      },
+      "hero": "sky_herald",
+      "favorBuilding": "sky_temple",
+      "unitNames": { "infantry_base": "Gale Sworn", "spearman": "Cloud Pike", "archer_base": "Skybow", "skirmisher": "Squall Slinger", "cavalry_base": "Thunder Lancer", "raider_cavalry": "Tempest Rider" },
+      "majors": [
+        {
+          "id": "indravan", "name": "Indravan", "title": "King of the High Sky", "domain": "lightning, sovereignty",
+          "passives": ["God power damage +15%", "Sky-Temples cost -20%"],
+          "minorPool": { "classical": ["zephyrion", "anila"], "heroic": ["maruth", "vrithra"], "mythic": ["kethran", "ashvayu"] }
+        },
+        {
+          "id": "vayuna", "name": "Vayuna", "title": "The Endless Wind", "domain": "wind, journeys",
+          "passives": ["All units +5% speed", "Scouts free LOS upgrade"],
+          "minorPool": { "classical": ["zephyrion", "anila"], "heroic": ["maruth", "vrithra"], "mythic": ["kethran", "ashvayu"] }
+        },
+        {
+          "id": "eshura", "name": "Eshura", "title": "The Laughing Veil", "domain": "trickery, fate",
+          "passives": ["Market trades 10% better", "Enemy god powers cost them +10% favor"],
+          "minorPool": { "classical": ["zephyrion", "anila"], "heroic": ["maruth", "vrithra"], "mythic": ["kethran", "ashvayu"] }
+        }
+      ],
+      "minors": [
+        { "id": "zephyrion", "name": "Zephyrion", "title": "The Far-Seeing Gale", "age": "classical", "grants": { "mythUnits": ["garuhawk"], "techs": ["zephyr_wings"], "power": "clarity" } },
+        { "id": "anila", "name": "Anila", "title": "Mistress of the Crosswinds", "age": "classical", "grants": { "mythUnits": [], "techs": ["tailwind"], "power": "crosswinds" } },
+        { "id": "maruth", "name": "Maruth", "title": "Lord of the Storm Host", "age": "heroic", "grants": { "mythUnits": ["wind_djinn"], "techs": ["gale_force"], "power": "tempest" } },
+        { "id": "vrithra", "name": "Vrithra", "title": "The Coiled Sky-Serpent", "age": "heroic", "grants": { "mythUnits": ["stonegaze_naga"], "techs": ["serpents_sight"], "power": "mirrored_skies" } },
+        { "id": "kethran", "name": "Kethran", "title": "The Whispered Bargain", "age": "mythic", "grants": { "mythUnits": [], "techs": ["silver_tongues"], "power": "tricksters_gift" } },
+        { "id": "ashvayu", "name": "Ashvayu", "title": "Bearer of the King-Bolt", "age": "mythic", "grants": { "mythUnits": ["sky_manticore"], "techs": ["crown_of_storms"], "power": "sovereign_bolt" } }
+      ]
+    }
+  }
+}

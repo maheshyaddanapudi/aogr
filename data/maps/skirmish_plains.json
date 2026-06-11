@@ -1,0 +1,26 @@
+{
+  "$comment": "Random-map generation config. All generation is seed-driven inside the sim (KICKOFF §3). size in tiles.",
+  "version": 1,
+  "id": "skirmish_plains",
+  "name": "Sunlit Plains",
+  "size": 200,
+  "biome": "plains",
+  "players": 2,
+  "popCap": 300,
+  "startUnits": { "villager": 4, "scout": 1 },
+  "startBuildings": { "town_center": 1 },
+  "startResources": { "food": 200, "wood": 200, "gold": 100, "favor": 0 },
+  "generation": {
+    "settlementSockets": 6,
+    "forestsPerPlayer": 4,
+    "goldMinesPerPlayer": 3,
+    "huntableHerdsPerPlayer": 3,
+    "forageBushPatchesPerPlayer": 2,
+    "lakes": 2,
+    "fishPerLake": 6,
+    "relics": 5,
+    "elevationVariance": 0.15,
+    "cliffs": false
+  },
+  "postProcessing": { "colorGrading": "warm_plains", "fogColor": "#c8d8e8" }
+}

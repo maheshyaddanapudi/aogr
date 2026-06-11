@@ -1,0 +1,54 @@
+# 07 — SKILLS LEDGER (append-only)
+
+Every skill consulted, invoked, vendored, or authored in this repository is logged here
+**at invocation time** (KICKOFF §11.2). Negative results ("consulted, not applicable")
+are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.md.
+
+| Date | Session/Phase | Skill name | Vendored path | Origin | Why invoked | What it contributed | Artifacts touched |
+|------|---------------|------------|---------------|--------|-------------|---------------------|-------------------|
+| 2026-06-10 | Pre-repo design phase | deep-research | `.claude/skills/deep-research/` `[stub]` | Anthropic plugin (harness registry; not redistributable from this container) | Architecture + pantheon research behind the build charter | Stack selection rationale (Babylon/bitECS/lockstep determinism/Petra-style AI), AoM mechanics anchors, pantheon design space — distilled into KICKOFF.md | KICKOFF.md |
+| 2026-06-10 | Pre-repo design phase | docx | `.claude/skills/docx/` | Anthropic skill (`/mnt/skills/public/docx/`) | Routing check: was the charter to be delivered as .docx? | **Consulted, not applicable** — output was plain markdown | — |
+| 2026-06-11 | Session 1 / Phase 0 | frontend-design | `.claude/skills/frontend-design/` | Anthropic skill (`/mnt/skills/public/frontend-design/`) | Phase 0 HUD + test-scene visual direction before writing UI code (KICKOFF §4 gates visuals) | Process discipline (plan tokens → critique → build), "signature element" framing → the bronze determinism-plaque telemetry HUD; restraint guidance (one bold element, quality floor: reduced-motion, no default fonts) | `index.html`, `src/ui/hud.ts`, `src/ui/hud.css`, `src/render/scene.ts` |
+| 2026-06-11 | Session 1 / Phase 0 | deterministic-sim-testing (candidate) | — | authored-in-repo candidate | — | **Deferred — insufficient evidence** (pattern solved once: PRNG+checksum+10k-tick harness in Phase 0). Revisit at Phase 2 gate per §11.3. | — |
+| 2026-06-11 | Session 1 / Phase 0 | bitecs-babylon-bridge (candidate) | — | authored-in-repo candidate | — | **Deferred — insufficient evidence** (one bridge built: per-sim stores → instanced orbs; two real findings logged: bitECS 0.4 new API has no defineComponent/Types; Babylon tree-shaken imports need side-effect modules for pipeline manager + InstancedMesh). Revisit at Phase 2. | — |
+
+| 2026-06-11 | Session 1 / Phase 1 | babylon-integration-pitfalls | `.claude/skills/babylon-integration-pitfalls/` | **authored in-repo** | §11.3 threshold met: Babylon side-effect import trap hit 3× (pipeline manager, InstancedMesh, Ray), plus SSAO2-prepass shader failures, inverted-winding invisible terrain, SwiftShader headless throttling, and dual-instance probe contamination — a fresh instance would re-derive all of it | Distilled checklist + verification steps for every Babylon feature addition; to be consulted at each render-layer change from Phase 2 on | `src/render/scene.ts`, `src/render/terrainMesh.ts`, `src/render/camera.ts`, `docs/02` |
+
+| 2026-06-11 | Session 1 / Phase 2 | babylon-integration-pitfalls | `.claude/skills/babylon-integration-pitfalls/` | authored in-repo (Phase 1) | Consulted before adding picking/instancing/GLTF unit rendering; **updated** with Phase 2 evidence (headless capture recipe, skinned-crowd pattern, variant-submesh trap, texture-adoption ordering) | Pre-empted the silent `scene.pick` failure (Ray import was already in); guided headless gate verification | `src/render/units.ts`, `src/render/selection.ts`, SKILL.md §7–8 |
+| 2026-06-11 | Session 1 / Phase 2 | deterministic-sim-testing | `.claude/skills/deterministic-sim-testing/` | **authored in-repo** | §11.3 threshold met: pattern exercised in Phases 0, 1, and 2 (10k-tick gates, terrain checksum folding, 200-unit march determinism, serialize-lockstep, isqrt int32-shift pitfall, salted PRNG streams, ascending-eid iteration discipline) | Distilled harness shape + design rules + divergence-debugging checklist; to be invoked at every subsequent gate | `tests/sim/*.test.ts`, `src/sim/*` |
+
+| 2026-06-11 | Session 1 / Phase 3 | deterministic-sim-testing | `.claude/skills/deterministic-sim-testing/` | authored in-repo (Phase 2) | Applied to the economy suite: micro-accumulator pattern for sub-milli rates, derived-data rule (flow fields cleared on nav-grid change, never serialized), eid-remap on snapshot restore | Economy determinism + serialize round-trip passed first try; harness shape reused verbatim | `tests/sim/economy.test.ts`, `src/sim/economy.ts` |
+| 2026-06-11 | Session 1 / Phase 3 | babylon-integration-pitfalls | `.claude/skills/babylon-integration-pitfalls/` | authored in-repo (Phase 1) | Consulted for gltf+bin+texture vendoring (relative-URI texture must ship beside the gltf; rebuild before preview-testing public/ additions) and `__step(n)` extension of the headless capture recipe (§7) | Caught the stale-dist texture 404 quickly; capture recipe extended | `src/render/buildings.ts`, `public/models/**`, SKILL.md |
+
+| 2026-06-11 | Session 1 / Phase 4 | deterministic-sim-testing | (vendored) | authored in-repo | Battle determinism suite incl. entity-removal ordering and mid-battle serialize | Suite passed once removal order + snapshot lanes were aligned with the skill's rules | tests/sim/combat.test.ts |
+| 2026-06-11 | Session 1 / Phase 4 | babylon-integration-pitfalls | (vendored) | authored in-repo | FX debugging marathon: end-on projectiles mistaken for missing, rAF race disposing FX before slow screenshots, async shader compile skipping fresh materials — skill UPDATED with §10 | Root-caused three stacked capture artifacts; recipe now reliable | src/render/combatFx.ts, SKILL.md §10 |
+
+| 2026-06-11 | Session 1 / Phase 5 | deterministic-sim-testing | (vendored) | authored in-repo | Research/ages suite: string hashing for tech lists, derived-modifier rule (rebuild from researchedTechs on load) | Determinism + serialization green on first run | tests/sim/ages.test.ts, src/sim/research.ts |
+| 2026-06-11 | Session 1 / Phase 5 | frontend-design | (vendored) | Anthropic skill | Consulted for the age-up panel: signature moment = the god-choice cards; restraint (one glowing accent = pantheon color), copy discipline (grants listed as Power/Myth/Tech rows, no filler) | Panel passes the §4 bar on first capture | src/ui/agePanel.ts, hud.css |
+
+| 2026-06-11 | Session 1 / Phase 6 | deterministic-sim-testing | (vendored) | authored in-repo | Powers/favor suite; caught the module-init cycle (TICK_RATE undefined → NaN favor) — added to the divergence checklist as "module-eval-order constants" | NaN favor diagnosed in minutes via the harness | tests/sim/gods.test.ts, src/sim/fixed.ts |
+| 2026-06-11 | Session 1 / Phase 6 | babylon-integration-pitfalls | (vendored) | authored in-repo | VFX built mesh-centric (pillar/bolt/ring) BECAUSE the skill's §10 documents that particles can't be frozen in stills — pattern chosen for capturability and in-game readability | First capture usable; additive blending fix only | src/render/powerFx.ts |
+
+| 2026-06-11 | Session 1 / Phase 7 | deterministic-sim-testing | (vendored) | authored in-repo | AI determinism test (same seed ⇒ same AI match checksum); trace-driven debugging of the boom (food starvation → farm mechanics → stall re-walks) | The "assert counts via probes, never eyeball" rule drove the minute-by-minute trace harness that found 3 stall bugs | tests/ai/ai.test.ts, src/sim/economy.ts, src/ai/brain.ts |
+| 2026-06-11 | Session 1 / Phase 7 | petra-style-ai (candidate) | — | authored-in-repo candidate | — | **Deferred — single implementation** (one brain, one game's evidence); revisit if a second AI profile or major rework lands | — |
+
+| 2026-06-11 | Session 1 / Phase 8 | babylon-integration-pitfalls | (vendored) | authored in-repo | §10 applied twice (fresh fog/ghost materials invisible until warm renders); RawTexture-RGBA rule reused for the fog texture | No re-derivation: both "missing visual" incidents resolved by recipe in one step | src/render/fog.ts, src/render/buildings.ts |
+| 2026-06-11 | Session 1 / Phase 8 | frontend-design | (vendored) | Anthropic skill | Full HUD pass layout (bottom panel split: selection identity left, verbs right; minimap as framed artifact; copy in plain verbs) | Panel reads cleanly at first capture | src/ui/commandCard.ts, minimap.ts, hud.css |
+
+| 2026-06-11 | Session 1 / Phase 9 | babylon-integration-pitfalls | (vendored) | authored in-repo | Audio collect had the same "__step bypasses the frame path" trap as FX (§7) — events must be collected in BOTH the rAF tick and __step | One-probe diagnosis | src/main.ts, src/platform/audio.ts |
+
+| 2026-06-11 | Session 1 / Phase 10 | deterministic-sim-testing | (vendored) | authored in-repo | Final release gate: victory-state lanes hashed+serialized; browser-level save/load equality proof reused the harness discipline (compare sealed checksums, not vibes) | The 0x3CCE7C55 = 0x3CCE7C55 proof | tests/sim/victory.test.ts, src/sim/victory.ts, src/platform/storage.ts |
+| 2026-06-11 | Session 1 / Phase 10 | frontend-design | (vendored) | Anthropic skill | Main menu: hero-as-thesis (the four pantheons ARE the choice), restraint elsewhere; credits line carries the CC-BY obligation | Menu passed the bar on first capture | src/main.ts, hud.css |
+
+| 2026-06-11 | Session 1 / Visual upgrade pass | babylon-integration-pitfalls | (vendored) | authored in-repo | Three new hard-won lessons while raising visuals to the 8.5 bar: frozen-defines texture race (white-material syndrome) + markAsDirty fix, ParticleSystem renders nothing on this stack (mesh FX only), Quaternius per-part material tinting — skill UPDATED with §11 | Root-caused the white-wash across 6 bisection runs; damage states rebuilt mesh-based | src/render/units.ts, buildings.ts, game.ts, SKILL.md §11 |
+
+## SESSION 1 FINAL ROLLUP (Phases 0–10 complete)
+
+**Skills used:** frontend-design (4 uses), deterministic-sim-testing (authored Phase 2; used at every gate after), babylon-integration-pitfalls (authored Phase 1; used + updated through Phase 9), docx + deep-research (pre-repo provenance).
+**Library delta:** vendored frontend-design, docx, deep-research[stub]; authored deterministic-sim-testing, babylon-integration-pitfalls (10 sections of earned knowledge); deferred with evidence notes: bitecs-babylon-bridge, rts-pathfinding-worker, petra-style-ai, balance-data-tuning, babylon-rts-vfx.
+
+## Phase 0 gate rollup
+
+**Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).
+
+**Skill library delta:** newly vendored: `frontend-design`, `docx`, `deep-research [stub]`. Newly authored: none (2 candidates deferred with evidence notes above). Updated: none.

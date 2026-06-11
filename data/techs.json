@@ -1,0 +1,290 @@
+{
+  "$comment": "SOURCE OF TRUTH for techs. Effects use the structured modifier schema {target, stat, op: add|mul|set, value}. target = unit class, unit id, or 'player'. Costs in resources, researchTime in seconds.",
+  "version": 1,
+  "techs": {
+    "age_classical": {
+      "name": "Classical Age", "age": "archaic", "researchedAt": "town_center", "researchTime": 60,
+      "cost": { "food": 400, "wood": 0, "gold": 0, "favor": 0 },
+      "requiresBuilding": "temple",
+      "effects": [{ "target": "player", "stat": "age", "op": "set", "value": 1 }]
+    },
+    "age_heroic": {
+      "name": "Heroic Age", "age": "classical", "researchedAt": "town_center", "researchTime": 75,
+      "cost": { "food": 800, "wood": 0, "gold": 500, "favor": 0 },
+      "requiresBuilding": "armory",
+      "effects": [{ "target": "player", "stat": "age", "op": "set", "value": 2 }]
+    },
+    "age_mythic": {
+      "name": "Mythic Age", "age": "heroic", "researchedAt": "town_center", "researchTime": 90,
+      "cost": { "food": 1000, "wood": 0, "gold": 1000, "favor": 0 },
+      "requiresBuilding": "market",
+      "effects": [{ "target": "player", "stat": "age", "op": "set", "value": 3 }]
+    },
+
+    "hunting_dogs": {
+      "name": "Hunting Dogs", "age": "archaic", "researchedAt": "granary", "researchTime": 25,
+      "cost": { "food": 100, "wood": 0, "gold": 0, "favor": 0 },
+      "effects": [{ "target": "villager", "stat": "gatherRates.huntFoodPerSec", "op": "mul", "value": 1.1 }]
+    },
+    "plow": {
+      "name": "Bronze Plow", "age": "classical", "researchedAt": "granary", "researchTime": 30,
+      "cost": { "food": 150, "wood": 50, "gold": 0, "favor": 0 },
+      "effects": [{ "target": "villager", "stat": "gatherRates.farmFoodPerSec", "op": "mul", "value": 1.1 }]
+    },
+    "irrigation": {
+      "name": "Irrigation", "age": "heroic", "researchedAt": "granary", "researchTime": 40,
+      "cost": { "food": 300, "wood": 100, "gold": 0, "favor": 0 },
+      "prerequisites": ["plow"],
+      "effects": [{ "target": "villager", "stat": "gatherRates.farmFoodPerSec", "op": "mul", "value": 1.15 }]
+    },
+    "fishing_nets": {
+      "name": "Fishing Nets", "age": "classical", "researchedAt": "dock", "researchTime": 30,
+      "cost": { "food": 0, "wood": 150, "gold": 0, "favor": 0 },
+      "effects": [{ "target": "fishing_boat", "stat": "gatherRates.fishFoodPerSec", "op": "mul", "value": 1.15 }]
+    },
+    "hand_axe": {
+      "name": "Hand Axe", "age": "archaic", "researchedAt": "storehouse", "researchTime": 25,
+      "cost": { "food": 100, "wood": 0, "gold": 0, "favor": 0 },
+      "effects": [{ "target": "villager", "stat": "gatherRates.woodPerSec", "op": "mul", "value": 1.1 }]
+    },
+    "bow_saw": {
+      "name": "Bow Saw", "age": "classical", "researchedAt": "storehouse", "researchTime": 30,
+      "cost": { "food": 150, "wood": 0, "gold": 50, "favor": 0 },
+      "prerequisites": ["hand_axe"],
+      "effects": [{ "target": "villager", "stat": "gatherRates.woodPerSec", "op": "mul", "value": 1.1 }]
+    },
+    "carpenters_guild": {
+      "name": "Carpenters' Guild", "age": "heroic", "researchedAt": "storehouse", "researchTime": 40,
+      "cost": { "food": 250, "wood": 0, "gold": 100, "favor": 0 },
+      "prerequisites": ["bow_saw"],
+      "effects": [{ "target": "villager", "stat": "gatherRates.woodPerSec", "op": "mul", "value": 1.15 }]
+    },
+    "prospecting_picks": {
+      "name": "Prospecting Picks", "age": "archaic", "researchedAt": "storehouse", "researchTime": 25,
+      "cost": { "food": 100, "wood": 0, "gold": 0, "favor": 0 },
+      "effects": [{ "target": "villager", "stat": "gatherRates.goldPerSec", "op": "mul", "value": 1.1 }]
+    },
+    "shaft_mines": {
+      "name": "Shaft Mines", "age": "classical", "researchedAt": "storehouse", "researchTime": 30,
+      "cost": { "food": 150, "wood": 50, "gold": 0, "favor": 0 },
+      "prerequisites": ["prospecting_picks"],
+      "effects": [{ "target": "villager", "stat": "gatherRates.goldPerSec", "op": "mul", "value": 1.1 }]
+    },
+    "deep_veins": {
+      "name": "Deep Veins", "age": "heroic", "researchedAt": "storehouse", "researchTime": 40,
+      "cost": { "food": 250, "wood": 100, "gold": 0, "favor": 0 },
+      "prerequisites": ["shaft_mines"],
+      "effects": [{ "target": "villager", "stat": "gatherRates.goldPerSec", "op": "mul", "value": 1.15 }]
+    },
+
+    "bronze_weapons": {
+      "name": "Bronze Weapons", "age": "classical", "researchedAt": "armory", "researchTime": 30,
+      "cost": { "food": 150, "wood": 0, "gold": 100, "favor": 0 },
+      "effects": [
+        { "target": "infantry", "stat": "attack.damage", "op": "mul", "value": 1.1 },
+        { "target": "cavalry", "stat": "attack.damage", "op": "mul", "value": 1.1 }
+      ]
+    },
+    "iron_weapons": {
+      "name": "Iron Weapons", "age": "heroic", "researchedAt": "armory", "researchTime": 40,
+      "cost": { "food": 300, "wood": 0, "gold": 200, "favor": 0 },
+      "prerequisites": ["bronze_weapons"],
+      "effects": [
+        { "target": "infantry", "stat": "attack.damage", "op": "mul", "value": 1.1 },
+        { "target": "cavalry", "stat": "attack.damage", "op": "mul", "value": 1.1 }
+      ]
+    },
+    "champion_weapons": {
+      "name": "Champion Weapons", "age": "mythic", "researchedAt": "armory", "researchTime": 50,
+      "cost": { "food": 500, "wood": 0, "gold": 350, "favor": 0 },
+      "prerequisites": ["iron_weapons"],
+      "effects": [
+        { "target": "infantry", "stat": "attack.damage", "op": "mul", "value": 1.15 },
+        { "target": "cavalry", "stat": "attack.damage", "op": "mul", "value": 1.15 }
+      ]
+    },
+    "bronze_mail": {
+      "name": "Bronze Mail", "age": "classical", "researchedAt": "armory", "researchTime": 30,
+      "cost": { "food": 150, "wood": 0, "gold": 100, "favor": 0 },
+      "$comment": "Armor upgrades reduce vulnerability (KICKOFF §6): +armor% via add.",
+      "effects": [
+        { "target": "infantry", "stat": "armor.hack", "op": "add", "value": 3 },
+        { "target": "cavalry", "stat": "armor.hack", "op": "add", "value": 3 }
+      ]
+    },
+    "iron_mail": {
+      "name": "Iron Mail", "age": "heroic", "researchedAt": "armory", "researchTime": 40,
+      "cost": { "food": 300, "wood": 0, "gold": 200, "favor": 0 },
+      "prerequisites": ["bronze_mail"],
+      "effects": [
+        { "target": "infantry", "stat": "armor.hack", "op": "add", "value": 3 },
+        { "target": "cavalry", "stat": "armor.hack", "op": "add", "value": 3 }
+      ]
+    },
+    "tower_shields": {
+      "name": "Tower Shields", "age": "heroic", "researchedAt": "armory", "researchTime": 40,
+      "cost": { "food": 250, "wood": 0, "gold": 250, "favor": 0 },
+      "effects": [
+        { "target": "infantry", "stat": "armor.pierce", "op": "add", "value": 5 }
+      ]
+    },
+    "fletching": {
+      "name": "Fletching", "age": "classical", "researchedAt": "armory", "researchTime": 30,
+      "cost": { "food": 100, "wood": 100, "gold": 0, "favor": 0 },
+      "effects": [{ "target": "archer", "stat": "attack.damage", "op": "mul", "value": 1.1 }]
+    },
+    "bodkin_arrows": {
+      "name": "Bodkin Arrows", "age": "heroic", "researchedAt": "armory", "researchTime": 40,
+      "cost": { "food": 200, "wood": 200, "gold": 0, "favor": 0 },
+      "prerequisites": ["fletching"],
+      "effects": [{ "target": "archer", "stat": "attack.damage", "op": "mul", "value": 1.1 }]
+    },
+    "flaming_arrows": {
+      "name": "Flaming Arrows", "age": "mythic", "researchedAt": "armory", "researchTime": 50,
+      "cost": { "food": 350, "wood": 300, "gold": 0, "favor": 0 },
+      "prerequisites": ["bodkin_arrows"],
+      "effects": [{ "target": "archer", "stat": "attack.damage", "op": "mul", "value": 1.15 }]
+    },
+    "conscription": {
+      "name": "Conscription", "age": "heroic", "researchedAt": "fortress", "researchTime": 45,
+      "cost": { "food": 300, "wood": 0, "gold": 150, "favor": 0 },
+      "effects": [
+        { "target": "infantry", "stat": "trainTime", "op": "mul", "value": 0.85 },
+        { "target": "archer", "stat": "trainTime", "op": "mul", "value": 0.85 },
+        { "target": "cavalry", "stat": "trainTime", "op": "mul", "value": 0.85 }
+      ]
+    },
+
+    "gilded_quivers": {
+      "name": "Gilded Quivers", "age": "classical", "researchedAt": "temple", "researchTime": 30, "pantheon": "auryan_dawn", "grantedBy": "helior",
+      "cost": { "food": 0, "wood": 0, "gold": 150, "favor": 10 },
+      "effects": [{ "target": "archer", "stat": "attack.damage", "op": "mul", "value": 1.1 }]
+    },
+    "golden_harvest": {
+      "name": "Golden Harvest", "age": "classical", "researchedAt": "temple", "researchTime": 30, "pantheon": "auryan_dawn", "grantedBy": "anshara",
+      "cost": { "food": 100, "wood": 0, "gold": 0, "favor": 10 },
+      "effects": [{ "target": "villager", "stat": "gatherRates.farmFoodPerSec", "op": "mul", "value": 1.15 }]
+    },
+    "pyre_brands": {
+      "name": "Pyre Brands", "age": "heroic", "researchedAt": "temple", "researchTime": 35, "pantheon": "auryan_dawn", "grantedBy": "mithrun",
+      "cost": { "food": 0, "wood": 0, "gold": 200, "favor": 15 },
+      "effects": [{ "target": "infantry", "stat": "attack.damage", "op": "mul", "value": 1.1 }]
+    },
+    "searing_zeal": {
+      "name": "Searing Zeal", "age": "heroic", "researchedAt": "temple", "researchTime": 35, "pantheon": "auryan_dawn", "grantedBy": "ravas",
+      "cost": { "food": 150, "wood": 0, "gold": 0, "favor": 15 },
+      "effects": [{ "target": "sandlion", "stat": "attack.damage", "op": "mul", "value": 1.25 }]
+    },
+    "eternal_flame": {
+      "name": "Eternal Flame", "age": "mythic", "researchedAt": "temple", "researchTime": 40, "pantheon": "auryan_dawn", "grantedBy": "aurion",
+      "cost": { "food": 0, "wood": 0, "gold": 300, "favor": 20 },
+      "effects": [{ "target": "ashen_phoenix", "stat": "hp", "op": "mul", "value": 1.2 }]
+    },
+    "meridian_order": {
+      "name": "Meridian Order", "age": "mythic", "researchedAt": "temple", "researchTime": 40, "pantheon": "auryan_dawn", "grantedBy": "kaelios",
+      "cost": { "food": 200, "wood": 0, "gold": 200, "favor": 20 },
+      "effects": [
+        { "target": "villager", "stat": "gatherRates.huntFoodPerSec", "op": "mul", "value": 1.05 },
+        { "target": "villager", "stat": "gatherRates.woodPerSec", "op": "mul", "value": 1.05 },
+        { "target": "villager", "stat": "gatherRates.goldPerSec", "op": "mul", "value": 1.05 }
+      ]
+    },
+
+    "tidal_bounty": {
+      "name": "Tidal Bounty", "age": "classical", "researchedAt": "temple", "researchTime": 30, "pantheon": "verdant_deep", "grantedBy": "nereon",
+      "cost": { "food": 100, "wood": 0, "gold": 0, "favor": 10 },
+      "effects": [{ "target": "fishing_boat", "stat": "gatherRates.fishFoodPerSec", "op": "mul", "value": 1.2 }]
+    },
+    "spring_blessing": {
+      "name": "Spring Blessing", "age": "classical", "researchedAt": "temple", "researchTime": 30, "pantheon": "verdant_deep", "grantedBy": "lirassa",
+      "cost": { "food": 0, "wood": 0, "gold": 100, "favor": 10 },
+      "effects": [{ "target": "hero", "stat": "hp", "op": "mul", "value": 1.1 }]
+    },
+    "storm_coils": {
+      "name": "Storm Coils", "age": "heroic", "researchedAt": "temple", "researchTime": 35, "pantheon": "verdant_deep", "grantedBy": "thalor",
+      "cost": { "food": 150, "wood": 0, "gold": 0, "favor": 15 },
+      "effects": [{ "target": "stormserpent", "stat": "attack.damage", "op": "mul", "value": 1.15 }]
+    },
+    "veiled_currents": {
+      "name": "Veiled Currents", "age": "heroic", "researchedAt": "temple", "researchTime": 35, "pantheon": "verdant_deep", "grantedBy": "undvara",
+      "cost": { "food": 0, "wood": 0, "gold": 150, "favor": 15 },
+      "effects": [{ "target": "scout", "stat": "los", "op": "add", "value": 4 }]
+    },
+    "abyssal_plate": {
+      "name": "Abyssal Plate", "age": "mythic", "researchedAt": "temple", "researchTime": 40, "pantheon": "verdant_deep", "grantedBy": "okeanor",
+      "cost": { "food": 0, "wood": 0, "gold": 300, "favor": 20 },
+      "effects": [{ "target": "coral_golem", "stat": "hp", "op": "mul", "value": 1.2 }]
+    },
+    "hydra_heads": {
+      "name": "Hydra Heads", "age": "mythic", "researchedAt": "temple", "researchTime": 40, "pantheon": "verdant_deep", "grantedBy": "sirath",
+      "cost": { "food": 250, "wood": 0, "gold": 0, "favor": 20 },
+      "effects": [{ "target": "rivermaw", "stat": "attack.damage", "op": "mul", "value": 1.25 }]
+    },
+
+    "hearth_iron": {
+      "name": "Hearth Iron", "age": "classical", "researchedAt": "temple", "researchTime": 30, "pantheon": "ashen_forge", "grantedBy": "hesmir",
+      "cost": { "food": 0, "wood": 0, "gold": 150, "favor": 10 },
+      "effects": [{ "target": "infantry", "stat": "armor.hack", "op": "add", "value": 4 }]
+    },
+    "smelters_creed": {
+      "name": "Smelter's Creed", "age": "classical", "researchedAt": "temple", "researchTime": 30, "pantheon": "ashen_forge", "grantedBy": "brandvar",
+      "cost": { "food": 100, "wood": 0, "gold": 50, "favor": 10 },
+      "effects": [{ "target": "player", "stat": "favorMechanic.favorPerDamage", "op": "mul", "value": 1.1 }]
+    },
+    "storm_anvils": {
+      "name": "Storm Anvils", "age": "heroic", "researchedAt": "temple", "researchTime": 35, "pantheon": "ashen_forge", "grantedBy": "tarkun",
+      "cost": { "food": 0, "wood": 0, "gold": 200, "favor": 15 },
+      "effects": [{ "target": "thunder_jotun", "stat": "attack.damage", "op": "mul", "value": 1.15 }]
+    },
+    "quake_fists": {
+      "name": "Quake Fists", "age": "heroic", "researchedAt": "temple", "researchTime": 35, "pantheon": "ashen_forge", "grantedBy": "velgar",
+      "cost": { "food": 150, "wood": 0, "gold": 50, "favor": 15 },
+      "effects": [{ "target": "cyclorn", "stat": "attack.crushDamage", "op": "add", "value": 4 }]
+    },
+    "forgeborn_ascendant": {
+      "name": "Forgeborn Ascendant", "age": "mythic", "researchedAt": "temple", "researchTime": 40, "pantheon": "ashen_forge", "grantedBy": "morvath",
+      "cost": { "food": 0, "wood": 0, "gold": 300, "favor": 25 },
+      "$comment": "KICKOFF §6: the Forgeborn hero doubles combat favor when upgraded.",
+      "effects": [
+        { "target": "player", "stat": "favorMechanic.combatFavorMultiplier", "op": "set", "value": 2 },
+        { "target": "forgeborn", "stat": "attack.damage", "op": "mul", "value": 1.2 }
+      ]
+    },
+    "living_bronze": {
+      "name": "Living Bronze", "age": "mythic", "researchedAt": "temple", "researchTime": 40, "pantheon": "ashen_forge", "grantedBy": "khaldun",
+      "cost": { "food": 0, "wood": 0, "gold": 350, "favor": 20 },
+      "effects": [{ "target": "bronze_colossus", "stat": "hp", "op": "mul", "value": 1.15 }]
+    },
+
+    "zephyr_wings": {
+      "name": "Zephyr Wings", "age": "classical", "researchedAt": "temple", "researchTime": 30, "pantheon": "storm_concord", "grantedBy": "zephyrion",
+      "cost": { "food": 100, "wood": 0, "gold": 0, "favor": 10 },
+      "effects": [{ "target": "garuhawk", "stat": "speed", "op": "mul", "value": 1.15 }]
+    },
+    "tailwind": {
+      "name": "Tailwind", "age": "classical", "researchedAt": "temple", "researchTime": 30, "pantheon": "storm_concord", "grantedBy": "anila",
+      "cost": { "food": 0, "wood": 100, "gold": 0, "favor": 10 },
+      "effects": [{ "target": "archer", "stat": "speed", "op": "mul", "value": 1.1 }]
+    },
+    "gale_force": {
+      "name": "Gale Force", "age": "heroic", "researchedAt": "temple", "researchTime": 35, "pantheon": "storm_concord", "grantedBy": "maruth",
+      "cost": { "food": 0, "wood": 0, "gold": 200, "favor": 15 },
+      "effects": [{ "target": "wind_djinn", "stat": "attack.damage", "op": "mul", "value": 1.15 }]
+    },
+    "serpents_sight": {
+      "name": "Serpent's Sight", "age": "heroic", "researchedAt": "temple", "researchTime": 35, "pantheon": "storm_concord", "grantedBy": "vrithra",
+      "cost": { "food": 150, "wood": 0, "gold": 0, "favor": 15 },
+      "effects": [{ "target": "stonegaze_naga", "stat": "attack.range", "op": "add", "value": 2 }]
+    },
+    "silver_tongues": {
+      "name": "Silver Tongues", "age": "mythic", "researchedAt": "temple", "researchTime": 40, "pantheon": "storm_concord", "grantedBy": "kethran",
+      "cost": { "food": 0, "wood": 0, "gold": 250, "favor": 20 },
+      "effects": [{ "target": "player", "stat": "market.spreadPercent", "op": "add", "value": -5 }]
+    },
+    "crown_of_storms": {
+      "name": "Crown of Storms", "age": "mythic", "researchedAt": "temple", "researchTime": 40, "pantheon": "storm_concord", "grantedBy": "ashvayu",
+      "cost": { "food": 200, "wood": 0, "gold": 200, "favor": 20 },
+      "effects": [{ "target": "sky_manticore", "stat": "hp", "op": "mul", "value": 1.2 }]
+    }
+  }
+}

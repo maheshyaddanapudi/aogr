@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Determinism guard (sim purity)
+        run: npm run check:determinism-rules
+      - name: Tests (incl. 10k-tick determinism checksum gate)
+        run: npm test
+      - name: Typecheck + build
+        run: npm run build
