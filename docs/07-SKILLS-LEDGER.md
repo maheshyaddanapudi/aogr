@@ -1,0 +1,19 @@
+# 07 — SKILLS LEDGER (append-only)
+
+Every skill consulted, invoked, vendored, or authored in this repository is logged here
+**at invocation time** (KICKOFF §11.2). Negative results ("consulted, not applicable")
+are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.md.
+
+| Date | Session/Phase | Skill name | Vendored path | Origin | Why invoked | What it contributed | Artifacts touched |
+|------|---------------|------------|---------------|--------|-------------|---------------------|-------------------|
+| 2026-06-10 | Pre-repo design phase | deep-research | `.claude/skills/deep-research/` `[stub]` | Anthropic plugin (harness registry; not redistributable from this container) | Architecture + pantheon research behind the build charter | Stack selection rationale (Babylon/bitECS/lockstep determinism/Petra-style AI), AoM mechanics anchors, pantheon design space — distilled into KICKOFF.md | KICKOFF.md |
+| 2026-06-10 | Pre-repo design phase | docx | `.claude/skills/docx/` | Anthropic skill (`/mnt/skills/public/docx/`) | Routing check: was the charter to be delivered as .docx? | **Consulted, not applicable** — output was plain markdown | — |
+| 2026-06-11 | Session 1 / Phase 0 | frontend-design | `.claude/skills/frontend-design/` | Anthropic skill (`/mnt/skills/public/frontend-design/`) | Phase 0 HUD + test-scene visual direction before writing UI code (KICKOFF §4 gates visuals) | Process discipline (plan tokens → critique → build), "signature element" framing → the bronze determinism-plaque telemetry HUD; restraint guidance (one bold element, quality floor: reduced-motion, no default fonts) | `index.html`, `src/ui/hud.ts`, `src/ui/hud.css`, `src/render/scene.ts` |
+| 2026-06-11 | Session 1 / Phase 0 | deterministic-sim-testing (candidate) | — | authored-in-repo candidate | — | **Deferred — insufficient evidence** (pattern solved once: PRNG+checksum+10k-tick harness in Phase 0). Revisit at Phase 2 gate per §11.3. | — |
+| 2026-06-11 | Session 1 / Phase 0 | bitecs-babylon-bridge (candidate) | — | authored-in-repo candidate | — | **Deferred — insufficient evidence** (one bridge built: per-sim stores → instanced orbs; two real findings logged: bitECS 0.4 new API has no defineComponent/Types; Babylon tree-shaken imports need side-effect modules for pipeline manager + InstancedMesh). Revisit at Phase 2. | — |
+
+## Phase 0 gate rollup
+
+**Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).
+
+**Skill library delta:** newly vendored: `frontend-design`, `docx`, `deep-research [stub]`. Newly authored: none (2 candidates deferred with evidence notes above). Updated: none.

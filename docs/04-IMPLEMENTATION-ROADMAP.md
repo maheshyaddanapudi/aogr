@@ -1,0 +1,79 @@
+# 04 — IMPLEMENTATION ROADMAP (live gate status)
+
+Build strictly in order (KICKOFF §9). A phase's gate must fully pass — logic AND
+visual — before the next phase starts. Update this file at every gate.
+
+**Performance budget:** 60fps with 300 pop on a 2021+ laptop GPU. Escape hatch: if
+Phase 2 can't hold 60fps at 200 units after worker offload + flow fields, reduce the
+match unit cap (e.g. 150) — never abandon true 3D.
+
+---
+
+## Phase 0 — Scaffold + deterministic loop + CI + Pages deploy
+
+- [x] Vite + TS(strict) + Babylon + bitECS + Vitest scaffold; §5 folder layout
+- [x] All `data/*.json` generated from the GDD, seeded from §7 anchors (40 contract tests)
+- [x] **Logic gate:** empty sim same-seed checksum identical after 10k ticks (tests/sim/determinism.test.ts)
+- [x] Vitest green in CI (.github/workflows/ci.yml)
+- [x] **Visual gate:** lit PBR test scene at 60fps with bloom pipeline active — `docs/screenshots/phase-0-gate.png` (verified headless: 60fps, WebGL2/SwiftShader)
+- [x] Pages deploy workflow (`deploy.yml`, gated on tests)
+- [ ] **Live URL serves the build** — pending merge to `main` + Pages enablement (workflow ready; deploys on merge)
+- [x] CLAUDE.md + docs/00–07; skills vendored + ledger seeded (§11.2)
+
+**Gate status: PASSED locally 2026-06-11** (live-URL criterion completes on merge to main).
+
+## Phase 1 — Terrain + RTS camera
+
+- [ ] Heightmap terrain 200×200 from map config (seeded, sim-owned heights as ints)
+- [ ] RTS camera: pan, edge-scroll, zoom, rotate; 60fps across the map
+- [ ] **Visual gate:** splatted terrain w/ normal maps + water plane + shadows — screenshot
+- [ ] GLTF pipeline proof: 1 animated character + 1 terrain texture end-to-end
+
+## Phase 2 — Units + movement + pathfinding (worker)
+
+- [ ] Hierarchical A* (sector portals) + flow fields + RVO in a Web Worker
+- [ ] **Logic gate:** 200 units path to a shared destination without overlap at 60fps
+- [ ] **Visual gate:** animated rigged units w/ team colors; selection rings; marquee select — screenshot
+- [ ] Revisit skill candidates: `deterministic-sim-testing`, `bitecs-babylon-bridge`, `rts-pathfinding-worker`
+
+## Phase 3 — Economy
+
+- [ ] **Logic gate:** gather all 4 resources; build house; pop cap rises; market trade works
+- [ ] **Visual gate:** gather animations; drop-off visuals; styled resource bar HUD
+
+## Phase 4 — Combat + counters
+
+- [ ] **Logic gate:** headless tests — archers>infantry>cavalry>archers; damage math matches units.json exactly
+- [ ] **Visual gate:** projectiles, hit sparks, death animations
+- [ ] Entity removal lands → revisit snapshot serialization seam (docs/02)
+
+## Phase 5 — Buildings + production + ages
+
+- [ ] **Logic gate:** Archaic→Mythic; per-data unlocks; tech effects apply
+- [ ] **Visual gate:** construction states; CSS age-up panel with 2-god choice cards — screenshot
+
+## Phase 6 — Gods + favor + powers + myth units
+
+- [ ] **Logic gate:** all 4 favor mechanics yield data-calibrated rates; powers cast w/ ramping cost; heroes counter myth
+- [ ] **Visual gate:** distinct particle VFX per power; per-pantheon favor UI — screenshot
+
+## Phase 7 — AI opponent (worker)
+
+- [ ] **Logic gate:** AI builds eco, ages to Mythic, attacks, defends, casts powers; Easy/Med/Hard measurably differ
+- [ ] **Visual gate:** AI armies move in formation; visible attack waves
+
+## Phase 8 — Fog of war + minimap + full UI
+
+- [ ] **Logic gate:** LOS-correct reveal/hide; clickable minimap; control groups 1–9; rally points; placement ghosts
+- [ ] **Visual gate:** soft-edged fog; styled minimap frame; full HUD pass — screenshot
+
+## Phase 9 — Audio + VFX polish
+
+- [ ] **Logic gate:** distinct SFX per power; unit acknowledgments; music loops with combat ducking
+- [ ] **Visual gate:** final VFX pass; post-processing tuned per biome
+
+## Phase 10 — Menus + save/load + settings + release
+
+- [ ] **Logic gate:** start→save→reload→resume with identical checksum; settings persist; victory/defeat screens
+- [ ] **Visual gate:** main menu + skirmish setup per art bible; public URL = playable release
+- [ ] Code-split Babylon bundle (<500 kB initial)
