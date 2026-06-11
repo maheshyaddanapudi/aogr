@@ -55,7 +55,9 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
 
   const params = new URLSearchParams(location.search);
   const seed = (config?.seed ?? Number(params.get("seed") ?? DEFAULT_SEED)) >>> 0;
-  const demo = !params.has("nodemo") && !config?.loadSnapshot;
+  // Demo script is OPT-IN (?demo): it commandeers player 0's villagers and
+  // spawns battle lines — must never run in a real menu-started match.
+  const demo = params.has("demo") && !config?.loadSnapshot;
 
   const sim = config?.loadSnapshot
     ? deserializeSim(config.loadSnapshot)
@@ -404,6 +406,10 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     queue.enqueue(sim.tick + 1, { type: "cast_power", playerId: 0, power, x: x * FP_ONE, y: y * FP_ONE });
   };
   (window as unknown as Record<string, unknown>).__agePanel = agePanel;
+  (window as unknown as Record<string, unknown>).__view = () => {
+    refreshViews();
+    return { units: unitView, buildings: buildingView, nodes: nodeView };
+  };
   (window as unknown as Record<string, unknown>).__spawn = (playerId: number, unit: string, x: number, y: number) =>
     spawnUnitEntity(sim, playerId, unit, x * FP_ONE, y * FP_ONE);
   (window as unknown as Record<string, unknown>).__step = (n: number) => {

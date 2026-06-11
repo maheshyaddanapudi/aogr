@@ -122,3 +122,29 @@ start the loop) for ALL gate captures with transient FX.
   materials wholesale turns the model white.
 - Billboarded textured quads can corrupt the frame on this stack; avoid for
   required visuals.
+
+## 12. Picking pitfalls + per-pool remat (added mobile/playtest pass)
+
+- **`scene.pickWithRay` needs a real `Ray` instance.** Passing a plain
+  `{origin, direction, length}` object returns garbage intersections (points
+  far outside the mesh's own bounding box) instead of throwing. In page-side
+  probes, grab classes off live objects (`cam.position.constructor` → Vector3,
+  `scene.getTransformMatrix().constructor` → Matrix) or use `scene.pick(x, y)`.
+- **Large alpha-blended planes swallow pick rays.** The water plane was
+  pickable and ate clicks that grazed past slim units near shores. Any
+  full-map decorative plane (water, fog drape) must set `isPickable = false`.
+- **Slim GLB parts make exact-pixel picking unreliable.** KayKit/Quaternius
+  body parts have tiny, sometimes zero-extent bounding boxes; a ray through a
+  unit's screen position often slips between limbs. Click/tap selection needs
+  screen-space forgiveness: if the ray misses, select the nearest own unit
+  within ~14px (mouse) / ~24px (touch) using the same projection as the
+  marquee.
+- **Building `Position` is the footprint CENTER** (`tile*1000 + size*1000/2`),
+  not the corner — aim probes and tests at `b.x, b.z` directly.
+- **White-material syndrome recurs per lazy pool load.** Boot-timed remats
+  (§11) miss GLB pools loaded later; schedule extra `markAsDirty(63)` passes
+  ~0.4s/2.5s after EACH pool import completes. Sessions can stay white even
+  after manual remat under SwiftShader — never seen on real GPUs; verify
+  questionable captures in a plain (non-touch-emulated) context before
+  blaming the renderer, and never ship `engine.releaseEffects()` as a "fix"
+  (async recompile leaves the scene black in paused captures).

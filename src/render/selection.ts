@@ -48,6 +48,14 @@ export function setupSelection(deps: SelectionDeps): Selection {
   const groups = new Map<number, number[]>();
   let placement: { buildingId: string; size: number } | null = null;
 
+  // touch taps: only treat as select when the finger barely moved
+  let touchDownAt: { x: number; y: number; t: number } | null = null;
+  window.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch") touchDownAt = { x: e.clientX, y: e.clientY, t: performance.now() };
+  });
+  const touchTapOk = (e: PointerEvent): boolean =>
+    !!touchDownAt && Math.hypot(e.clientX - touchDownAt.x, e.clientY - touchDownAt.y) < 12 && performance.now() - touchDownAt.t < 450;
+
   const marquee = document.createElement("div");
   marquee.className = "marquee";
   marquee.style.display = "none";
@@ -65,6 +73,27 @@ export function setupSelection(deps: SelectionDeps): Selection {
       deps.camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight()),
     );
     return { x: p.x, y: p.y };
+  };
+
+  // Unit models are slim — an exact-pixel ray often slips between limbs.
+  // Classic RTS forgiveness: fall back to the nearest own unit within a
+  // small screen radius around the click/tap.
+  const pickUnitNear = (cx: number, cy: number, radiusPx: number): number | null => {
+    const pick = scene.pick(cx, cy);
+    const direct = pick?.pickedMesh ? deps.isUnitMesh(pick.pickedMesh) : null;
+    if (direct !== null) return direct;
+    let best: number | null = null;
+    let bestD = radiusPx;
+    for (const u of deps.unitPositions()) {
+      if (u.playerId !== deps.localPlayerId) continue;
+      const sp = screenPos(u.x, deps.groundHeightAt(u.x, u.z) + 0.8, u.z);
+      const d = Math.hypot(sp.x - cx, sp.y - cy);
+      if (d < bestD) {
+        bestD = d;
+        best = u.eid;
+      }
+    }
+    return best;
   };
 
   canvas.addEventListener("pointerdown", (e) => {
@@ -89,6 +118,7 @@ export function setupSelection(deps: SelectionDeps): Selection {
       return;
     }
     if (e.button === 0) {
+      if (e.pointerType === "touch") return; // touch drags pan the camera; taps select via pointerup
       dragStart = { x: e.clientX, y: e.clientY };
       dragging = false;
     } else if (e.button === 2 && selectedBuilding !== null) {
@@ -148,6 +178,17 @@ export function setupSelection(deps: SelectionDeps): Selection {
   });
 
   window.addEventListener("pointerup", (e) => {
+    // touch tap = click-select (no marquee path)
+    if (e.pointerType === "touch" && e.button === 0 && touchTapOk(e)) {
+      const eid = pickUnitNear(e.clientX, e.clientY, 24);
+      const pick = eid === null ? scene.pick(e.clientX, e.clientY) : null;
+      const beid = eid === null && pick?.pickedMesh && deps.isBuildingMesh ? deps.isBuildingMesh(pick.pickedMesh) : null;
+      selected.clear();
+      selectedBuilding = null;
+      if (eid !== null) selected.add(eid);
+      else if (beid !== null) selectedBuilding = beid;
+      return;
+    }
     if (e.button !== 0 || !dragStart) return;
     if (dragging) {
       const x0 = Math.min(dragStart.x, e.clientX);
@@ -165,8 +206,8 @@ export function setupSelection(deps: SelectionDeps): Selection {
       }
       marquee.style.display = "none";
     } else {
-      const pick = scene.pick(e.clientX, e.clientY);
-      const eid = pick?.pickedMesh ? deps.isUnitMesh(pick.pickedMesh) : null;
+      const eid = pickUnitNear(e.clientX, e.clientY, 14);
+      const pick = eid === null ? scene.pick(e.clientX, e.clientY) : null;
       const beid = eid === null && pick?.pickedMesh && deps.isBuildingMesh ? deps.isBuildingMesh(pick.pickedMesh) : null;
       if (!e.shiftKey) selected.clear();
       selectedBuilding = null;

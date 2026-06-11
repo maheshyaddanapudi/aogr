@@ -235,6 +235,19 @@ export async function createUnitRenderer(scene: Scene, shadows: CascadedShadowGe
       result.push({ meshes, scaling: new Vector3(scale, scale, scale) });
     }
     pools.set(poolKey, result);
+    // Each lazy pool load is a fresh texture-decode/effect-compile race
+    // (skill §11) — re-specialize shortly after the textures settle.
+    for (const t of [400, 2500]) {
+      setTimeout(() => {
+        for (const m of scene.materials) {
+          try {
+            m.markAsDirty(63);
+          } catch {
+            /* some material types don't support it */
+          }
+        }
+      }, t);
+    }
   };
 
   // pre-warm the universal starters so the first frame isn't empty

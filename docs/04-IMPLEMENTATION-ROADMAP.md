@@ -125,3 +125,15 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 - Captures: `v2-*` screenshots in docs/screenshots/
 
 Verified: 111/111 tests green, sim purity clean, AI match runs 6 game-minutes headless with zero errors.
+
+## Mobile + manual playtest pass (post-release hardening)
+
+- [x] **Critical fix:** the Phase 3/4 demo script ran in EVERY game (menu-started matches included), commandeering the player's villagers, spending their resources, and spawning 12 free military units — demo is now opt-in via `?demo`
+- [x] Click/tap selection forgiveness: slim GLB parts let exact-pixel rays slip between limbs; nearest-own-unit fallback within 14px (mouse) / 24px (touch); water plane made unpickable (it swallowed clicks near shores)
+- [x] Responsive UI: portrait-phone menu (2×2 pantheon grid, stacked actions), landscape-phone menu + compact HUD (`max-height: 520px` query), loading overlay with spinner during the ~2MB game-chunk download
+- [x] Touch controls: one-finger pan (camera-space, zoom-scaled), two-finger pinch zoom, tap-select
+- [x] Gameplay is landscape-only on phones: full-screen "Rotate your device" overlay in portrait (`orientation: portrait` + `pointer: coarse`); desktop windows unaffected
+- [x] White-material guard extended: per-pool-load remat passes (skill §12)
+- Manually play-tested headless (desktop 1280×720 + phone 844×390/390×844): menu→boot, click-select, marquee, move/gather orders, TC select, train villager, rally point, build placement + completion, minimap pan, save button, touch pan/pinch/tap — all verified, zero console errors
+
+Verified: 111/111 tests green, sim purity clean, build clean.

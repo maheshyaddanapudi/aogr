@@ -146,6 +146,7 @@ export function buildTerrainMesh(scene: Scene, terrain: Terrain): TerrainView {
   // Water plane (reflective/refractive animated).
   const water = MeshBuilder.CreateGround("water", { width: s * 1.2, height: s * 1.2, subdivisions: 32 }, scene);
   water.position = new Vector3(s / 2, waterY, s / 2);
+  water.isPickable = false; // must never swallow unit/terrain pick rays
   const waterMaterial = new WaterMaterial("waterMat", scene);
   waterMaterial.bumpTexture = tex(scene, "waterbump.png");
   waterMaterial.windForce = -4;

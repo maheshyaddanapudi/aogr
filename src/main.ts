@@ -12,8 +12,17 @@ const params = new URLSearchParams(location.search);
 
 async function startGame(config: Parameters<typeof import("./game").boot>[0]): Promise<void> {
   document.getElementById("main-menu")?.remove();
+  const loading = document.createElement("div");
+  loading.className = "loading-overlay";
+  loading.id = "loading-overlay";
+  loading.innerHTML = `
+    <div class="loading-rune"></div>
+    <h2>Forging the world…</h2>
+    <p>First load downloads the gods, beasts, and terrain — give it a moment.</p>`;
+  document.body.appendChild(loading);
   const { boot } = await import("./game");
   await boot(config);
+  loading.remove();
 }
 
 function renderMenu(): void {
