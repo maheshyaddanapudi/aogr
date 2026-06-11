@@ -25,3 +25,18 @@ export function fpMul(a: number, b: number): number {
 export function fpDiv(a: number, b: number): number {
   return Math.trunc((a * FP_ONE) / b);
 }
+
+/**
+ * Integer square root (floor), Newton's method. No bit-shifts: inputs can
+ * exceed 32 bits (squared millitile distances), and >> truncates to int32.
+ */
+export function isqrt(n: number): number {
+  if (n <= 0) return 0;
+  let x = n;
+  let y = Math.trunc((x + 1) / 2);
+  while (y < x) {
+    x = y;
+    y = Math.trunc((x + Math.trunc(n / x)) / 2);
+  }
+  return x;
+}
