@@ -30,8 +30,11 @@ import {
 import { combatSystem, emptyEvents, handleCombatCommand, hashCombat, targetAliveAndValid, type SimEvents } from "./combat";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
 import { effectiveGatherMicroPerTick, handleResearchCommand, hashResearch, researchSystem } from "./research";
+// eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
+import { getPower, handlePowerCommand, hashPowers, powerSystem, type ActiveEffect } from "./powers";
 
-export const TICK_RATE = 15;
+export { TICK_RATE } from "./fixed";
+import { TICK_RATE } from "./fixed";
 export const MS_PER_TICK = 1000 / TICK_RATE; // render-side pacing only; sim counts ticks
 export const MAX_ENTITIES = 4096;
 
@@ -140,10 +143,20 @@ export interface Sim {
   readonly matchOptions: MatchOptions;
   /** transient per-tick outputs for the render layer; never hashed/serialized */
   events: SimEvents;
+  readonly activeEffects: ActiveEffect[];
   tick: number;
   unitRadiusFp(eid: number): number;
   unitStats(eid: number): UnitStats;
   effectiveGatherMicroPerTick(eid: number, resType: number): number;
+  buildingIdOf(eid: number): string;
+}
+
+function isSummonPower(powerId: string): boolean {
+  try {
+    return typeof (getPower(powerId).params as { summons?: unknown }).summons === "string";
+  } catch {
+    return false;
+  }
 }
 
 const DEFAULT_MATCH: MatchOptions = { players: 2, skirmish: false };
@@ -167,6 +180,7 @@ export function createSim(
     trainQueues: new Map(),
     matchOptions,
     events: emptyEvents(),
+    activeEffects: [],
     tick: 0,
     unitRadiusFp(eid: number): number {
       return getUnitStatsByIndex(stores.UnitRef.typeIndex[eid]!).radiusFp;
@@ -176,6 +190,9 @@ export function createSim(
     },
     effectiveGatherMicroPerTick(eid: number, resType: number): number {
       return effectiveGatherMicroPerTick(sim, eid, resType);
+    },
+    buildingIdOf(eid: number): string {
+      return getBuildingStatsByIndex(stores.Building.typeIndex[eid]!).id;
     },
   };
   if (matchOptions.skirmish) {
@@ -274,6 +291,7 @@ export function spawnUnitEntity(sim: Sim, playerId: number, unitId: string, x: n
 
 function applyCommand(sim: Sim, cmd: Command): void {
   if (handleResearchCommand(sim, cmd)) return;
+  if (handlePowerCommand(sim, cmd)) return;
   if (handleCombatCommand(sim, cmd)) return;
   if (handleEconomyCommand(sim, cmd)) return;
   switch (cmd.type) {
@@ -523,6 +541,7 @@ export function stepSim(sim: Sim, commands: readonly Command[]): void {
   sim.events = emptyEvents();
   for (const cmd of commands) applyCommand(sim, cmd);
   combatSystem(sim);
+  powerSystem(sim);
   researchSystem(sim);
   economySystem(sim);
   unitMovementSystem(sim);
@@ -560,6 +579,7 @@ export function simChecksum(sim: Sim): number {
   hashEconomy(sim, c);
   hashCombat(sim, c);
   hashResearch(sim, c);
+  hashPowers(sim, c);
   return c.digest();
 }
 
@@ -601,6 +621,7 @@ interface SimSnapshot {
   matchOptions: MatchOptions;
   players: PlayerState[];
   trainQueues: Array<[number, TrainEntry[]]>;
+  activeEffects: ActiveEffect[];
   entities: EntitySnapshot[];
 }
 
@@ -628,6 +649,7 @@ export function serializeSim(sim: Sim): string {
     trainQueues: Array.from(sim.trainQueues.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([k, v]) => [k, v.map((e) => ({ ...e }))]),
+    activeEffects: sim.activeEffects.map((e) => ({ ...e })),
     entities: eids.map((eid) => {
       const e: EntitySnapshot = { eid, x: Position.x[eid]!, y: Position.y[eid]! };
       if (isNode.has(eid)) {
@@ -749,5 +771,11 @@ export function deserializeSim(json: string): Sim {
   for (const p of snapshot.players) sim.players.push({ ...p, townCenterEid: r(p.townCenterEid) });
   sim.trainQueues.clear();
   for (const [k, v] of snapshot.trainQueues) sim.trainQueues.set(r(k), v.map((t) => ({ ...t })));
+  sim.activeEffects.length = 0;
+  for (const fx of snapshot.activeEffects ?? []) {
+    const power = fx.powerId;
+    // summon-effect data refers to an eid; remap it
+    sim.activeEffects.push({ ...fx, data: power && fx.data > 0 && typeof fx.data === "number" && isSummonPower(power) ? r(fx.data) : fx.data });
+  }
   return sim;
 }

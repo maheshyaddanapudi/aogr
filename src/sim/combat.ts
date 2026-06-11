@@ -14,6 +14,8 @@ import type { UnitStats } from "./unitdata";
 import { type Sim } from "./sim";
 // eslint-disable-next-line import/no-cycle -- runtime-safe
 import { applyModifiers, effectiveArmor } from "./research";
+// eslint-disable-next-line import/no-cycle -- runtime-safe
+import { creditCombatFavor } from "./powers";
 
 const MELEE_REACH_PAD_FP = 250;
 /** chase re-acquisition scan interval is every tick but capped by LOS */
@@ -22,10 +24,11 @@ export interface SimEvents {
   fired: Array<{ from: number; to: number; fromX: number; fromY: number; toX: number; toY: number; ranged: boolean }>;
   hits: Array<{ x: number; y: number }>;
   deaths: Array<{ eid: number; x: number; y: number; playerId: number; unitClass: string | null }>;
+  powerCasts: Array<{ power: string; playerId: number; x: number; y: number }>;
 }
 
 export function emptyEvents(): SimEvents {
-  return { fired: [], hits: [], deaths: [] };
+  return { fired: [], hits: [], deaths: [], powerCasts: [] };
 }
 
 export function handleCombatCommand(sim: Sim, cmd: Command): boolean {
@@ -155,6 +158,7 @@ export function combatSystem(sim: Sim): void {
         CombatState.cooldown[eid] = stats.attack!.cooldownTicks;
         const dmg = computeDamage100(sim, eid, target);
         Health.hp100[target] = Health.hp100[target]! - dmg;
+        creditCombatFavor(sim, sim.stores.Owner.playerId[eid]!, dmg);
         sim.events.fired.push({
           from: eid,
           to: target,

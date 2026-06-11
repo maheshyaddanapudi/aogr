@@ -39,6 +39,8 @@ export interface PlayerState {
   minorGods: string[];
   researchedTechs: string[];
   researchQueue: ResearchEntry[];
+  castCounts: Record<string, number>;
+  powerReadyTick: Record<string, number>;
 }
 
 export interface TrainEntry {
@@ -63,6 +65,8 @@ export function createPlayers(count: number): PlayerState[] {
     minorGods: [],
     researchedTechs: [],
     researchQueue: [],
+    castCounts: {},
+    powerReadyTick: {},
   }));
 }
 
@@ -315,6 +319,18 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
         (bstats.trains.includes("heroes") && ustats.unitClass === "hero") ||
         (bstats.trains.includes("myth_units") && ustats.unitClass === "myth");
       if (!trainable) return true;
+      if (ustats.unitClass === "myth") {
+        if (ustats.pantheon !== p.pantheon) return true;
+        const granted = p.minorGods.some((g) => {
+          try {
+            return getMinorOf(p.pantheon, g).grants.mythUnits.includes(ustats.id);
+          } catch {
+            return false;
+          }
+        });
+        if (!granted) return true;
+      }
+      if (ustats.unitClass === "hero" && ustats.pantheon !== "all" && ustats.pantheon !== p.pantheon) return true;
       if (!canAfford(p, ustats.cost) || p.popUsed + ustats.pop > Math.min(p.popCap, POP_CAP_ABSOLUTE)) return true;
       payCost(p, ustats.cost);
       const q = sim.trainQueues.get(beid) ?? [];
@@ -357,16 +373,9 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
 
 /* ───────────────────────── systems ───────────────────────── */
 
-/** Skyward-chants style prayer: 6/min first worshipper, ×0.85 each additional. */
-const PRAYER_TABLE_MILLI_PER_MIN: number[] = (() => {
-  const t: number[] = [];
-  let r = 6000;
-  for (let i = 0; i < 12; i++) {
-    t.push(r);
-    r = Math.trunc((r * 85) / 100);
-  }
-  return t;
-})();
+// eslint-disable-next-line import/no-cycle -- runtime-safe
+import { favorSystem } from "./powers";
+import { getMinor as getMinorOf } from "./pantheondata";
 
 export function economySystem(sim: Sim): void {
   const { Position, GatherTask, ResourceNode, Building, Owner, MoveState } = sim.stores;
@@ -460,17 +469,8 @@ export function economySystem(sim: Sim): void {
     }
   }
 
-  // favor income from prayer (per player, deterministic player order)
-  for (let pid = 0; pid < sim.players.length; pid++) {
-    const n = Math.min(prayingByPlayer.get(pid) ?? 0, PRAYER_TABLE_MILLI_PER_MIN.length);
-    if (n === 0) continue;
-    let totalMilliPerMin = 0;
-    for (let i = 0; i < n; i++) totalMilliPerMin += PRAYER_TABLE_MILLI_PER_MIN[i]!;
-    const p = getPlayer(sim, pid);
-    const micro = p.favorMicroAccum + Math.trunc((totalMilliPerMin * 1000) / 900);
-    p.favorMilli += Math.trunc(micro / 1000);
-    p.favorMicroAccum = micro % 1000;
-  }
+  // favor income — all four pantheon mechanics, data-calibrated
+  favorSystem(sim, prayingByPlayer);
 
   // training queues (ascending building eid)
   const qEids = Array.from(sim.trainQueues.keys()).sort((a, b) => a - b);

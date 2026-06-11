@@ -6,6 +6,9 @@
  */
 export const FP_ONE = 1000;
 
+/** Sim runs at a fixed 15 Hz (lives here so leaf modules avoid import cycles). */
+export const TICK_RATE = 15;
+
 /** Whole tiles → millitiles. */
 export function fpFromInt(tiles: number): number {
   return tiles * FP_ONE;
