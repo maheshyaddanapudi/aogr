@@ -1,0 +1,14 @@
+{
+  "$comment": "KICKOFF §3 hook wiring. Rename to settings.json (a human must do this — Claude Code's permission model treats hook installation as self-modification). Until then, the same rules are enforced by CI and tests/sim/purity.test.ts.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/sim-purity-hook.sh" },
+          { "type": "command", "command": "bash .claude/hooks/no-secrets-hook.sh" }
+        ]
+      }
+    ]
+  }
+}
