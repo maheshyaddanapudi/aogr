@@ -22,6 +22,7 @@ import { createCombatFx } from "./render/combatFx";
 import { createPowerFx } from "./render/powerFx";
 import { setupSelection } from "./render/selection";
 import { createPathService } from "./platform/pathService";
+import { createAiService } from "./platform/aiService";
 import { startLoop } from "./platform/loop";
 import { createHud } from "./ui/hud";
 import { createAgePanel } from "./ui/agePanel";
@@ -85,6 +86,8 @@ async function boot(): Promise<void> {
   const combatFx = await createCombatFx(world.scene);
   const powerFx = createPowerFx(world.scene);
   const pathService = createPathService(sim);
+  const aiDifficulty = (params.get("ai") ?? "medium") as "easy" | "medium" | "hard";
+  const aiService = params.get("ai") === "off" ? null : createAiService(1, aiDifficulty, seed);
   const hud = createHud(hudRoot);
   const agePanel = createAgePanel((tech, minorGod) => {
     queue.enqueue(sim.tick + 1, { type: "research", playerId: 0, tech, minorGod });
@@ -226,6 +229,7 @@ async function boot(): Promise<void> {
   // ?paused: gate-capture mode — sim/render driven only via __step/__forceFrame
   if (!params.has("paused")) startLoop({
     onTick: () => {
+      aiService?.onTick(sim, queue);
       stepSim(sim, queue.drain(sim.tick));
       combatFx.collect(sim.events, world.groundHeightAt);
       powerFx.collect(sim.events, world.groundHeightAt);
@@ -253,6 +257,7 @@ async function boot(): Promise<void> {
     spawnUnitEntity(sim, playerId, unit, x * FP_ONE, y * FP_ONE);
   (window as unknown as Record<string, unknown>).__step = (n: number) => {
     for (let i = 0; i < n; i++) {
+      aiService?.decideSyncNow(sim, queue);
       stepSim(sim, queue.drain(sim.tick));
       if (i >= n - 3) combatFx.collect(sim.events, world.groundHeightAt); // only recent FX
       powerFx.collect(sim.events, world.groundHeightAt);

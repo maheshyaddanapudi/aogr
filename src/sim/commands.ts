@@ -16,7 +16,8 @@ export type Command =
   | { type: "pray"; playerId: number; eids: number[] }
   | { type: "attack"; playerId: number; eids: number[]; targetEid: number }
   | { type: "research"; playerId: number; tech: string; minorGod?: string }
-  | { type: "cast_power"; playerId: number; power: string; x: number; y: number };
+  | { type: "cast_power"; playerId: number; power: string; x: number; y: number }
+  | { type: "work_on"; playerId: number; eids: number[]; buildingEid: number };
 
 interface Pending {
   tick: number;

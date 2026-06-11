@@ -8,6 +8,7 @@ import type { Checksum } from "./checksum";
 import type { Command } from "./commands";
 import { isqrt } from "./fixed";
 import { isPassable } from "./path/grid";
+import { computeFlowField, flowDistAt, UNREACHABLE } from "./path/flowfield";
 import { getBuildingStats, getBuildingStatsByIndex, type BuildingStats } from "./buildingdata";
 import { getUnitStats } from "./unitdata";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
@@ -170,15 +171,26 @@ function footprintClear(sim: Sim, tileX: number, tileY: number, size: number): b
   return true;
 }
 
-/** Deterministic spiral search for a clear building site near a tile. */
+/** Deterministic spiral search for a clear building site near a tile,
+ * restricted to tiles REACHABLE from the anchor (no across-the-river sites). */
 export function findBuildSite(sim: Sim, nearX: number, nearY: number, size: number): { x: number; y: number } | null {
+  const anchor = nearestPassableTile(sim, nearX, nearY);
+  const key = anchor.y * sim.navGrid.size + anchor.x;
+  let field = sim.flowFields.get(key);
+  if (!field) {
+    field = computeFlowField(sim.navGrid, anchor.x, anchor.y);
+    sim.flowFields.set(key, field);
+  }
   for (let r = 2; r < 40; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         const x = nearX + dx;
         const y = nearY + dy;
-        if (footprintClear(sim, x, y, size)) return { x, y };
+        if (!footprintClear(sim, x, y, size)) continue;
+        // a tile just outside the footprint must be reachable from the anchor
+        if (flowDistAt(field, x - 1, y - 1) >= UNREACHABLE) continue;
+        return { x, y };
       }
     }
   }
@@ -248,8 +260,9 @@ export function setupSkirmish(sim: Sim): void {
         spawnResourceNode(sim, kind, t.x, t.y, each);
       }
     };
-    place("food", 7, 5, 6, 100_000, 3);
-    place("wood", -9, -7, 12, 150_000, 4);
+    place("food", 7, 5, 8, 500_000, 4);
+    place("food", -10, 8, 6, 500_000, 3);
+    place("wood", -9, -7, 12, 200_000, 4);
     place("gold", 9, -8, 3, 1_500_000, 3);
   }
 }
@@ -353,6 +366,19 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
       stockAdd(p, buy, Math.trunc((amount * (100 - spread)) / 100));
       return true;
     }
+    case "work_on": {
+      const beid = cmd.buildingEid;
+      if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
+      if (Building.active[beid] === 1) return true;
+      const sorted = [...cmd.eids].sort((a, b) => a - b);
+      for (const eid of sorted) {
+        if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, GatherTask)) continue;
+        GatherTask.phase[eid] = 4;
+        GatherTask.nodeEid[eid] = beid;
+        setMoveTarget(sim, eid, Position.x[beid]!, Position.y[beid]!);
+      }
+      return true;
+    }
     case "pray": {
       const sorted = [...cmd.eids].sort((a, b) => a - b);
       const temple = buildingsOf(sim, cmd.playerId, (s) => s.id === "temple" || s.id === "sky_temple")[0];
@@ -399,6 +425,8 @@ export function economySystem(sim: Sim): void {
       if (d <= GATHER_REACH_FP) {
         GatherTask.phase[eid] = 2;
         MoveState.active[eid] = 0;
+      } else if (MoveState.active[eid] !== 1) {
+        setMoveTarget(sim, eid, Position.x[node]!, Position.y[node]!); // stalled short: re-approach
       }
     } else if (phase === 2) {
       // gathering
@@ -427,6 +455,9 @@ export function economySystem(sim: Sim): void {
         continue;
       }
       const reach = buildingReach(getBuildingStatsByIndex(Building.typeIndex[drop]!).size);
+      if (dist(px, py, Position.x[drop]!, Position.y[drop]!) > reach && MoveState.active[eid] !== 1) {
+        setMoveTarget(sim, eid, Position.x[drop]!, Position.y[drop]!); // stalled short: re-approach
+      }
       if (dist(px, py, Position.x[drop]!, Position.y[drop]!) <= reach) {
         const p = getPlayer(sim, Owner.playerId[eid]!);
         stockAdd(p, RES_BY_INDEX[GatherTask.carriedType[eid]!]!, GatherTask.carriedMilli[eid]!);
@@ -447,11 +478,20 @@ export function economySystem(sim: Sim): void {
         continue;
       }
       const reach = buildingReach(getBuildingStatsByIndex(Building.typeIndex[b]!).size);
+      if (dist(px, py, Position.x[b]!, Position.y[b]!) > reach && MoveState.active[eid] !== 1) {
+        setMoveTarget(sim, eid, Position.x[b]!, Position.y[b]!); // stalled short: re-approach
+      }
       if (dist(px, py, Position.x[b]!, Position.y[b]!) <= reach) {
         MoveState.active[eid] = 0;
         Building.progress[b] = Building.progress[b]! + 1;
         if (Building.progress[b]! >= Building.total[b]!) {
           Building.active[b] = 1;
+          // farms provide a quasi-infinite food node at their center
+          if (getBuildingStatsByIndex(Building.typeIndex[b]!).isFarm) {
+            const fx = Math.trunc(Position.x[b]! / 1000);
+            const fy = Math.trunc(Position.y[b]! / 1000);
+            spawnResourceNode(sim, "food", fx, fy, 1_000_000_000);
+          }
         }
       }
     } else if (phase === 5) {
@@ -460,6 +500,9 @@ export function economySystem(sim: Sim): void {
       if (!hasComponent(sim.world, t, Building) || Building.active[t] !== 1) {
         GatherTask.phase[eid] = 0;
         continue;
+      }
+      if (dist(px, py, Position.x[t]!, Position.y[t]!) > PRAY_REACH_FP + 1500 && MoveState.active[eid] !== 1) {
+        setMoveTarget(sim, eid, Position.x[t]!, Position.y[t]!);
       }
       if (dist(px, py, Position.x[t]!, Position.y[t]!) <= PRAY_REACH_FP + 1500) {
         MoveState.active[eid] = 0;

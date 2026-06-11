@@ -1,0 +1,33 @@
+{
+  "$comment": "SOURCE OF TRUTH for AI difficulty knobs (docs/05). Times in ticks (15/s).",
+  "version": 1,
+  "difficulties": {
+    "easy": {
+      "decisionIntervalTicks": 60,
+      "villagerTarget": 14,
+      "armyTarget": 8,
+      "waveSize": 8,
+      "usePowers": false,
+      "prayerVillagers": 1,
+      "mythTarget": 0
+    },
+    "medium": {
+      "decisionIntervalTicks": 38,
+      "villagerTarget": 22,
+      "armyTarget": 14,
+      "waveSize": 10,
+      "usePowers": true,
+      "prayerVillagers": 2,
+      "mythTarget": 1
+    },
+    "hard": {
+      "decisionIntervalTicks": 23,
+      "villagerTarget": 32,
+      "armyTarget": 20,
+      "waveSize": 10,
+      "usePowers": true,
+      "prayerVillagers": 3,
+      "mythTarget": 3
+    }
+  }
+}

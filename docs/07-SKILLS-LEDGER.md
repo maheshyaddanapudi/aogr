@@ -29,6 +29,9 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 | 2026-06-11 | Session 1 / Phase 6 | deterministic-sim-testing | (vendored) | authored in-repo | Powers/favor suite; caught the module-init cycle (TICK_RATE undefined → NaN favor) — added to the divergence checklist as "module-eval-order constants" | NaN favor diagnosed in minutes via the harness | tests/sim/gods.test.ts, src/sim/fixed.ts |
 | 2026-06-11 | Session 1 / Phase 6 | babylon-integration-pitfalls | (vendored) | authored in-repo | VFX built mesh-centric (pillar/bolt/ring) BECAUSE the skill's §10 documents that particles can't be frozen in stills — pattern chosen for capturability and in-game readability | First capture usable; additive blending fix only | src/render/powerFx.ts |
 
+| 2026-06-11 | Session 1 / Phase 7 | deterministic-sim-testing | (vendored) | authored in-repo | AI determinism test (same seed ⇒ same AI match checksum); trace-driven debugging of the boom (food starvation → farm mechanics → stall re-walks) | The "assert counts via probes, never eyeball" rule drove the minute-by-minute trace harness that found 3 stall bugs | tests/ai/ai.test.ts, src/sim/economy.ts, src/ai/brain.ts |
+| 2026-06-11 | Session 1 / Phase 7 | petra-style-ai (candidate) | — | authored-in-repo candidate | — | **Deferred — single implementation** (one brain, one game's evidence); revisit if a second AI profile or major rework lands | — |
+
 ## Phase 0 gate rollup
 
 **Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).
