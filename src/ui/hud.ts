@@ -17,6 +17,7 @@ export interface Hud {
   update: (data: { tick: number; checksum: number; fps: number; seed: number; backend: string }) => void;
   updateResources: (r: HudResources) => void;
   setAge: (age: number, canAdvance: boolean) => void;
+  setPantheon: (pantheonId: string) => void;
   onAgeUp: (cb: () => void) => void;
 }
 
@@ -72,6 +73,22 @@ export function createHud(root: HTMLElement): Hud {
         checksumEl.classList.add("pulse");
         setTimeout(() => checksumEl.classList.remove("pulse"), 240);
       }
+    },
+    setPantheon(pantheonId) {
+      const cfg: Record<string, { icon: string; color: string; label: string }> = {
+        auryan_dawn: { icon: "☀", color: "#e8a83c", label: "Devotion Pyres — Sun-Altars radiate favor" },
+        verdant_deep: { icon: "🌊", color: "#2e8f7a", label: "Tidal Oracles — stationary Tide-Seers attune favor" },
+        ashen_forge: { icon: "🔥", color: "#b8472e", label: "Forge-Wrath — combat damage feeds the forge" },
+        storm_concord: { icon: "🕊", color: "#5a6fc7", label: "Skyward Chants — villagers pray at Sky-Temples" },
+      };
+      const c = cfg[pantheonId];
+      if (!c) return;
+      const favorEl = root.querySelector<HTMLElement>(".res-favor")!;
+      favorEl.title = c.label;
+      const icon = favorEl.querySelector("i")!;
+      icon.textContent = c.icon;
+      (icon as HTMLElement).style.color = c.color;
+      (icon as HTMLElement).style.textShadow = `0 0 8px ${c.color}`;
     },
     setAge(age, canAdvance) {
       ageEl.textContent = AGE_NAMES[age] ?? "—";

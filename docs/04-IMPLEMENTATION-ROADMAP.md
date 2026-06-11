@@ -69,8 +69,10 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 6 — Gods + favor + powers + myth units
 
-- [ ] **Logic gate:** all 4 favor mechanics yield data-calibrated rates; powers cast w/ ramping cost; heroes counter myth
-- [ ] **Visual gate:** distinct particle VFX per power; per-pantheon favor UI — screenshot
+- [x] **Logic gate:** all 4 favor mechanics at data rates (pyres 28.6/min @5 altars; oracles 5.5/min LOS-scaled + non-stacking; forge-wrath exact favor/damage + trickle; chants 6/min param-driven); powers ramp free→base→×1.5 with cooldowns; effect engine (instant/DoT/heal/summon, exact pools); myth units gate on granting minor god; Forgeborn beats Emberbull 1v1; determinism + serialization (tests/sim/gods.test.ts, 11 tests)
+- [x] **Visual gate:** distinct mesh+particle VFX per power (pattern × pantheon palette: pillar/bolt/rain/burst/swirl/ring, additive glow) — `phase-6-gate-powers.png` (solar lance pillar + searing mirage swirl + pyre storm field in one frame); favor chip changes icon/color/tooltip per pantheon — `phase-6-favor-*.png`
+
+**Gate status: PASSED 2026-06-11.** Deferred (ledgered): Radiant kindle boost, petrify/convert/decoy special params — power engine handles damage/heal/summon/timed classes; remaining param wirings land with their UI in Phases 8–10.
 
 ## Phase 7 — AI opponent (worker)
 

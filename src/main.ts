@@ -19,6 +19,7 @@ import { createEngine, createWorldScene } from "./render/scene";
 import { createUnitRenderer, type UnitAnimState } from "./render/units";
 import { createWorldObjectsRenderer } from "./render/buildings";
 import { createCombatFx } from "./render/combatFx";
+import { createPowerFx } from "./render/powerFx";
 import { setupSelection } from "./render/selection";
 import { createPathService } from "./platform/pathService";
 import { startLoop } from "./platform/loop";
@@ -82,6 +83,7 @@ async function boot(): Promise<void> {
   const unitRenderer = await createUnitRenderer(world.scene, world.shadows);
   const objects = await createWorldObjectsRenderer(world.scene, world.shadows);
   const combatFx = await createCombatFx(world.scene);
+  const powerFx = createPowerFx(world.scene);
   const pathService = createPathService(sim);
   const hud = createHud(hudRoot);
   const agePanel = createAgePanel((tech, minorGod) => {
@@ -210,6 +212,7 @@ async function boot(): Promise<void> {
     const p = getPlayer(sim, 0);
     hud.update({ tick: sim.tick, checksum, fps: engine.getFps(), seed, backend });
     hud.setAge(p.age, canAgeUp());
+    hud.setPantheon(p.pantheon);
     hud.updateResources({
       food: Math.trunc(p.foodMilli / 1000),
       wood: Math.trunc(p.woodMilli / 1000),
@@ -225,10 +228,12 @@ async function boot(): Promise<void> {
     onTick: () => {
       stepSim(sim, queue.drain(sim.tick));
       combatFx.collect(sim.events, world.groundHeightAt);
+      powerFx.collect(sim.events, world.groundHeightAt);
       if (sim.tick % 15 === 0) checksum = simChecksum(sim);
     },
     onFrame: (alpha, dtMs) => {
       combatFx.update(dtMs);
+      powerFx.update(dtMs);
       renderFrame();
     },
   });
@@ -239,7 +244,10 @@ async function boot(): Promise<void> {
   (window as unknown as Record<string, unknown>).__scene = world.scene;
   (window as unknown as Record<string, unknown>).__sim = sim;
   (window as unknown as Record<string, unknown>).__selection = selection;
-  (window as unknown as Record<string, unknown>).__forceFrame = () => { combatFx.update(120); renderFrame(); };
+  (window as unknown as Record<string, unknown>).__forceFrame = () => { combatFx.update(120); powerFx.update(120); renderFrame(); };
+  (window as unknown as Record<string, unknown>).__cast = (power: string, x: number, y: number) => {
+    queue.enqueue(sim.tick + 1, { type: "cast_power", playerId: 0, power, x: x * FP_ONE, y: y * FP_ONE });
+  };
   (window as unknown as Record<string, unknown>).__agePanel = agePanel;
   (window as unknown as Record<string, unknown>).__spawn = (playerId: number, unit: string, x: number, y: number) =>
     spawnUnitEntity(sim, playerId, unit, x * FP_ONE, y * FP_ONE);
@@ -247,6 +255,7 @@ async function boot(): Promise<void> {
     for (let i = 0; i < n; i++) {
       stepSim(sim, queue.drain(sim.tick));
       if (i >= n - 3) combatFx.collect(sim.events, world.groundHeightAt); // only recent FX
+      powerFx.collect(sim.events, world.groundHeightAt);
     }
     checksum = simChecksum(sim);
   };
