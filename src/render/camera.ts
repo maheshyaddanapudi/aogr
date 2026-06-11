@@ -30,6 +30,51 @@ export function createRtsCamera(scene: Scene, canvas: HTMLCanvasElement, mapSize
   let mouseY = -1;
   let rotating = false;
 
+  // ── touch: one-finger drag pans, two-finger pinch zooms ──
+  const touches = new Map<number, { x: number; y: number }>();
+  let pinchDist = 0;
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch") return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) {
+      const [a, b] = Array.from(touches.values());
+      pinchDist = Math.hypot(a!.x - b!.x, a!.y - b!.y);
+    }
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "touch" || !touches.has(e.pointerId)) return;
+    const prev = touches.get(e.pointerId)!;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 1) {
+      // pan in camera space; scale with zoom so it feels 1:1 with the ground
+      const worldPerPx = (camera.radius * 1.35) / canvas.clientHeight;
+      const dx = (e.clientX - prev.x) * worldPerPx;
+      const dz = (e.clientY - prev.y) * worldPerPx;
+      const fx = -Math.cos(camera.alpha);
+      const fz = -Math.sin(camera.alpha);
+      const rx = -Math.sin(camera.alpha);
+      const rz = Math.cos(camera.alpha);
+      camera.target.x -= rx * dx + fx * -dz;
+      camera.target.z -= rz * dx + fz * -dz;
+      camera.target.x = Math.min(Math.max(camera.target.x, 0), mapSize);
+      camera.target.z = Math.min(Math.max(camera.target.z, 0), mapSize);
+    } else if (touches.size === 2) {
+      const [a, b] = Array.from(touches.values());
+      const d = Math.hypot(a!.x - b!.x, a!.y - b!.y);
+      if (pinchDist > 0) {
+        camera.radius = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, camera.radius * (pinchDist / d)));
+      }
+      pinchDist = d;
+    }
+  });
+  const endTouch = (e: PointerEvent) => {
+    if (e.pointerType !== "touch") return;
+    touches.delete(e.pointerId);
+    pinchDist = 0;
+  };
+  canvas.addEventListener("pointerup", endTouch);
+  canvas.addEventListener("pointercancel", endTouch);
+
   window.addEventListener("keydown", (e) => keys.add(e.code));
   window.addEventListener("keyup", (e) => keys.delete(e.code));
   window.addEventListener("blur", () => keys.clear());

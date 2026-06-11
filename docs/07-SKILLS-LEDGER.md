@@ -42,6 +42,8 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 
 | 2026-06-11 | Session 1 / Visual upgrade pass | babylon-integration-pitfalls | (vendored) | authored in-repo | Three new hard-won lessons while raising visuals to the 8.5 bar: frozen-defines texture race (white-material syndrome) + markAsDirty fix, ParticleSystem renders nothing on this stack (mesh FX only), Quaternius per-part material tinting — skill UPDATED with §11 | Root-caused the white-wash across 6 bisection runs; damage states rebuilt mesh-based | src/render/units.ts, buildings.ts, game.ts, SKILL.md §11 |
 
+| 2026-06-11 | Session 1 / Mobile + manual playtest pass | babylon-integration-pitfalls | `.claude/skills/babylon-integration-pitfalls/` | authored in-repo | Consulted for the headless playtest harness (§7 capture recipe, §11 remat) while manually exercising every desktop/mobile interaction; **updated** with §12 (plain-object Ray garbage, pickable water swallowing clicks, slim-part pick forgiveness, building center positions, per-pool-load remat, releaseEffects trap) | Root-caused the demo-script-in-real-games bug, water-blocked click-select, and the white-capture flakiness triage | src/render/selection.ts, terrainMesh.ts, units.ts, src/game.ts, SKILL.md §12 |
+
 ## SESSION 1 FINAL ROLLUP (Phases 0–10 complete)
 
 **Skills used:** frontend-design (4 uses), deterministic-sim-testing (authored Phase 2; used at every gate after), babylon-integration-pitfalls (authored Phase 1; used + updated through Phase 9), docx + deep-research (pre-repo provenance).

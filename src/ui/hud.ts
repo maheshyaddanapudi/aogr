@@ -37,6 +37,11 @@ export function createHud(root: HTMLElement): Hud {
         <button class="age-up-btn" data-f="ageup" disabled>Advance Age</button>
       </div>
     </div>
+    <div class="rotate-overlay">
+      <div class="rotate-icon">⟳</div>
+      <h2>Rotate your device</h2>
+      <p>Pantheons plays in landscape. Turn your phone sideways to continue.</p>
+    </div>
     <div class="plaque">
       <h2>Determinism Seal</h2>
       <dl>
