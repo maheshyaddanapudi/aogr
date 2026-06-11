@@ -37,6 +37,14 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 
 | 2026-06-11 | Session 1 / Phase 9 | babylon-integration-pitfalls | (vendored) | authored in-repo | Audio collect had the same "__step bypasses the frame path" trap as FX (§7) — events must be collected in BOTH the rAF tick and __step | One-probe diagnosis | src/main.ts, src/platform/audio.ts |
 
+| 2026-06-11 | Session 1 / Phase 10 | deterministic-sim-testing | (vendored) | authored in-repo | Final release gate: victory-state lanes hashed+serialized; browser-level save/load equality proof reused the harness discipline (compare sealed checksums, not vibes) | The 0x3CCE7C55 = 0x3CCE7C55 proof | tests/sim/victory.test.ts, src/sim/victory.ts, src/platform/storage.ts |
+| 2026-06-11 | Session 1 / Phase 10 | frontend-design | (vendored) | Anthropic skill | Main menu: hero-as-thesis (the four pantheons ARE the choice), restraint elsewhere; credits line carries the CC-BY obligation | Menu passed the bar on first capture | src/main.ts, hud.css |
+
+## SESSION 1 FINAL ROLLUP (Phases 0–10 complete)
+
+**Skills used:** frontend-design (4 uses), deterministic-sim-testing (authored Phase 2; used at every gate after), babylon-integration-pitfalls (authored Phase 1; used + updated through Phase 9), docx + deep-research (pre-repo provenance).
+**Library delta:** vendored frontend-design, docx, deep-research[stub]; authored deterministic-sim-testing, babylon-integration-pitfalls (10 sections of earned knowledge); deferred with evidence notes: bitecs-babylon-bridge, rts-pathfinding-worker, petra-style-ai, balance-data-tuning, babylon-rts-vfx.
+
 ## Phase 0 gate rollup
 
 **Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).

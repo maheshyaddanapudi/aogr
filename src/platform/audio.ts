@@ -5,6 +5,7 @@
  */
 import { Howl, Howler } from "howler";
 import type { SimEvents } from "../sim/combat";
+import { loadSettings } from "./storage";
 
 const BASE = `${import.meta.env.BASE_URL}audio/`;
 
@@ -33,7 +34,8 @@ export interface AudioSystem {
 }
 
 export function createAudioSystem(): AudioSystem {
-  const sfx = (file: string, volume = 0.6) => new Howl({ src: [`${BASE}${file}`], volume });
+  const settings = loadSettings();
+  const sfx = (file: string, volume = 0.6) => new Howl({ src: [`${BASE}${file}`], volume: volume * settings.sfxVol });
   const powers: Record<string, Howl> = {
     pillar: sfx("power_pillar.ogg", 0.7),
     bolt: sfx("power_bolt.ogg", 0.7),
@@ -52,7 +54,7 @@ export function createAudioSystem(): AudioSystem {
     military: sfx("ack_military.ogg", 0.5),
   };
   const click = sfx("ui_click.ogg", 0.4);
-  const music = new Howl({ src: [`${BASE}music_main.mp3`], loop: true, volume: 0.35 });
+  const music = new Howl({ src: [`${BASE}music_main.mp3`], loop: true, volume: settings.musicVol });
 
   const debug = { powerPlays: 0, hitPlays: 0, musicStarted: false, ducked: false };
   let lastCombatMs = -100000;
@@ -71,7 +73,9 @@ export function createAudioSystem(): AudioSystem {
     const fighting = performance.now() - lastCombatMs < 2500;
     if (fighting !== debug.ducked) {
       debug.ducked = fighting;
-      music.fade(fighting ? 0.35 : 0.18, fighting ? 0.18 : 0.35, 450);
+      const hi = settings.musicVol;
+      const lo = settings.musicVol * 0.5;
+      music.fade(fighting ? hi : lo, fighting ? lo : hi, 450);
     }
   }, 300);
 

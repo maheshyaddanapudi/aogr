@@ -34,6 +34,8 @@ import { effectiveGatherMicroPerTick, handleResearchCommand, hashResearch, resea
 import { getPower, handlePowerCommand, hashPowers, powerSystem, type ActiveEffect } from "./powers";
 // eslint-disable-next-line import/no-cycle -- runtime-safe
 import { visibilitySystem } from "./visibility";
+// eslint-disable-next-line import/no-cycle -- runtime-safe
+import { hashVictory, victorySystem } from "./victory";
 
 export { TICK_RATE } from "./fixed";
 import { TICK_RATE } from "./fixed";
@@ -152,6 +154,10 @@ export interface Sim {
   readonly activeEffects: ActiveEffect[];
   /** per-player fog grids — DERIVED, never hashed/serialized */
   readonly visibility: Uint8Array[];
+  /** -1 while the match runs; winning playerId once decided */
+  winner: number;
+  /** per-player wonder countdown (ticks remaining; 0 = no countdown) */
+  readonly wonderTicksLeft: number[];
   tick: number;
   unitRadiusFp(eid: number): number;
   unitStats(eid: number): UnitStats;
@@ -190,6 +196,8 @@ export function createSim(
     events: emptyEvents(),
     activeEffects: [],
     visibility: [],
+    winner: -1,
+    wonderTicksLeft: Array.from({ length: matchOptions.players }, () => 0),
     tick: 0,
     unitRadiusFp(eid: number): number {
       return getUnitStatsByIndex(stores.UnitRef.typeIndex[eid]!).radiusFp;
@@ -556,6 +564,7 @@ export function stepSim(sim: Sim, commands: readonly Command[]): void {
   unitMovementSystem(sim);
   wanderSystem(sim);
   visibilitySystem(sim);
+  victorySystem(sim);
   sim.tick++;
 }
 
@@ -590,6 +599,7 @@ export function simChecksum(sim: Sim): number {
   hashCombat(sim, c);
   hashResearch(sim, c);
   hashPowers(sim, c);
+  hashVictory(sim, c);
   return c.digest();
 }
 
@@ -632,6 +642,8 @@ interface SimSnapshot {
   players: PlayerState[];
   trainQueues: Array<[number, TrainEntry[]]>;
   activeEffects: ActiveEffect[];
+  winner: number;
+  wonderTicksLeft: number[];
   entities: EntitySnapshot[];
 }
 
@@ -660,6 +672,8 @@ export function serializeSim(sim: Sim): string {
       .sort((a, b) => a[0] - b[0])
       .map(([k, v]) => [k, v.map((e) => ({ ...e }))]),
     activeEffects: sim.activeEffects.map((e) => ({ ...e })),
+    winner: sim.winner,
+    wonderTicksLeft: [...sim.wonderTicksLeft],
     entities: eids.map((eid) => {
       const e: EntitySnapshot = { eid, x: Position.x[eid]!, y: Position.y[eid]! };
       if (isNode.has(eid)) {
@@ -785,6 +799,9 @@ export function deserializeSim(json: string): Sim {
   for (const p of snapshot.players) sim.players.push({ ...p, townCenterEid: r(p.townCenterEid) });
   sim.trainQueues.clear();
   for (const [k, v] of snapshot.trainQueues) sim.trainQueues.set(r(k), v.map((t) => ({ ...t })));
+  sim.winner = snapshot.winner ?? -1;
+  sim.wonderTicksLeft.length = 0;
+  for (const w of snapshot.wonderTicksLeft ?? sim.players.map(() => 0)) sim.wonderTicksLeft.push(w);
   sim.activeEffects.length = 0;
   for (const fx of snapshot.activeEffects ?? []) {
     const power = fx.powerId;

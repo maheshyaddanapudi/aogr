@@ -103,6 +103,10 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 10 — Menus + save/load + settings + release
 
-- [ ] **Logic gate:** start→save→reload→resume with identical checksum; settings persist; victory/defeat screens
-- [ ] **Visual gate:** main menu + skirmish setup per art bible; public URL = playable release
-- [ ] Code-split Babylon bundle (<500 kB initial)
+- [x] **Logic gate:** start→save→reload→resume with IDENTICAL checksum proven end-to-end in the browser (IndexedDB snapshot, tick 600, 0x3CCE7C55 both sides); settings (music/sfx) persist via localStorage; victory (conquest + wonder countdown w/ cancel) and defeat screens (tests/sim/victory.test.ts, 4 tests + browser probe)
+- [x] **Visual gate:** main menu + skirmish setup per the art bible (4 pantheon cards w/ favor-mechanic blurbs + color identity, opponent/seed/volume controls, Continue-saved-match) — `phase-10-gate-menu.png`; victory overlay — `phase-10-victory.png`
+- [x] Code-split: 17.7 kB initial menu bundle; the Babylon game module (1.9 MB) lazy-loads on match start
+- [ ] Settlement/relic-control victory — relics not yet in worldgen; conquest + wonder shipped. Flagged for human decision (3rd condition or accept two for v1)
+- [ ] Live URL = playable release — completes when this branch merges to `main` (deploy workflow is test-gated and ready)
+
+**Gate status: PASSED 2026-06-11** (two explicitly flagged human items above — nothing silently skipped).
