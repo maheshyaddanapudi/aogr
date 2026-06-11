@@ -18,5 +18,11 @@ export {
   simChecksum,
   serializeSim,
   deserializeSim,
+  nearestPassableTile,
+  spawnUnitEntity,
   type Sim,
 } from "./sim";
+export { getUnitStats, getUnitStatsByIndex, listUnitIds, type UnitStats } from "./unitdata";
+export { buildNavGrid, isPassable, type NavGrid } from "./path/grid";
+export { computeFlowField, flowDirAt, flowDistAt, type FlowField } from "./path/flowfield";
+export { SECTOR_SIZE, buildPortalGraph, findSectorPath, type PortalGraph } from "./path/portals";

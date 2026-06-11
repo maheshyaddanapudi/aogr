@@ -157,3 +157,12 @@ body {
     transition: none;
   }
 }
+
+/* marquee selection rectangle */
+.marquee {
+  position: absolute;
+  border: 1px solid var(--bronze-bright);
+  background: rgba(217, 169, 78, 0.12);
+  pointer-events: none;
+  z-index: 10;
+}

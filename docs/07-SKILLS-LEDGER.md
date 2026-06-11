@@ -14,6 +14,9 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 
 | 2026-06-11 | Session 1 / Phase 1 | babylon-integration-pitfalls | `.claude/skills/babylon-integration-pitfalls/` | **authored in-repo** | §11.3 threshold met: Babylon side-effect import trap hit 3× (pipeline manager, InstancedMesh, Ray), plus SSAO2-prepass shader failures, inverted-winding invisible terrain, SwiftShader headless throttling, and dual-instance probe contamination — a fresh instance would re-derive all of it | Distilled checklist + verification steps for every Babylon feature addition; to be consulted at each render-layer change from Phase 2 on | `src/render/scene.ts`, `src/render/terrainMesh.ts`, `src/render/camera.ts`, `docs/02` |
 
+| 2026-06-11 | Session 1 / Phase 2 | babylon-integration-pitfalls | `.claude/skills/babylon-integration-pitfalls/` | authored in-repo (Phase 1) | Consulted before adding picking/instancing/GLTF unit rendering; **updated** with Phase 2 evidence (headless capture recipe, skinned-crowd pattern, variant-submesh trap, texture-adoption ordering) | Pre-empted the silent `scene.pick` failure (Ray import was already in); guided headless gate verification | `src/render/units.ts`, `src/render/selection.ts`, SKILL.md §7–8 |
+| 2026-06-11 | Session 1 / Phase 2 | deterministic-sim-testing | `.claude/skills/deterministic-sim-testing/` | **authored in-repo** | §11.3 threshold met: pattern exercised in Phases 0, 1, and 2 (10k-tick gates, terrain checksum folding, 200-unit march determinism, serialize-lockstep, isqrt int32-shift pitfall, salted PRNG streams, ascending-eid iteration discipline) | Distilled harness shape + design rules + divergence-debugging checklist; to be invoked at every subsequent gate | `tests/sim/*.test.ts`, `src/sim/*` |
+
 ## Phase 0 gate rollup
 
 **Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).

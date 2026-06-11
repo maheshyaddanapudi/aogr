@@ -111,8 +111,8 @@ function getFlowField(sim: Sim, key: number): FlowField {
   return f;
 }
 
-/** Deterministic spiral search for the nearest passable tile. */
-function nearestPassableTile(sim: Sim, tx: number, ty: number): { x: number; y: number } {
+/** Deterministic spiral search for the nearest passable tile (move targets snap here). */
+export function nearestPassableTile(sim: Sim, tx: number, ty: number): { x: number; y: number } {
   if (isPassable(sim.navGrid, tx, ty)) return { x: tx, y: ty };
   for (let r = 1; r < sim.navGrid.size; r++) {
     for (let dy = -r; dy <= r; dy++) {

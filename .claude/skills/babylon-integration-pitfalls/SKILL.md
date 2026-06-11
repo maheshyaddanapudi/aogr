@@ -59,3 +59,25 @@ Use `TEXTUREFORMAT_RGBA` — plain RGB raw textures are unreliable on WebGL2.
 Installing a new dependency mid-session invalidates `.vite/deps` hashed URLs —
 in-flight pages mass-fail module requests. Restart `vite` (optionally `--force`)
 after any `npm install`, and prefer testing the production build via preview.
+
+## 7. Headless gate-capture recipe (added Phase 2)
+
+Composition races make naive Playwright captures lie: the rAF loop keeps
+ticking the sim (armies march away mid-screenshot) while frames render at
+seconds-per-frame. The reliable pattern:
+
+1. Expose `window.__forceFrame = () => { refreshViews(); renderer.update(...); scene.render(); }`
+   and a `?nomarch`-style flag to freeze scripted scenarios.
+2. In ONE `evaluate`: position the camera, then `__forceFrame()` twice.
+3. Drive input (marquee drags etc.) with Playwright mouse, `__forceFrame()`,
+   THEN screenshot (`timeout: 120000` — SwiftShader frames are slow).
+4. Assert counts via probes (`window.__sim`, selection sets, mesh visibility),
+   never by eyeballing alone — and remember elapsed wall-time advances the sim.
+
+## 8. Skinned crowds (added Phase 2)
+
+InstancedMesh of a skinned mesh shares the source's skeleton + animation —
+one pool per (animation × team), instances swap pools by visibility toggle.
+Asset packs ship VARIANT submeshes in one GLB (4 shields, 3 swords…): filter
+by name allowlist or every unit renders the whole armory (30 → 9 meshes/unit).
+Capture the GLTF material's `albedoTexture` BEFORE overriding materials.

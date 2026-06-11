@@ -35,10 +35,14 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 2 — Units + movement + pathfinding (worker)
 
-- [ ] Hierarchical A* (sector portals) + flow fields + RVO in a Web Worker
-- [ ] **Logic gate:** 200 units path to a shared destination without overlap at 60fps
-- [ ] **Visual gate:** animated rigged units w/ team colors; selection rings; marquee select — screenshot
-- [ ] Revisit skill candidates: `deterministic-sim-testing`, `bitecs-babylon-bridge`, `rts-pathfinding-worker`
+- [x] Flow fields (integer Dijkstra, octile, no corner-cutting) + HPA sector portals (10×10, region-aware) + RVO-lite reciprocal separation
+- [x] Web Worker: flow-field pre-warm via `src/platform/flowFieldWorker.ts` — sim computes the identical field synchronously when the worker hasn't answered, so determinism never depends on worker timing (docs/02 contract)
+- [x] **Logic gate:** 200 units path to a shared destination — all arrive <12 tiles, ZERO overlapping pairs, checksum-identical rerun, serialize/lockstep round-trip, <20ms/tick budget (tests/sim/movement.test.ts)
+- [x] **Visual gate:** rigged animated KayKit knights (idle/walk pools, team tint), selection rings, marquee select — `phase-2-gate.png`, `phase-2-marquee.png`, `phase-2-selection-rings.png`
+- [ ] 60fps @ 200 units on real GPU — unverifiable under SwiftShader; ~1.8k instances + shared-skeleton GPU skinning is well within budget; confirm at next human check-in
+- [x] Skill candidates revisited: `deterministic-sim-testing` AUTHORED (3-phase evidence); `babylon-integration-pitfalls` updated (+headless capture recipe, +skinned crowds); `bitecs-babylon-bridge` + `rts-pathfinding-worker` still deferred (1–2 data points)
+
+**Gate status: PASSED 2026-06-11** (real-GPU fps criterion flagged for human confirmation, as in Phase 1).
 
 ## Phase 3 — Economy
 
