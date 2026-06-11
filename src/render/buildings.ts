@@ -49,6 +49,10 @@ export interface WorldObjectsRenderer {
     groundHeightAt: (x: number, z: number) => number,
   ) => void;
   isNodeMesh: (mesh: AbstractMesh) => number | null;
+  isBuildingMesh: (mesh: AbstractMesh) => number | null;
+  /** placement ghost: show/hide a footprint box that follows the cursor */
+  showGhost: (size: number, x: number, z: number, ok: boolean, groundY: number) => void;
+  hideGhost: () => void;
 }
 
 export async function createWorldObjectsRenderer(
@@ -124,6 +128,16 @@ export async function createWorldObjectsRenderer(
   const buildingVisuals = new Map<number, BuildingVisual>();
   const nodeVisuals = new Map<number, TransformNode>();
   const nodeMeshToEid = new Map<AbstractMesh, number>();
+  const buildingMeshToEid = new Map<AbstractMesh, number>();
+
+  // placement ghost
+  const ghost = MeshBuilder.CreateBox("ghost", { width: 1, depth: 1, height: 0.6 }, scene);
+  const ghostMat = new StandardMaterial("ghostMat", scene);
+  ghostMat.alpha = 0.6;
+  ghostMat.disableLighting = true;
+  ghost.material = ghostMat;
+  ghost.isPickable = false;
+  ghost.setEnabled(false);
 
   const update: WorldObjectsRenderer["update"] = (buildings, nodes, groundHeightAt) => {
     for (const b of buildings) {
@@ -139,6 +153,7 @@ export async function createWorldObjectsRenderer(
         node.scaling.setAll(s);
         v = { node, height: (bounds.max.y - bounds.min.y) * s, scaffold: b.active ? null : makeScaffold(b.size) };
         buildingVisuals.set(b.eid, v);
+        for (const m of node.getChildMeshes()) buildingMeshToEid.set(m, b.eid);
       }
       const ground = groundHeightAt(b.x, b.z);
       const t = b.active ? 1 : Math.min(1, b.progress / Math.max(1, b.total));
@@ -175,5 +190,15 @@ export async function createWorldObjectsRenderer(
   return {
     update,
     isNodeMesh: (mesh) => nodeMeshToEid.get(mesh) ?? null,
+    isBuildingMesh: (mesh) => buildingMeshToEid.get(mesh) ?? null,
+    showGhost(size, x, z, ok, groundY) {
+      ghost.setEnabled(true);
+      ghost.scaling.set(size, 1, size);
+      ghost.position.set(x, groundY + 0.3, z);
+      ghostMat.emissiveColor = ok ? new Color3(0.3, 1.6, 0.5) : new Color3(1.8, 0.3, 0.25);
+    },
+    hideGhost() {
+      ghost.setEnabled(false);
+    },
   };
 }

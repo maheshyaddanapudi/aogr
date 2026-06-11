@@ -81,8 +81,11 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 8 — Fog of war + minimap + full UI
 
-- [ ] **Logic gate:** LOS-correct reveal/hide; clickable minimap; control groups 1–9; rally points; placement ghosts
-- [ ] **Visual gate:** soft-edged fog; styled minimap frame; full HUD pass — screenshot
+- [x] **Logic gate:** LOS-correct visibility grids (visible/explored/unexplored, derived state — never hashed), enemy reveal/hide, clarity map-reveal aura, rally points (trained units walk to rally), minimap click jumps camera (verified 34→150), control groups Ctrl+1–9 assign / 1–9 recall (verified 4→0→4), placement ghosts with valid/invalid coloring (tests/sim/fog.test.ts + headless interaction probes)
+- [x] **Visual gate:** soft-edged fog plane (bilinear 200² visibility texture), bronze-framed live minimap (terrain/fog/units/buildings), full HUD pass — resource bar + age chip + selection panel + command card (build/train buttons) — `phase-8-gate-hud.png`, `phase-8-ghost.png`
+- [x] Enemy units hidden outside LOS in the 3D view and on the minimap; building/train buttons enforce age + cost client-side, sim revalidates
+
+**Gate status: PASSED 2026-06-11.** Noted (ledgered): AI remains omniscient — limiting AI knowledge to its own fog is a deferred fairness polish (docs/05).
 
 ## Phase 9 — Audio + VFX polish
 

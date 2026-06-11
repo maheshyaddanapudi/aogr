@@ -75,6 +75,7 @@ export interface UnitRenderer {
     }>,
     groundHeightAt: (x: number, z: number) => number,
     selected: ReadonlySet<number>,
+    isVisible?: (u: { eid: number; x: number; z: number; playerId: number }) => boolean,
   ) => void;
   isUnitMesh: (mesh: AbstractMesh) => number | null;
 }
@@ -146,7 +147,7 @@ export async function createUnitRenderer(scene: Scene, shadows: CascadedShadowGe
   const visuals = new Map<number, UnitVisual>();
   const meshToEid = new Map<AbstractMesh, number>();
 
-  const update: UnitRenderer["update"] = (units, groundHeightAt, selected) => {
+  const update: UnitRenderer["update"] = (units, groundHeightAt, selected, isVisible) => {
     for (const u of units) {
       let v = visuals.get(u.eid);
       if (!v) {
@@ -173,6 +174,8 @@ export async function createUnitRenderer(scene: Scene, shadows: CascadedShadowGe
         visuals.set(u.eid, v);
       }
       v.node.position.set(u.x, groundHeightAt(u.x, u.z), u.z);
+      const show = !isVisible || isVisible(u);
+      if (v.node.isEnabled() !== show) v.node.setEnabled(show);
       const anim = ANIM_INDEX[u.anim];
       if (anim !== v.anim) {
         v.parts[v.anim]!.forEach((m) => (m.isVisible = false));

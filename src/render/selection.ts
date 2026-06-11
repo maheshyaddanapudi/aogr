@@ -22,13 +22,21 @@ export interface SelectionDeps {
   isUnitMesh: (mesh: AbstractMesh) => number | null;
   /** resource-node hit test: right-clicking a node issues a gather order */
   isNodeMesh?: (mesh: AbstractMesh) => number | null;
+  isBuildingMesh?: (mesh: AbstractMesh) => number | null;
   groundHeightAt: (x: number, z: number) => number;
+  /** placement support */
+  canPlace?: (buildingId: string, tileX: number, tileY: number) => boolean;
+  onGhost?: (size: number, x: number, z: number, ok: boolean) => void;
+  onGhostEnd?: () => void;
   /** notify platform a move target was chosen (flow-field prewarm) */
   onMoveOrder?: (tileX: number, tileY: number) => void;
 }
 
 export interface Selection {
   readonly selected: ReadonlySet<number>;
+  readonly selectedBuilding: () => number | null;
+  /** enter placement mode for a building id; clicks place it, Esc cancels */
+  enterPlacement: (buildingId: string, size: number) => void;
 }
 
 const DRAG_THRESHOLD_PX = 6;
@@ -36,6 +44,9 @@ const DRAG_THRESHOLD_PX = 6;
 export function setupSelection(deps: SelectionDeps): Selection {
   const { scene, canvas, queue } = deps;
   const selected = new Set<number>();
+  let selectedBuilding: number | null = null;
+  const groups = new Map<number, number[]>();
+  let placement: { buildingId: string; size: number } | null = null;
 
   const marquee = document.createElement("div");
   marquee.className = "marquee";
@@ -57,9 +68,40 @@ export function setupSelection(deps: SelectionDeps): Selection {
   };
 
   canvas.addEventListener("pointerdown", (e) => {
+    if (placement && e.button === 0) {
+      const pick = scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
+      if (pick?.pickedPoint) {
+        const tx = Math.trunc(pick.pickedPoint.x - placement.size / 2);
+        const ty = Math.trunc(pick.pickedPoint.z - placement.size / 2);
+        if (!deps.canPlace || deps.canPlace(placement.buildingId, tx, ty)) {
+          queue.enqueue(deps.currentTick() + 1, {
+            type: "build",
+            playerId: deps.localPlayerId,
+            eids: Array.from(selected),
+            building: placement.buildingId,
+            x: tx * FP_ONE,
+            y: ty * FP_ONE,
+          });
+          placement = null;
+          deps.onGhostEnd?.();
+        }
+      }
+      return;
+    }
     if (e.button === 0) {
       dragStart = { x: e.clientX, y: e.clientY };
       dragging = false;
+    } else if (e.button === 2 && selectedBuilding !== null) {
+      const pick = scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
+      if (pick?.pickedPoint) {
+        queue.enqueue(deps.currentTick() + 1, {
+          type: "rally",
+          playerId: deps.localPlayerId,
+          buildingEid: selectedBuilding,
+          x: Math.round(pick.pickedPoint.x * FP_ONE),
+          y: Math.round(pick.pickedPoint.z * FP_ONE),
+        });
+      }
     } else if (e.button === 2 && selected.size > 0) {
       // resource node? → gather order
       const nodePick = scene.pick(e.clientX, e.clientY);
@@ -125,14 +167,56 @@ export function setupSelection(deps: SelectionDeps): Selection {
     } else {
       const pick = scene.pick(e.clientX, e.clientY);
       const eid = pick?.pickedMesh ? deps.isUnitMesh(pick.pickedMesh) : null;
+      const beid = eid === null && pick?.pickedMesh && deps.isBuildingMesh ? deps.isBuildingMesh(pick.pickedMesh) : null;
       if (!e.shiftKey) selected.clear();
+      selectedBuilding = null;
       if (eid !== null) selected.add(eid);
+      else if (beid !== null) selectedBuilding = beid;
     }
     dragStart = null;
     dragging = false;
   });
 
+  // placement ghost follows the cursor
+  canvas.addEventListener("pointermove", (e) => {
+    if (!placement) return;
+    const pick = scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
+    if (pick?.pickedPoint) {
+      const tx = Math.trunc(pick.pickedPoint.x - placement.size / 2);
+      const ty = Math.trunc(pick.pickedPoint.z - placement.size / 2);
+      const ok = !deps.canPlace || deps.canPlace(placement.buildingId, tx, ty);
+      deps.onGhost?.(placement.size, tx + placement.size / 2, ty + placement.size / 2, ok);
+    }
+  });
+
+  // control groups: Ctrl+1..9 assign, 1..9 recall; Esc cancels placement
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Escape" && placement) {
+      placement = null;
+      deps.onGhostEnd?.();
+      return;
+    }
+    const digit = e.code.startsWith("Digit") ? Number(e.code.slice(5)) : NaN;
+    if (!Number.isInteger(digit) || digit < 1 || digit > 9) return;
+    if (e.ctrlKey || e.metaKey) {
+      groups.set(digit, Array.from(selected));
+      e.preventDefault();
+    } else {
+      const g = groups.get(digit);
+      if (g && g.length > 0) {
+        selected.clear();
+        for (const eid of g) selected.add(eid);
+      }
+    }
+  });
+
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  return { selected };
+  return {
+    selected,
+    selectedBuilding: () => selectedBuilding,
+    enterPlacement(buildingId, size) {
+      placement = { buildingId, size };
+    },
+  };
 }

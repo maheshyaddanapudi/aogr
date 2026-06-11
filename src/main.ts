@@ -26,6 +26,12 @@ import { createAiService } from "./platform/aiService";
 import { startLoop } from "./platform/loop";
 import { createHud } from "./ui/hud";
 import { createAgePanel } from "./ui/agePanel";
+import { createMinimap } from "./ui/minimap";
+import { createCommandCard } from "./ui/commandCard";
+import { createFogRenderer } from "./render/fog";
+import { isPassable as tilePassable } from "./sim/path/grid";
+import { getBuildingStats } from "./sim/buildingdata";
+import { VIS_VISIBLE } from "./sim/visibility";
 import { getTechStats } from "./sim/techdata";
 import { canAfford } from "./sim/economy";
 
@@ -85,6 +91,7 @@ async function boot(): Promise<void> {
   const objects = await createWorldObjectsRenderer(world.scene, world.shadows);
   const combatFx = await createCombatFx(world.scene);
   const powerFx = createPowerFx(world.scene);
+  const fog = createFogRenderer(world.scene, sim.terrain.size);
   const pathService = createPathService(sim);
   const aiDifficulty = (params.get("ai") ?? "medium") as "easy" | "medium" | "hard";
   const aiService = params.get("ai") === "off" ? null : createAiService(1, aiDifficulty, seed);
@@ -192,11 +199,32 @@ async function boot(): Promise<void> {
     unitPositions: () => unitView,
     isUnitMesh: (m) => unitRenderer.isUnitMesh(m),
     isNodeMesh: (m) => objects.isNodeMesh(m),
+    isBuildingMesh: (m) => objects.isBuildingMesh(m),
+    canPlace: (buildingId, tx, ty) => {
+      const size = getBuildingStats(buildingId).size;
+      for (let y = ty - 1; y < ty + size + 1; y++) {
+        for (let x = tx - 1; x < tx + size + 1; x++) {
+          if (!tilePassable(sim.navGrid, x, y)) return false;
+        }
+      }
+      return true;
+    },
+    onGhost: (size, x, z, ok) => objects.showGhost(size, x, z, ok, world.groundHeightAt(x, z)),
+    onGhostEnd: () => objects.hideGhost(),
     groundHeightAt: world.groundHeightAt,
     onMoveOrder: (tx, ty) => {
       const snapped = nearestPassableTile(sim, tx, ty);
       pathService.prewarm(snapped.x, snapped.y);
     },
+  });
+
+  const minimap = createMinimap(hudRoot, sim, (mx, mz) => {
+    world.rtsCamera.camera.target.x = mx;
+    world.rtsCamera.camera.target.z = mz;
+  });
+  const commandCard = createCommandCard(hudRoot, {
+    onBuild: (buildingId) => selection.enterPlacement(buildingId, getBuildingStats(buildingId).size),
+    onTrain: (buildingEid, unitId) => queue.enqueue(sim.tick + 1, { type: "train", playerId: 0, buildingEid, unit: unitId }),
   });
 
   // frame the player base
@@ -207,10 +235,28 @@ async function boot(): Promise<void> {
 
   let checksum = simChecksum(sim);
 
+  let uiPulse = 0;
   const renderFrame = () => {
     refreshViews();
-    unitRenderer.update(unitView, world.groundHeightAt, selection.selected);
+    unitRenderer.update(unitView, world.groundHeightAt, selection.selected, (u) =>
+      u.playerId === 0 ? true : fog.isTileVisible(sim, 0, u.x, u.z),
+    );
     objects.update(buildingView, nodeView, world.groundHeightAt);
+    if (uiPulse++ % 8 === 0) {
+      fog.refresh(sim, 0);
+      minimap.refresh(sim, 0);
+      const selUnits = unitView
+        .filter((u) => selection.selected.has(u.eid))
+        .map((u) => ({
+          eid: u.eid,
+          unitClass: u.unitClass,
+          name: sim.unitStats(u.eid).name,
+          hp: Math.ceil((sim.stores.Health.hp100[u.eid] ?? 0) / 100),
+          maxHp: Math.ceil(sim.unitStats(u.eid).hp100 / 100),
+        }));
+      const selB = selection.selectedBuilding();
+      commandCard.refresh(sim, 0, selUnits, selB !== null ? { eid: selB, buildingId: sim.buildingIdOf(selB) } : null);
+    }
     world.scene.render();
     const p = getPlayer(sim, 0);
     hud.update({ tick: sim.tick, checksum, fps: engine.getFps(), seed, backend });

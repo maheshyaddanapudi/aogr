@@ -32,6 +32,9 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 | 2026-06-11 | Session 1 / Phase 7 | deterministic-sim-testing | (vendored) | authored in-repo | AI determinism test (same seed ⇒ same AI match checksum); trace-driven debugging of the boom (food starvation → farm mechanics → stall re-walks) | The "assert counts via probes, never eyeball" rule drove the minute-by-minute trace harness that found 3 stall bugs | tests/ai/ai.test.ts, src/sim/economy.ts, src/ai/brain.ts |
 | 2026-06-11 | Session 1 / Phase 7 | petra-style-ai (candidate) | — | authored-in-repo candidate | — | **Deferred — single implementation** (one brain, one game's evidence); revisit if a second AI profile or major rework lands | — |
 
+| 2026-06-11 | Session 1 / Phase 8 | babylon-integration-pitfalls | (vendored) | authored in-repo | §10 applied twice (fresh fog/ghost materials invisible until warm renders); RawTexture-RGBA rule reused for the fog texture | No re-derivation: both "missing visual" incidents resolved by recipe in one step | src/render/fog.ts, src/render/buildings.ts |
+| 2026-06-11 | Session 1 / Phase 8 | frontend-design | (vendored) | Anthropic skill | Full HUD pass layout (bottom panel split: selection identity left, verbs right; minimap as framed artifact; copy in plain verbs) | Panel reads cleanly at first capture | src/ui/commandCard.ts, minimap.ts, hud.css |
+
 ## Phase 0 gate rollup
 
 **Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).
