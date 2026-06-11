@@ -1,9 +1,8 @@
 /**
- * Phase 0 render layer: lit PBR test scene with the full post pipeline
- * (bloom + FXAA + tone mapping + SSAO2) per KICKOFF §4. WebGPU first,
- * WebGL2 fallback. Sim entities are visualized as team-colored orbs.
+ * World scene: engine (WebGPU→WebGL2), sun + cascaded shadows, sky, splatted
+ * terrain + water, post pipeline (bloom/FXAA/tonemap/SSAO2), team-colored
+ * entity orbs, and the GLTF animation pipeline proof. KICKOFF §4 standards.
  */
-import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
@@ -16,6 +15,7 @@ import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import "@babylonjs/core/Meshes/instancedMesh";
+import "@babylonjs/core/Culling/ray"; // scene.pick silently no-ops without this
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import "@babylonjs/core/PostProcesses/RenderPipeline/postProcessRenderPipelineManagerSceneComponent";
@@ -24,17 +24,12 @@ import { SSAO2RenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipe
 import "@babylonjs/core/Rendering/prePassRendererSceneComponent";
 import "@babylonjs/core/Rendering/geometryBufferRendererSceneComponent";
 import { Scene } from "@babylonjs/core/scene";
-
-/** World scale: 1 Babylon unit = 1 tile = 1 meter. Map center for the test scene. */
-const CENTER = 100;
-
-export interface GameRenderer {
-  engine: AbstractEngine;
-  scene: Scene;
-  /** Move/show up to maxUnits team-colored orbs. positions in tiles (floats OK here). */
-  updateUnits: (units: ReadonlyArray<{ x: number; y: number; playerId: number }>) => void;
-  beacon: Mesh;
-}
+import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import "@babylonjs/loaders/glTF";
+import { SkyMaterial } from "@babylonjs/materials/sky/skyMaterial";
+import type { Terrain } from "../sim";
+import { buildTerrainMesh, sampleHeight, type TerrainView } from "./terrainMesh";
+import { createRtsCamera, type RtsCamera } from "./camera";
 
 export async function createEngine(canvas: HTMLCanvasElement): Promise<AbstractEngine> {
   if (await WebGPUEngine.IsSupportedAsync) {
@@ -45,142 +40,140 @@ export async function createEngine(canvas: HTMLCanvasElement): Promise<AbstractE
   return new Engine(canvas, true, { adaptToDeviceRatio: true });
 }
 
-export function createTestScene(engine: AbstractEngine): GameRenderer {
+export interface WorldScene {
+  scene: Scene;
+  rtsCamera: RtsCamera;
+  terrainView: TerrainView;
+  shadows: CascadedShadowGenerator;
+  groundHeightAt: (x: number, z: number) => number;
+  updateUnits: (units: ReadonlyArray<{ x: number; y: number; playerId: number }>) => void;
+}
+
+export function createWorldScene(engine: AbstractEngine, canvas: HTMLCanvasElement, terrain: Terrain): WorldScene {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.04, 0.05, 0.08, 1);
 
-  const camera = new ArcRotateCamera("camera", -Math.PI / 3, Math.PI / 3.4, 46, new Vector3(CENTER, 0, CENTER), scene);
-  camera.lowerRadiusLimit = 18;
-  camera.upperRadiusLimit = 90;
-  camera.upperBetaLimit = Math.PI / 2.2;
-  camera.wheelPrecision = 12;
-  camera.attachControl(true);
+  const rtsCamera = createRtsCamera(scene, canvas, terrain.size);
 
-  const sun = new DirectionalLight("sun", new Vector3(-0.45, -0.9, 0.35), scene);
-  sun.position = new Vector3(CENTER + 40, 60, CENTER - 40);
-  sun.intensity = 2.6;
-  sun.diffuse = new Color3(1.0, 0.93, 0.82);
+  const sun = new DirectionalLight("sun", new Vector3(-0.45, -0.85, 0.3), scene);
+  sun.position = new Vector3(terrain.size / 2 + 60, 90, terrain.size / 2 - 60);
+  sun.intensity = 2.4;
+  sun.diffuse = new Color3(1.0, 0.94, 0.84);
   const ambient = new HemisphericLight("ambient", new Vector3(0, 1, 0), scene);
-  ambient.intensity = 0.55;
-  ambient.groundColor = new Color3(0.22, 0.2, 0.18);
+  ambient.intensity = 0.5;
+  ambient.groundColor = new Color3(0.25, 0.23, 0.2);
 
   const shadows = new CascadedShadowGenerator(2048, sun);
-  shadows.lambda = 0.9;
-  shadows.transparencyShadow = false;
+  shadows.lambda = 0.92;
   shadows.stabilizeCascades = true;
+  shadows.shadowMaxZ = 220;
+  shadows.bias = 0.012;
 
-  const ground = MeshBuilder.CreateGround("ground", { width: 240, height: 240, subdivisions: 4 }, scene);
-  ground.position = new Vector3(CENTER, 0, CENTER);
-  const groundMat = new PBRMaterial("groundMat", scene);
-  groundMat.albedoColor = new Color3(0.23, 0.32, 0.16);
-  groundMat.metallic = 0;
-  groundMat.roughness = 0.95;
-  ground.material = groundMat;
-  ground.receiveShadows = true;
+  // Sky dome (also feeds water reflections).
+  const skybox = MeshBuilder.CreateBox("sky", { size: 900 }, scene);
+  skybox.position = new Vector3(terrain.size / 2, 0, terrain.size / 2);
+  const sky = new SkyMaterial("skyMat", scene);
+  sky.backFaceCulling = false;
+  sky.inclination = 0.28;
+  sky.azimuth = 0.22;
+  sky.turbidity = 6;
+  sky.luminance = 0.9;
+  skybox.material = sky;
 
-  // Ring of weathered columns — silhouette + shadow test.
-  const columnMat = new PBRMaterial("columnMat", scene);
-  columnMat.albedoColor = new Color3(0.82, 0.78, 0.68);
-  columnMat.metallic = 0.05;
-  columnMat.roughness = 0.6;
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const col = MeshBuilder.CreateCylinder(`column${i}`, { height: 7, diameter: 1.6, tessellation: 12 }, scene);
-    col.position = new Vector3(CENTER + Math.cos(a) * 14, 3.5, CENTER + Math.sin(a) * 14);
-    col.material = columnMat;
-    shadows.addShadowCaster(col);
-    const cap = MeshBuilder.CreateBox(`cap${i}`, { width: 2.2, depth: 2.2, height: 0.5 }, scene);
-    cap.position = col.position.add(new Vector3(0, 3.75, 0));
-    cap.material = columnMat;
-    shadows.addShadowCaster(cap);
-  }
+  const terrainView = buildTerrainMesh(scene, terrain);
+  terrainView.waterMaterial.addToRenderList(skybox);
 
-  // Bronze altar — metallic PBR test.
-  const altar = MeshBuilder.CreateBox("altar", { width: 4, depth: 4, height: 2 }, scene);
-  altar.position = new Vector3(CENTER, 1, CENTER);
-  const bronzeMat = new PBRMaterial("bronzeMat", scene);
-  bronzeMat.albedoColor = new Color3(0.55, 0.36, 0.18);
-  bronzeMat.metallic = 0.9;
-  bronzeMat.roughness = 0.35;
-  altar.material = bronzeMat;
-  shadows.addShadowCaster(altar);
+  const groundHeightAt = (x: number, z: number) => sampleHeight(terrain, x, z);
 
-  // The god-power beacon: strongly emissive so the bloom pipeline visibly glows.
-  const beacon = MeshBuilder.CreateSphere("beacon", { diameter: 2.4, segments: 24 }, scene);
-  beacon.position = new Vector3(CENTER, 4.4, CENTER);
-  const beaconMat = new PBRMaterial("beaconMat", scene);
-  beaconMat.emissiveColor = new Color3(1.0, 0.72, 0.25);
-  beaconMat.emissiveIntensity = 6;
-  beaconMat.albedoColor = Color3.Black();
-  beaconMat.metallic = 0;
-  beaconMat.roughness = 1;
-  beacon.material = beaconMat;
-  let elapsed = 0;
-  scene.onBeforeRenderObservable.add(() => {
-    elapsed += scene.getEngine().getDeltaTime() / 1000;
-    beacon.position.y = 4.4 + Math.sin(elapsed * 1.4) * 0.5;
-    beaconMat.emissiveIntensity = 5 + Math.sin(elapsed * 2.2) * 1.5;
-  });
-
-  // Post pipeline — Phase 0 gate requires bloom active.
-  const pipeline = new DefaultRenderingPipeline("default", true, scene, [camera]);
+  // Post pipeline (bloom is a standing gate requirement).
+  const pipeline = new DefaultRenderingPipeline("default", true, scene, [rtsCamera.camera]);
   pipeline.bloomEnabled = true;
-  pipeline.bloomThreshold = 0.8;
-  pipeline.bloomWeight = 0.5;
+  pipeline.bloomThreshold = 0.85;
+  pipeline.bloomWeight = 0.4;
   pipeline.bloomKernel = 64;
   pipeline.fxaaEnabled = true;
   pipeline.imageProcessingEnabled = true;
   if (pipeline.imageProcessing) {
     pipeline.imageProcessing.toneMappingEnabled = true;
-    pipeline.imageProcessing.contrast = 1.15;
-    pipeline.imageProcessing.exposure = 1.05;
+    pipeline.imageProcessing.contrast = 1.12;
+    pipeline.imageProcessing.exposure = 1.0;
     pipeline.imageProcessing.vignetteEnabled = true;
-    pipeline.imageProcessing.vignetteWeight = 1.4;
+    pipeline.imageProcessing.vignetteWeight = 1.2;
   }
-  try {
-    // SSAO2 needs WebGL2/WebGPU; skip silently on anything older.
-    const ssao = new SSAO2RenderingPipeline("ssao", scene, 0.75, [camera]);
-    ssao.totalStrength = 0.9;
-    ssao.radius = 2.0;
-  } catch {
-    // WebGL1 fallback — acceptable, bloom remains the gated requirement.
+  const enableSsao = !new URLSearchParams(globalThis.location?.search ?? "").has("nossao");
+  if (enableSsao) {
+    try {
+      // forceGeometryBuffer: the PREPASS path injects defines that break
+      // StandardMaterial-family shaders (TerrainMaterial) on some GL stacks.
+      const ssao = new SSAO2RenderingPipeline("ssao", scene, 0.75, [rtsCamera.camera], true);
+      ssao.totalStrength = 0.8;
+      ssao.radius = 2.0;
+    } catch {
+      /* WebGL1 fallback — bloom remains the gated requirement */
+    }
   }
 
-  // Team-colored orbs visualizing live sim entities.
+  // Team-colored orbs for sim entities (placeholder units until Phase 2 rigs).
   const teamColors = [new Color3(0.95, 0.75, 0.2), new Color3(0.2, 0.7, 0.75)];
-  const unitProto = MeshBuilder.CreateSphere("unitProto", { diameter: 1.2, segments: 16 }, scene);
-  unitProto.isVisible = false;
-  const protoMats = teamColors.map((c, i) => {
+  const protos: Mesh[] = teamColors.map((c, i) => {
+    const p = MeshBuilder.CreateSphere(`unitProto${i}`, { diameter: 1.1, segments: 14 }, scene);
     const m = new PBRMaterial(`unitMat${i}`, scene);
     m.albedoColor = c;
-    m.emissiveColor = c.scale(0.6);
-    m.metallic = 0.2;
-    m.roughness = 0.45;
-    return m;
-  });
-  const instances: InstancedMesh[] = [];
-  const protos: Mesh[] = protoMats.map((m, i) => {
-    const p = unitProto.clone(`unitProtoTeam${i}`);
+    m.emissiveColor = c.scale(0.55);
+    m.metallic = 0.15;
+    m.roughness = 0.5;
     p.material = m;
     p.isVisible = false;
     return p;
   });
-
-  const updateUnits: GameRenderer["updateUnits"] = (units) => {
+  const instances: InstancedMesh[] = [];
+  const updateUnits: WorldScene["updateUnits"] = (units) => {
     while (instances.length < units.length) {
       const i = instances.length;
-      const team = units[i]!.playerId % protos.length;
-      const inst = protos[team]!.createInstance(`unit${i}`);
+      const inst = protos[units[i]!.playerId % protos.length]!.createInstance(`unit${i}`);
       shadows.addShadowCaster(inst);
       instances.push(inst);
     }
     units.forEach((u, i) => {
       const inst = instances[i]!;
-      inst.position.set(u.x, 0.6, u.y);
+      inst.position.set(u.x, groundHeightAt(u.x, u.y) + 0.55, u.y);
       inst.isVisible = true;
     });
     for (let i = units.length; i < instances.length; i++) instances[i]!.isVisible = false;
   };
 
-  return { engine, scene, updateUnits, beacon };
+  scene.onBeforeRenderObservable.add(() => rtsCamera.update(groundHeightAt));
+
+  return { scene, rtsCamera, terrainView, shadows, groundHeightAt, updateUnits };
+}
+
+/**
+ * GLTF pipeline proof (KICKOFF §12): load one animated CC0 character, play its
+ * run cycle, walk it in a circle on the terrain. Returns once visible.
+ */
+export async function addShowcaseCharacter(world: WorldScene, terrain: Terrain): Promise<void> {
+  const result = await SceneLoader.ImportMeshAsync("", `${import.meta.env.BASE_URL}models/`, "fox.glb", world.scene);
+  const root = result.meshes[0]!;
+  // Normalize to ~1.4 tiles tall regardless of source units.
+  const bounds = root.getHierarchyBoundingVectors();
+  const height = bounds.max.y - bounds.min.y || 1;
+  const scale = 1.4 / height;
+  root.scaling.setAll(scale);
+  for (const m of result.meshes) {
+    if (m.getTotalVertices() > 0) world.shadows.addShadowCaster(m);
+  }
+  const run = result.animationGroups.find((g) => /run|walk/i.test(g.name)) ?? result.animationGroups[0];
+  run?.start(true, 1.0);
+
+  const cx = terrain.size / 2;
+  const cz = terrain.size / 2;
+  let angle = 0;
+  world.scene.onBeforeRenderObservable.add(() => {
+    angle += world.scene.getEngine().getDeltaTime() * 0.00035;
+    const x = cx + Math.cos(angle) * 9;
+    const z = cz + Math.sin(angle) * 9;
+    root.position.set(x, world.groundHeightAt(x, z), z);
+    root.rotationQuaternion = null;
+    root.rotation.y = -angle - Math.PI / 2;
+  });
 }

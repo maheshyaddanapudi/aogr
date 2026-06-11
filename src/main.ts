@@ -1,11 +1,11 @@
 /**
- * Boot: deterministic sim (15 Hz) + Babylon PBR scene (60 fps interpolated)
+ * Boot: deterministic sim (15 Hz) + Babylon world scene (60 fps interpolated)
  * + bronze HUD. Seed comes from ?seed= so two browsers given the same seed
- * and commands display the same checksum — the Phase 0 proof, live.
+ * and commands display the same checksum — the determinism proof, live.
  */
 import { CommandQueue, createSim, simChecksum, stepSim, FP_ONE } from "./sim";
 import { query } from "bitecs";
-import { createEngine, createTestScene } from "./render/scene";
+import { addShowcaseCharacter, createEngine, createWorldScene } from "./render/scene";
 import { startLoop } from "./platform/loop";
 import { createHud } from "./ui/hud";
 
@@ -20,16 +20,17 @@ async function boot(): Promise<void> {
 
   const sim = createSim(seed);
   const queue = new CommandQueue();
-  // Scripted Phase 0 demo: two teams of wanderers spawn around the altar.
+  const mid = Math.trunc(sim.terrain.size / 2);
   for (let i = 0; i < 6; i++) {
-    queue.enqueue(i * 15, { type: "debug_spawn", playerId: 0, x: (92 + i * 3) * FP_ONE, y: 94 * FP_ONE });
-    queue.enqueue(i * 15 + 7, { type: "debug_spawn", playerId: 1, x: (92 + i * 3) * FP_ONE, y: 106 * FP_ONE });
+    queue.enqueue(i * 15, { type: "debug_spawn", playerId: 0, x: (mid - 8 + i * 3) * FP_ONE, y: (mid - 6) * FP_ONE });
+    queue.enqueue(i * 15 + 7, { type: "debug_spawn", playerId: 1, x: (mid - 8 + i * 3) * FP_ONE, y: (mid + 6) * FP_ONE });
   }
 
   const engine = await createEngine(canvas);
-  const renderer = createTestScene(engine);
+  const world = createWorldScene(engine, canvas, sim.terrain);
   const hud = createHud(hudRoot);
   const backend = engine.constructor.name === "WebGPUEngine" ? "WebGPU" : "WebGL2";
+  void addShowcaseCharacter(world, sim.terrain);
 
   let checksum = simChecksum(sim);
   const unitView: { x: number; y: number; playerId: number }[] = [];
@@ -49,13 +50,15 @@ async function boot(): Promise<void> {
           playerId: Owner.playerId[eid]!,
         });
       }
-      renderer.updateUnits(unitView);
-      renderer.scene.render();
+      world.updateUnits(unitView);
+      world.scene.render();
       hud.update({ tick: sim.tick, checksum, fps: engine.getFps(), seed, backend });
     },
   });
 
   window.addEventListener("resize", () => engine.resize());
+  // Debug handle for headless gate probes (harmless in production).
+  (window as unknown as Record<string, unknown>).__scene = world.scene;
 }
 
 void boot();

@@ -24,10 +24,14 @@ match unit cap (e.g. 150) — never abandon true 3D.
 
 ## Phase 1 — Terrain + RTS camera
 
-- [ ] Heightmap terrain 200×200 from map config (seeded, sim-owned heights as ints)
-- [ ] RTS camera: pan, edge-scroll, zoom, rotate; 60fps across the map
-- [ ] **Visual gate:** splatted terrain w/ normal maps + water plane + shadows — screenshot
-- [ ] GLTF pipeline proof: 1 animated character + 1 terrain texture end-to-end
+- [x] Heightmap terrain 200×200 from map config (seeded, sim-owned integer heights; island falloff; terrain checksum folded into sim checksum — 7 new tests)
+- [x] RTS camera: pan (WASD/arrows + edge-scroll), zoom (wheel), rotate (Q/E + middle-drag) — directions verified headless via per-frame deltas
+- [x] **Visual gate:** splatted terrain (sand/grass/rock + ambientCG normal maps) + animated water plane + CSM shadows — `docs/screenshots/phase-1-gate.png`, close-up `phase-1-texture-detail.png`
+- [x] GLTF pipeline proof: CC0 animated character (Khronos Fox) loads, plays run cycle, follows terrain height end-to-end
+- [ ] 60fps-across-map on real GPU — unverifiable under SwiftShader (~2fps software rendering); verify in a real browser at next human check-in (40k-vert static mesh: low risk)
+
+**Gate status: PASSED 2026-06-11** (one perf criterion flagged for human-browser confirmation).
+Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 2 — Units + movement + pathfinding (worker)
 

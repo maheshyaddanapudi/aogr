@@ -73,3 +73,12 @@ purity guard → tests → typecheck+build on every push/PR. Deploy
 (`deploy.yml`): on `main`, gate (purity+tests) → build → GitHub Pages
 (`vite.config.ts` base `/aogr/`). Visual gates: Playwright + SwiftShader headless
 screenshots into `docs/screenshots/`.
+
+## Phase 1 addenda (hard-won facts — full detail in .claude/skills/babylon-integration-pitfalls)
+
+- `scene.pick` needs `import "@babylonjs/core/Culling/ray"` or it silently misses.
+- SSAO2 must use `forceGeometryBuffer=true`; its prepass path breaks Standard-family shaders.
+- Custom ground grids: triangles `(i, i+1, i+verts)` / `(i+1, i+verts+1, i+verts)` — reversed winding = downward normals = invisible mesh.
+- RawTexture: always RGBA.
+- Headless SwiftShader runs the full scene at ~2fps while `getFps()` claims 60 — assert per-frame deltas, never wall-clock behavior; probe only via `window.__scene` (importing core in-page creates a second Babylon instance with fake shader errors).
+- Terrain textures: ambientCG 1K JPGs vendored in `public/textures/` (CC0, see ATTRIBUTION.md); Fox GLTF from Khronos sample models (CC0) proves the animation pipeline until KayKit units land in Phase 2.

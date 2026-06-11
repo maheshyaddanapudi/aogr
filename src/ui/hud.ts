@@ -12,7 +12,7 @@ export function createHud(root: HTMLElement): Hud {
   root.innerHTML = `
     <div class="hud-topbar">
       <div class="hud-title">PANTHEONS<small>Age of the Reforged Gods</small></div>
-      <div class="hud-phase">Phase 0 — Deterministic Core</div>
+      <div class="hud-phase">Phase 1 — Terrain &amp; Camera</div>
     </div>
     <div class="plaque">
       <h2>Determinism Seal</h2>

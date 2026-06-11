@@ -12,6 +12,8 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 | 2026-06-11 | Session 1 / Phase 0 | deterministic-sim-testing (candidate) | — | authored-in-repo candidate | — | **Deferred — insufficient evidence** (pattern solved once: PRNG+checksum+10k-tick harness in Phase 0). Revisit at Phase 2 gate per §11.3. | — |
 | 2026-06-11 | Session 1 / Phase 0 | bitecs-babylon-bridge (candidate) | — | authored-in-repo candidate | — | **Deferred — insufficient evidence** (one bridge built: per-sim stores → instanced orbs; two real findings logged: bitECS 0.4 new API has no defineComponent/Types; Babylon tree-shaken imports need side-effect modules for pipeline manager + InstancedMesh). Revisit at Phase 2. | — |
 
+| 2026-06-11 | Session 1 / Phase 1 | babylon-integration-pitfalls | `.claude/skills/babylon-integration-pitfalls/` | **authored in-repo** | §11.3 threshold met: Babylon side-effect import trap hit 3× (pipeline manager, InstancedMesh, Ray), plus SSAO2-prepass shader failures, inverted-winding invisible terrain, SwiftShader headless throttling, and dual-instance probe contamination — a fresh instance would re-derive all of it | Distilled checklist + verification steps for every Babylon feature addition; to be consulted at each render-layer change from Phase 2 on | `src/render/scene.ts`, `src/render/terrainMesh.ts`, `src/render/camera.ts`, `docs/02` |
+
 ## Phase 0 gate rollup
 
 **Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).

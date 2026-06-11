@@ -27,6 +27,8 @@
   },
   "dependencies": {
     "@babylonjs/core": "^9.11.0",
+    "@babylonjs/loaders": "^9.11.0",
+    "@babylonjs/materials": "^9.11.0",
     "bitecs": "^0.4.0",
     "howler": "^2.2.4"
   },

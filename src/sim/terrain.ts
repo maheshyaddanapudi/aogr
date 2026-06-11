@@ -18,17 +18,20 @@ export interface TerrainConfig {
   size: number;
   waterLevelFp: number;
   octaves: TerrainOctave[];
+  /** 0..FP_ONE: how strongly heights sink toward the map border (island look). */
+  edgeFalloffFp: number;
 }
 
 export const DEFAULT_TERRAIN_CONFIG: TerrainConfig = {
   size: 200,
-  waterLevelFp: -300,
+  waterLevelFp: -600,
   octaves: [
     { cell: 50, ampFp: 2200 },
     { cell: 25, ampFp: 900 },
     { cell: 10, ampFp: 400 },
     { cell: 5, ampFp: 150 },
   ],
+  edgeFalloffFp: 800,
 };
 
 export interface Terrain {
@@ -72,6 +75,28 @@ export function generateTerrain(prng: Prng, config: TerrainConfig): Terrain {
         const i01 = lattice[(gy + 1) * lat + gx]!;
         const i11 = lattice[(gy + 1) * lat + gx + 1]!;
         heights[y * verts + x] = heights[y * verts + x]! + ilerp(ilerp(i00, i10, tx), ilerp(i01, i11, tx), ty);
+      }
+    }
+  }
+
+  // Gentle continental lift keeps the interior mostly land.
+  const liftFp = 400;
+  for (let i = 0; i < heights.length; i++) heights[i] = heights[i]! + liftFp;
+
+  // Island falloff: depress heights toward the border (integer ramp over the
+  // outer 12% of the map) so coastlines form instead of cliffs at the void.
+  if (config.edgeFalloffFp > 0) {
+    const margin = Math.max(1, Math.trunc(size * 12 / 100));
+    const dropFp = 2 * config.edgeFalloffFp;
+    for (let y = 0; y < verts; y++) {
+      for (let x = 0; x < verts; x++) {
+        const d = Math.min(x, y, size - x, size - y);
+        if (d < margin) {
+          const tFp = Math.trunc(((margin - d) * FP_ONE) / margin);
+          const sFp = ismooth(tFp);
+          const i = y * verts + x;
+          heights[i] = heights[i]! - Math.trunc((dropFp * sFp) / FP_ONE);
+        }
       }
     }
   }
