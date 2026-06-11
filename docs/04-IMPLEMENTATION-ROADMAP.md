@@ -46,8 +46,12 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 3 — Economy
 
-- [ ] **Logic gate:** gather all 4 resources; build house; pop cap rises; market trade works
-- [ ] **Visual gate:** gather animations; drop-off visuals; styled resource bar HUD
+- [x] **Logic gate:** villagers gather food/wood/gold via the full walk→gather→drop-off loop; prayer at the temple earns favor (4th resource, skyward-chants calibration); house raises pop cap 15→25; TC trains villagers (cost/time/pop); market trades with 15% spread, favor rejected; 10k-tick economy determinism + snapshot round-trip (tests/sim/economy.test.ts, 7 tests)
+- [x] Buildings: foundation blocks nav grid + clears flow fields deterministically; auto-placement via spiral clear-footprint search; multi-builder construction; training queues serialized
+- [x] **Visual gate:** KayKit medieval buildings (castle TC/house/church/market/windmill/lumbermill, yellow vs blue team variants), construction rises from foundation, tree/rock resource nodes, villager work animations (chop), bronze resource bar HUD — `phase-3-gate.png`, `phase-3-base.png`, `phase-3-gather-closeup.png`
+- [x] Right-click on a resource node issues gather orders; `__step(n)` headless fast-forward hook added for gate verification
+
+**Gate status: PASSED 2026-06-11.** Bug fixed en route: building interaction reach must cover footprint-corner + move-snap + arrival tolerance (`buildingReach()`), or builders strand just outside their site.
 
 ## Phase 4 — Combat + counters
 

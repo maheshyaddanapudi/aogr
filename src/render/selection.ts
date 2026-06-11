@@ -20,6 +20,8 @@ export interface SelectionDeps {
   /** live view of own units: eid -> world position */
   unitPositions: () => ReadonlyArray<{ eid: number; x: number; z: number; playerId: number }>;
   isUnitMesh: (mesh: AbstractMesh) => number | null;
+  /** resource-node hit test: right-clicking a node issues a gather order */
+  isNodeMesh?: (mesh: AbstractMesh) => number | null;
   groundHeightAt: (x: number, z: number) => number;
   /** notify platform a move target was chosen (flow-field prewarm) */
   onMoveOrder?: (tileX: number, tileY: number) => void;
@@ -59,6 +61,18 @@ export function setupSelection(deps: SelectionDeps): Selection {
       dragStart = { x: e.clientX, y: e.clientY };
       dragging = false;
     } else if (e.button === 2 && selected.size > 0) {
+      // resource node? → gather order
+      const nodePick = scene.pick(e.clientX, e.clientY);
+      const nodeEid = nodePick?.pickedMesh && deps.isNodeMesh ? deps.isNodeMesh(nodePick.pickedMesh) : null;
+      if (nodeEid !== null) {
+        queue.enqueue(deps.currentTick() + 1, {
+          type: "gather",
+          playerId: deps.localPlayerId,
+          eids: Array.from(selected),
+          nodeEid,
+        });
+        return;
+      }
       const pick = scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
       if (pick?.pickedPoint) {
         const x = Math.round(pick.pickedPoint.x * FP_ONE);

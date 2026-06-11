@@ -81,3 +81,13 @@ one pool per (animation × team), instances swap pools by visibility toggle.
 Asset packs ship VARIANT submeshes in one GLB (4 shields, 3 swords…): filter
 by name allowlist or every unit renders the whole armory (30 → 9 meshes/unit).
 Capture the GLTF material's `albedoTexture` BEFORE overriding materials.
+
+## 9. Asset vendoring + headless fast-forward (added Phase 3)
+
+- gltf (non-GLB) files reference textures by relative URI — vendor the texture
+  file BESIDE the .gltf/.bin pair or loads throw (and may kill boot).
+- Anything added to `public/` needs `npm run build` before `vite preview`
+  shows it — a stale dist 404s as an HTML blob that fails image decode.
+- For sim-time-dependent gate captures, expose `window.__step(n)` that runs
+  `stepSim` synchronously n times — never wait wall-clock for rAF-throttled
+  sim progress.

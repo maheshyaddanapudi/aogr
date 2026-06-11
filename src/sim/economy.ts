@@ -396,7 +396,7 @@ export function economySystem(sim: Sim): void {
         goDropoff(sim, eid);
         continue;
       }
-      const reach = (getBuildingStatsByIndex(Building.typeIndex[drop]!).size * 1000) / 2 + 1400;
+      const reach = buildingReach(getBuildingStatsByIndex(Building.typeIndex[drop]!).size);
       if (dist(px, py, Position.x[drop]!, Position.y[drop]!) <= reach) {
         const p = getPlayer(sim, Owner.playerId[eid]!);
         stockAdd(p, RES_BY_INDEX[GatherTask.carriedType[eid]!]!, GatherTask.carriedMilli[eid]!);
@@ -416,7 +416,7 @@ export function economySystem(sim: Sim): void {
         MoveState.active[eid] = 0;
         continue;
       }
-      const reach = (getBuildingStatsByIndex(Building.typeIndex[b]!).size * 1000) / 2 + 1400;
+      const reach = buildingReach(getBuildingStatsByIndex(Building.typeIndex[b]!).size);
       if (dist(px, py, Position.x[b]!, Position.y[b]!) <= reach) {
         MoveState.active[eid] = 0;
         Building.progress[b] = Building.progress[b]! + 1;
@@ -474,6 +474,12 @@ export function economySystem(sim: Sim): void {
 
   // pop accounting (recomputed every tick — no drift)
   recomputePop(sim);
+}
+
+/** Reach = footprint corner distance + working margin: move targets snap OUTSIDE
+ * blocked footprints and arrival tolerance adds up to 0.7 tiles. */
+function buildingReach(size: number): number {
+  return size * 710 + 1900;
 }
 
 function dist(ax: number, ay: number, bx: number, by: number): number {

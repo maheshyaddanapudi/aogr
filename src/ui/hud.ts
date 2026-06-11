@@ -1,18 +1,35 @@
 /**
- * Phase 0 HUD: title bar + the determinism plaque (live tick, state
- * checksum, fps). Pure DOM/CSS over the canvas per KICKOFF §4.
+ * HUD: bronze resource bar (food/wood/gold/favor/pop) + title + the
+ * determinism plaque (live tick, state checksum, fps). Pure DOM/CSS.
  */
 import "./hud.css";
 
+export interface HudResources {
+  food: number;
+  wood: number;
+  gold: number;
+  favor: number;
+  pop: number;
+  popCap: number;
+}
+
 export interface Hud {
   update: (data: { tick: number; checksum: number; fps: number; seed: number; backend: string }) => void;
+  updateResources: (r: HudResources) => void;
 }
 
 export function createHud(root: HTMLElement): Hud {
   root.innerHTML = `
     <div class="hud-topbar">
       <div class="hud-title">PANTHEONS<small>Age of the Reforged Gods</small></div>
-      <div class="hud-phase">Phase 2 — Units &amp; Pathfinding</div>
+      <div class="resource-bar">
+        <span class="res res-food" title="Food"><i>❖</i><b data-r="food">0</b></span>
+        <span class="res res-wood" title="Wood"><i>⬢</i><b data-r="wood">0</b></span>
+        <span class="res res-gold" title="Gold"><i>◉</i><b data-r="gold">0</b></span>
+        <span class="res res-favor" title="Favor"><i>☀</i><b data-r="favor">0</b></span>
+        <span class="res res-pop" title="Population"><i>⚑</i><b data-r="pop">0/0</b></span>
+      </div>
+      <div class="hud-phase">Phase 3 — Economy</div>
     </div>
     <div class="plaque">
       <h2>Determinism Seal</h2>
@@ -25,10 +42,12 @@ export function createHud(root: HTMLElement): Hud {
     </div>
   `;
   const field = (name: string) => root.querySelector<HTMLElement>(`[data-f="${name}"]`)!;
+  const res = (name: string) => root.querySelector<HTMLElement>(`[data-r="${name}"]`)!;
   const seedEl = field("seed");
   const tickEl = field("tick");
   const checksumEl = field("checksum");
   const fpsEl = field("fps");
+  const els = { food: res("food"), wood: res("wood"), gold: res("gold"), favor: res("favor"), pop: res("pop") };
 
   let lastChecksum = -1;
   return {
@@ -42,6 +61,13 @@ export function createHud(root: HTMLElement): Hud {
         checksumEl.classList.add("pulse");
         setTimeout(() => checksumEl.classList.remove("pulse"), 240);
       }
+    },
+    updateResources(r) {
+      els.food.textContent = String(r.food);
+      els.wood.textContent = String(r.wood);
+      els.gold.textContent = String(r.gold);
+      els.favor.textContent = String(r.favor);
+      els.pop.textContent = `${r.pop}/${r.popCap}`;
     },
   };
 }
