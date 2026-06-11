@@ -1,0 +1,159 @@
+/* Phase 0 HUD — aged-bronze/parchment language per KICKOFF §4.
+   The determinism plaque is the signature element: live sim telemetry
+   engraved in bronze, because proving lockstep IS this phase's deliverable. */
+
+:root {
+  --bronze-deep: #2a1f12;
+  --bronze: #8a6a35;
+  --bronze-bright: #d9a94e;
+  --parchment: #efe3c8;
+  --parchment-dim: #b9ab8a;
+  --ink: #1c150c;
+  --glow: rgba(217, 169, 78, 0.45);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #07090e;
+  font-family: "Alegreya Sans", sans-serif;
+}
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+}
+
+#hud-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--parchment);
+}
+
+.hud-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 22px 26px;
+  background: linear-gradient(180deg, rgba(10, 8, 4, 0.85) 0%, rgba(10, 8, 4, 0.4) 60%, transparent 100%);
+}
+
+.hud-title {
+  font-family: "Cinzel", serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.14em;
+  color: var(--parchment);
+  text-shadow: 0 0 18px var(--glow);
+}
+
+.hud-title small {
+  display: block;
+  font-family: "Alegreya Sans", sans-serif;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--bronze-bright);
+  margin-top: 2px;
+}
+
+.hud-phase {
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+  border: 1px solid var(--bronze);
+  border-radius: 2px;
+  padding: 6px 12px;
+  background: rgba(26, 18, 8, 0.6);
+}
+
+/* The determinism plaque */
+.plaque {
+  position: absolute;
+  left: 22px;
+  bottom: 22px;
+  min-width: 280px;
+  padding: 14px 18px 12px;
+  background:
+    linear-gradient(160deg, rgba(64, 46, 22, 0.92), rgba(34, 24, 11, 0.94)),
+    repeating-linear-gradient(90deg, transparent 0 3px, rgba(0, 0, 0, 0.12) 3px 4px);
+  border: 1px solid var(--bronze);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(233, 196, 124, 0.25),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.5),
+    0 6px 24px rgba(0, 0, 0, 0.55);
+}
+
+.plaque::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(217, 169, 78, 0.28);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.plaque h2 {
+  font-family: "Cinzel", serif;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--bronze-bright);
+  margin-bottom: 8px;
+}
+
+.plaque dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 16px;
+  font-size: 13px;
+}
+
+.plaque dt {
+  color: var(--parchment-dim);
+  letter-spacing: 0.06em;
+}
+
+.plaque dd {
+  font-variant-numeric: tabular-nums;
+  color: var(--parchment);
+  text-align: right;
+}
+
+.plaque dd.checksum {
+  font-weight: 700;
+  color: var(--bronze-bright);
+  letter-spacing: 0.08em;
+  transition: text-shadow 240ms ease;
+}
+
+.plaque dd.checksum.pulse {
+  text-shadow: 0 0 14px var(--glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plaque dd.checksum {
+    transition: none;
+  }
+}
