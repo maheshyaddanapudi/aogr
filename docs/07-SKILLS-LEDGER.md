@@ -23,6 +23,9 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 | 2026-06-11 | Session 1 / Phase 4 | deterministic-sim-testing | (vendored) | authored in-repo | Battle determinism suite incl. entity-removal ordering and mid-battle serialize | Suite passed once removal order + snapshot lanes were aligned with the skill's rules | tests/sim/combat.test.ts |
 | 2026-06-11 | Session 1 / Phase 4 | babylon-integration-pitfalls | (vendored) | authored in-repo | FX debugging marathon: end-on projectiles mistaken for missing, rAF race disposing FX before slow screenshots, async shader compile skipping fresh materials — skill UPDATED with §10 | Root-caused three stacked capture artifacts; recipe now reliable | src/render/combatFx.ts, SKILL.md §10 |
 
+| 2026-06-11 | Session 1 / Phase 5 | deterministic-sim-testing | (vendored) | authored in-repo | Research/ages suite: string hashing for tech lists, derived-modifier rule (rebuild from researchedTechs on load) | Determinism + serialization green on first run | tests/sim/ages.test.ts, src/sim/research.ts |
+| 2026-06-11 | Session 1 / Phase 5 | frontend-design | (vendored) | Anthropic skill | Consulted for the age-up panel: signature moment = the god-choice cards; restraint (one glowing accent = pantheon color), copy discipline (grants listed as Power/Myth/Tech rows, no filler) | Panel passes the §4 bar on first capture | src/ui/agePanel.ts, hud.css |
+
 ## Phase 0 gate rollup
 
 **Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).

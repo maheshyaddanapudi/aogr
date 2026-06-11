@@ -5,6 +5,9 @@
  * Resource nodes are instanced trees/rocks; depleted nodes disappear.
  */
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -36,6 +39,7 @@ const NODE_MODEL: Record<number, string> = {
 interface BuildingVisual {
   node: TransformNode;
   height: number;
+  scaffold: TransformNode | null;
 }
 
 export interface WorldObjectsRenderer {
@@ -93,6 +97,30 @@ export async function createWorldObjectsRenderer(
     return clone;
   };
 
+  const scaffoldMat = new StandardMaterial("scaffoldMat", scene);
+  scaffoldMat.diffuseColor = new Color3(0.45, 0.33, 0.18);
+  scaffoldMat.emissiveColor = new Color3(0.12, 0.09, 0.05);
+
+  const makeScaffold = (size: number): TransformNode => {
+    const node = new TransformNode("scaffold", scene);
+    const h = size * 0.9;
+    const half = size / 2;
+    for (const [sx, sz] of [[-half, -half], [half, -half], [-half, half], [half, half]] as const) {
+      const post = MeshBuilder.CreateCylinder("post", { height: h, diameter: 0.12 }, scene);
+      post.material = scaffoldMat;
+      post.position.set(sx, h / 2, sz);
+      post.parent = node;
+    }
+    for (const [rx, rz, len, rot] of [[0, -half, size, 0], [0, half, size, 0], [-half, 0, size, Math.PI / 2], [half, 0, size, Math.PI / 2]] as const) {
+      const rail = MeshBuilder.CreateBox("rail", { width: len, height: 0.08, depth: 0.08 }, scene);
+      rail.material = scaffoldMat;
+      rail.position.set(rx, h * 0.92, rz);
+      rail.rotation.y = rot;
+      rail.parent = node;
+    }
+    return node;
+  };
+
   const buildingVisuals = new Map<number, BuildingVisual>();
   const nodeVisuals = new Map<number, TransformNode>();
   const nodeMeshToEid = new Map<AbstractMesh, number>();
@@ -109,13 +137,20 @@ export async function createWorldObjectsRenderer(
         const w = Math.max(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z, 0.001);
         const s = (b.size * 0.95) / w;
         node.scaling.setAll(s);
-        v = { node, height: (bounds.max.y - bounds.min.y) * s };
+        v = { node, height: (bounds.max.y - bounds.min.y) * s, scaffold: b.active ? null : makeScaffold(b.size) };
         buildingVisuals.set(b.eid, v);
       }
       const ground = groundHeightAt(b.x, b.z);
       const t = b.active ? 1 : Math.min(1, b.progress / Math.max(1, b.total));
       // rise from the foundation as construction progresses
       v.node.position.set(b.x, ground - v.height * (1 - t), b.z);
+      if (v.scaffold) {
+        v.scaffold.position.set(b.x, ground, b.z);
+        if (b.active) {
+          v.scaffold.dispose();
+          v.scaffold = null;
+        }
+      }
     }
     for (const n of nodes) {
       let v = nodeVisuals.get(n.eid);

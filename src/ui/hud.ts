@@ -16,6 +16,8 @@ export interface HudResources {
 export interface Hud {
   update: (data: { tick: number; checksum: number; fps: number; seed: number; backend: string }) => void;
   updateResources: (r: HudResources) => void;
+  setAge: (age: number, canAdvance: boolean) => void;
+  onAgeUp: (cb: () => void) => void;
 }
 
 export function createHud(root: HTMLElement): Hud {
@@ -29,7 +31,10 @@ export function createHud(root: HTMLElement): Hud {
         <span class="res res-favor" title="Favor"><i>☀</i><b data-r="favor">0</b></span>
         <span class="res res-pop" title="Population"><i>⚑</i><b data-r="pop">0/0</b></span>
       </div>
-      <div class="hud-phase">Phase 4 — Combat &amp; Counters</div>
+      <div class="age-wrap" style="display:flex;gap:10px;align-items:center">
+        <span class="age-chip" data-f="age">Archaic Age</span>
+        <button class="age-up-btn" data-f="ageup" disabled>Advance Age</button>
+      </div>
     </div>
     <div class="plaque">
       <h2>Determinism Seal</h2>
@@ -49,6 +54,12 @@ export function createHud(root: HTMLElement): Hud {
   const fpsEl = field("fps");
   const els = { food: res("food"), wood: res("wood"), gold: res("gold"), favor: res("favor"), pop: res("pop") };
 
+  const AGE_NAMES = ["Archaic Age", "Classical Age", "Heroic Age", "Mythic Age"];
+  const ageEl = field("age");
+  const ageBtn = field("ageup") as HTMLButtonElement;
+  let ageUpCb: (() => void) | null = null;
+  ageBtn.addEventListener("click", () => ageUpCb?.());
+
   let lastChecksum = -1;
   return {
     update({ tick, checksum, fps, seed, backend }) {
@@ -61,6 +72,13 @@ export function createHud(root: HTMLElement): Hud {
         checksumEl.classList.add("pulse");
         setTimeout(() => checksumEl.classList.remove("pulse"), 240);
       }
+    },
+    setAge(age, canAdvance) {
+      ageEl.textContent = AGE_NAMES[age] ?? "—";
+      ageBtn.disabled = !canAdvance;
+    },
+    onAgeUp(cb) {
+      ageUpCb = cb;
     },
     updateResources(r) {
       els.food.textContent = String(r.food);

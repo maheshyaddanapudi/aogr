@@ -23,6 +23,9 @@ import { setupSelection } from "./render/selection";
 import { createPathService } from "./platform/pathService";
 import { startLoop } from "./platform/loop";
 import { createHud } from "./ui/hud";
+import { createAgePanel } from "./ui/agePanel";
+import { getTechStats } from "./sim/techdata";
+import { canAfford } from "./sim/economy";
 
 const DEFAULT_SEED = 20260611;
 
@@ -81,6 +84,28 @@ async function boot(): Promise<void> {
   const combatFx = await createCombatFx(world.scene);
   const pathService = createPathService(sim);
   const hud = createHud(hudRoot);
+  const agePanel = createAgePanel((tech, minorGod) => {
+    queue.enqueue(sim.tick + 1, { type: "research", playerId: 0, tech, minorGod });
+  });
+  const AGE_TIERS = ["classical", "heroic", "mythic"] as const;
+  const AGE_TECHS = ["age_classical", "age_heroic", "age_mythic"] as const;
+  const canAgeUp = (): boolean => {
+    const p = getPlayer(sim, 0);
+    if (p.age >= 3 || p.researchQueue.some((r) => r.techId.startsWith("age_"))) return false;
+    const tech = getTechStats(AGE_TECHS[p.age]!);
+    if (!canAfford(p, tech.cost)) return false;
+    if (!tech.requiresBuilding) return true;
+    const { Owner, Building } = sim.stores;
+    for (const eid of query(sim.world, [Building])) {
+      if (Owner.playerId[eid] === 0 && Building.active[eid] === 1 &&
+          getBuildingStatsByIndex(Building.typeIndex[eid]!).id === tech.requiresBuilding) return true;
+    }
+    return false;
+  };
+  hud.onAgeUp(() => {
+    const p = getPlayer(sim, 0);
+    if (p.age < 3) agePanel.show(p.pantheon, p.majorGod, AGE_TIERS[p.age]!);
+  });
   const backend = engine.constructor.name === "WebGPUEngine" ? "WebGPU" : "WebGL2";
 
   type UnitView = {
@@ -184,6 +209,7 @@ async function boot(): Promise<void> {
     world.scene.render();
     const p = getPlayer(sim, 0);
     hud.update({ tick: sim.tick, checksum, fps: engine.getFps(), seed, backend });
+    hud.setAge(p.age, canAgeUp());
     hud.updateResources({
       food: Math.trunc(p.foodMilli / 1000),
       wood: Math.trunc(p.woodMilli / 1000),
@@ -214,6 +240,7 @@ async function boot(): Promise<void> {
   (window as unknown as Record<string, unknown>).__sim = sim;
   (window as unknown as Record<string, unknown>).__selection = selection;
   (window as unknown as Record<string, unknown>).__forceFrame = () => { combatFx.update(120); renderFrame(); };
+  (window as unknown as Record<string, unknown>).__agePanel = agePanel;
   (window as unknown as Record<string, unknown>).__spawn = (playerId: number, unit: string, x: number, y: number) =>
     spawnUnitEntity(sim, playerId, unit, x * FP_ONE, y * FP_ONE);
   (window as unknown as Record<string, unknown>).__step = (n: number) => {

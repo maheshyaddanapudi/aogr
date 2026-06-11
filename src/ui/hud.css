@@ -207,3 +207,141 @@ body {
 .res-gold i { color: #e8c558; }
 .res-favor i { color: #9fd2ff; text-shadow: 0 0 8px rgba(159, 210, 255, 0.6); }
 .res-pop i { color: var(--parchment-dim); }
+
+/* ── age-up overlay ─────────────────────────────────────────── */
+.age-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(10, 8, 4, 0.55), rgba(10, 8, 4, 0.88));
+  z-index: 40;
+}
+
+.age-panel {
+  text-align: center;
+  padding: 36px 44px;
+  background: linear-gradient(165deg, rgba(58, 42, 20, 0.97), rgba(30, 21, 10, 0.98));
+  border: 1px solid var(--bronze);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(233, 196, 124, 0.3), 0 18px 60px rgba(0, 0, 0, 0.7);
+}
+
+.age-panel h1 {
+  font-family: "Cinzel", serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--parchment);
+  text-shadow: 0 0 24px var(--glow);
+}
+
+.age-sub {
+  margin-top: 6px;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--pantheon, var(--bronze-bright));
+}
+
+.god-cards {
+  display: flex;
+  gap: 26px;
+  margin-top: 28px;
+  justify-content: center;
+}
+
+.god-card {
+  width: 270px;
+  padding: 22px 20px;
+  text-align: left;
+  cursor: pointer;
+  font-family: "Alegreya Sans", sans-serif;
+  color: var(--parchment);
+  background:
+    linear-gradient(170deg, rgba(86, 64, 32, 0.55), rgba(40, 28, 13, 0.85)),
+    repeating-linear-gradient(0deg, transparent 0 5px, rgba(0, 0, 0, 0.08) 5px 6px);
+  border: 1px solid var(--bronze);
+  border-radius: 4px;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.god-card:hover,
+.god-card:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--pantheon, var(--bronze-bright));
+  box-shadow: 0 0 0 1px var(--pantheon, var(--bronze-bright)), 0 0 34px rgba(217, 169, 78, 0.35);
+  outline: none;
+}
+
+.god-card h2 {
+  font-family: "Cinzel", serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--bronze-bright);
+}
+
+.god-card h3 {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+  margin: 2px 0 12px;
+}
+
+.god-card ul {
+  list-style: none;
+  font-size: 14px;
+  display: grid;
+  gap: 5px;
+}
+
+.god-card li b {
+  display: inline-block;
+  width: 52px;
+  color: var(--pantheon, var(--bronze-bright));
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.god-blurb {
+  margin-top: 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--parchment-dim);
+  font-style: italic;
+}
+
+/* age chip + advance button in the top bar */
+.age-chip {
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--bronze-bright);
+  border: 1px solid var(--bronze);
+  border-radius: 2px;
+  padding: 6px 12px;
+  background: rgba(26, 18, 8, 0.6);
+}
+
+.age-up-btn {
+  font-family: "Cinzel", serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  background: linear-gradient(180deg, #e7c06a, #a87f3a);
+  border: 1px solid var(--bronze-bright);
+  border-radius: 3px;
+  padding: 7px 14px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: filter 150ms ease, transform 150ms ease;
+}
+
+.age-up-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.age-up-btn[disabled] { opacity: 0.35; cursor: default; transform: none; }
