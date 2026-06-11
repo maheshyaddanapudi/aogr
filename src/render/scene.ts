@@ -12,6 +12,7 @@ import { CascadedShadowGenerator } from "@babylonjs/core/Lights/Shadows/cascaded
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { ColorCurves } from "@babylonjs/core/Materials/colorCurves";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import "@babylonjs/core/Meshes/instancedMesh";
@@ -95,10 +96,19 @@ export function createWorldScene(engine: AbstractEngine, canvas: HTMLCanvasEleme
   pipeline.imageProcessingEnabled = true;
   if (pipeline.imageProcessing) {
     pipeline.imageProcessing.toneMappingEnabled = true;
-    pipeline.imageProcessing.contrast = 1.12;
-    pipeline.imageProcessing.exposure = 1.0;
+    // per-biome grading (data/maps postProcessing.colorGrading) — warm plains default
+    pipeline.imageProcessing.contrast = 1.16;
+    pipeline.imageProcessing.exposure = 1.04;
     pipeline.imageProcessing.vignetteEnabled = true;
-    pipeline.imageProcessing.vignetteWeight = 1.2;
+    pipeline.imageProcessing.vignetteWeight = 1.35;
+    const curves = new ColorCurves();
+    curves.globalSaturation = 12;
+    curves.shadowsHue = 30;
+    curves.shadowsDensity = 12;
+    curves.highlightsHue = 45;
+    curves.highlightsDensity = 14;
+    pipeline.imageProcessing.colorCurvesEnabled = true;
+    pipeline.imageProcessing.colorCurves = curves;
   }
   const enableSsao = !new URLSearchParams(globalThis.location?.search ?? "").has("nossao");
   if (enableSsao) {

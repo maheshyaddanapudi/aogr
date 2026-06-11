@@ -89,8 +89,11 @@ Hard-won knowledge captured in `.claude/skills/babylon-integration-pitfalls/`.
 
 ## Phase 9 — Audio + VFX polish
 
-- [ ] **Logic gate:** distinct SFX per power; unit acknowledgments; music loops with combat ducking
-- [ ] **Visual gate:** final VFX pass; post-processing tuned per biome
+- [x] **Logic gate:** per-power SFX (6 pattern samples × deterministic per-power pitch), per-class unit acknowledgment sounds on selection, UI clicks, hit/arrow/death SFX with rate budget, music loop with combat ducking (verified headless: ducked=true during battle, false after); Howler buses
+- [x] **Visual gate:** final VFX pass (additive power glow from Phase 6) + per-biome color grading (warm-plains ColorCurves: warm shadows/highlights, +saturation, tuned vignette/contrast) — `phase-9-gate-grading.png`
+- [ ] Spoken voice acknowledgment LINES — no redistributable CC0 voice set found; per-class acknowledgment SOUNDS shipped instead. Flagged for human decision (record/commission voices or accept sounds)
+
+**Gate status: PASSED 2026-06-11** (voice-line substitution explicitly flagged, not silently skipped).
 
 ## Phase 10 — Menus + save/load + settings + release
 

@@ -23,6 +23,7 @@ import { createPowerFx } from "./render/powerFx";
 import { setupSelection } from "./render/selection";
 import { createPathService } from "./platform/pathService";
 import { createAiService } from "./platform/aiService";
+import { createAudioSystem } from "./platform/audio";
 import { startLoop } from "./platform/loop";
 import { createHud } from "./ui/hud";
 import { createAgePanel } from "./ui/agePanel";
@@ -92,6 +93,7 @@ async function boot(): Promise<void> {
   const combatFx = await createCombatFx(world.scene);
   const powerFx = createPowerFx(world.scene);
   const fog = createFogRenderer(world.scene, sim.terrain.size);
+  const audio = createAudioSystem();
   const pathService = createPathService(sim);
   const aiDifficulty = (params.get("ai") ?? "medium") as "easy" | "medium" | "hard";
   const aiService = params.get("ai") === "off" ? null : createAiService(1, aiDifficulty, seed);
@@ -223,9 +225,27 @@ async function boot(): Promise<void> {
     world.rtsCamera.camera.target.z = mz;
   });
   const commandCard = createCommandCard(hudRoot, {
-    onBuild: (buildingId) => selection.enterPlacement(buildingId, getBuildingStats(buildingId).size),
-    onTrain: (buildingEid, unitId) => queue.enqueue(sim.tick + 1, { type: "train", playerId: 0, buildingEid, unit: unitId }),
+    onBuild: (buildingId) => {
+      audio.uiClick();
+      selection.enterPlacement(buildingId, getBuildingStats(buildingId).size);
+    },
+    onTrain: (buildingEid, unitId) => {
+      audio.uiClick();
+      queue.enqueue(sim.tick + 1, { type: "train", playerId: 0, buildingEid, unit: unitId });
+    },
   });
+  // unit acknowledgment on selection
+  let lastSelSize = 0;
+  setInterval(() => {
+    const size = selection.selected.size;
+    if (size > 0 && size !== lastSelSize) {
+      const first = selection.selected.values().next().value as number;
+      try {
+        audio.ack(["villager", "scout"].includes(sim.unitStats(first).unitClass) ? sim.unitStats(first).unitClass : sim.unitStats(first).unitClass === "hero" ? "hero" : "military");
+      } catch { /* entity died */ }
+    }
+    lastSelSize = size;
+  }, 200);
 
   // frame the player base
   const tcEid = getPlayer(sim, 0).townCenterEid;
@@ -279,6 +299,7 @@ async function boot(): Promise<void> {
       stepSim(sim, queue.drain(sim.tick));
       combatFx.collect(sim.events, world.groundHeightAt);
       powerFx.collect(sim.events, world.groundHeightAt);
+      audio.collect(sim.events);
       if (sim.tick % 15 === 0) checksum = simChecksum(sim);
     },
     onFrame: (alpha, dtMs) => {
@@ -294,6 +315,7 @@ async function boot(): Promise<void> {
   (window as unknown as Record<string, unknown>).__scene = world.scene;
   (window as unknown as Record<string, unknown>).__sim = sim;
   (window as unknown as Record<string, unknown>).__selection = selection;
+  (window as unknown as Record<string, unknown>).__audio = audio;
   (window as unknown as Record<string, unknown>).__forceFrame = () => { combatFx.update(120); powerFx.update(120); renderFrame(); };
   (window as unknown as Record<string, unknown>).__cast = (power: string, x: number, y: number) => {
     queue.enqueue(sim.tick + 1, { type: "cast_power", playerId: 0, power, x: x * FP_ONE, y: y * FP_ONE });
@@ -307,6 +329,7 @@ async function boot(): Promise<void> {
       stepSim(sim, queue.drain(sim.tick));
       if (i >= n - 3) combatFx.collect(sim.events, world.groundHeightAt); // only recent FX
       powerFx.collect(sim.events, world.groundHeightAt);
+      audio.collect(sim.events);
     }
     checksum = simChecksum(sim);
   };

@@ -10,6 +10,8 @@ CC0 assets are credited as a courtesy; CC-BY assets are credited as a requiremen
 | knight.glb (rigged+animated character) | [KayKit Adventurers](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) by Kay Lousberg | CC0 | single loadout used (1H sword + round shield) |
 | Medieval buildings + trees/rocks (gltf) | [KayKit Medieval Hexagon Pack](https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0) by Kay Lousberg | CC0 | curated subset; yellow/blue variants as team colors |
 | villager.glb (Rogue, rigged+animated) | [KayKit Adventurers](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) by Kay Lousberg | CC0 | none |
+| SFX (acknowledgments, hits, powers, UI) | [Kenney audio packs](https://kenney.nl/assets) via Boyquotes GitHub mirrors (RPG/Impact/Digital) | CC0 | renamed per role in public/audio/ |
+| music_main.mp3 — "Teller of the Tales" by Kevin MacLeod (incompetech.com) | [incompetech](https://incompetech.com) | **CC-BY 4.0 — credit required** (Licensed under Creative Commons: By Attribution 4.0, http://creativecommons.org/licenses/by/4.0/) | none |
 | fox.glb (animated low-poly fox) | [Khronos glTF-Sample-Models](https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/Fox) — model by PixelMannen, rig/animation by tomkranis | CC0 / CC-BY 4.0 (rig) | none; placeholder until Phase 2 unit rigs |
 
 Fonts: [Cinzel](https://fonts.google.com/specimen/Cinzel) and

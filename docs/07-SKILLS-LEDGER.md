@@ -35,6 +35,8 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 | 2026-06-11 | Session 1 / Phase 8 | babylon-integration-pitfalls | (vendored) | authored in-repo | §10 applied twice (fresh fog/ghost materials invisible until warm renders); RawTexture-RGBA rule reused for the fog texture | No re-derivation: both "missing visual" incidents resolved by recipe in one step | src/render/fog.ts, src/render/buildings.ts |
 | 2026-06-11 | Session 1 / Phase 8 | frontend-design | (vendored) | Anthropic skill | Full HUD pass layout (bottom panel split: selection identity left, verbs right; minimap as framed artifact; copy in plain verbs) | Panel reads cleanly at first capture | src/ui/commandCard.ts, minimap.ts, hud.css |
 
+| 2026-06-11 | Session 1 / Phase 9 | babylon-integration-pitfalls | (vendored) | authored in-repo | Audio collect had the same "__step bypasses the frame path" trap as FX (§7) — events must be collected in BOTH the rAF tick and __step | One-probe diagnosis | src/main.ts, src/platform/audio.ts |
+
 ## Phase 0 gate rollup
 
 **Skills used this phase:** frontend-design (1 use, HUD/scene direction); docx + deep-research (pre-repo provenance, seeded per §11.2).
