@@ -337,6 +337,29 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     });
   };
 
+  // AoM-style notifications: war horn when our own things take fire, a soft
+  // chime when a unit finishes training, a thunk when a building completes.
+  let knownOwnUnits = new Set<number>();
+  let knownActiveBuildings = new Set<number>();
+  let notifyArmed = false; // skip the initial population
+  const collectNotifications = () => {
+    const { Owner, UnitRef, Building } = sim.stores;
+    if (sim.events.fired.some((f) => Owner.playerId[f.to] === 0)) audio.alarm();
+    const units = new Set<number>();
+    for (const eid of query(sim.world, [UnitRef])) if (Owner.playerId[eid] === 0) units.add(eid);
+    const actives = new Set<number>();
+    for (const eid of query(sim.world, [Building])) {
+      if (Owner.playerId[eid] === 0 && sim.stores.Building.active[eid] === 1) actives.add(eid);
+    }
+    if (notifyArmed) {
+      for (const eid of units) if (!knownOwnUnits.has(eid)) audio.trained(sim.unitStats(eid).unitClass);
+      for (const eid of actives) if (!knownActiveBuildings.has(eid)) audio.buildDone();
+    }
+    knownOwnUnits = units;
+    knownActiveBuildings = actives;
+    notifyArmed = true;
+  };
+
   // ?paused: gate-capture mode — sim/render driven only via __step/__forceFrame
   if (!params.has("paused")) startLoop({
     onTick: () => {
@@ -345,6 +368,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       combatFx.collect(sim.events, world.groundHeightAt);
       powerFx.collect(sim.events, world.groundHeightAt);
       audio.collect(sim.events);
+      collectNotifications();
       if (sim.tick % 15 === 0) checksum = simChecksum(sim);
     },
     onFrame: (alpha, dtMs) => {
@@ -437,6 +461,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       if (i >= n - 3) combatFx.collect(sim.events, world.groundHeightAt); // only recent FX
       powerFx.collect(sim.events, world.groundHeightAt);
       audio.collect(sim.events);
+      collectNotifications();
     }
     checksum = simChecksum(sim);
   };

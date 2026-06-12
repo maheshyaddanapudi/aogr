@@ -55,6 +55,7 @@ interface BuildingVisual {
   scaffold: TransformNode | null;
   smoke: PuffFx | null;
   fire: PuffFx | null;
+  chimney: PuffFx | null;
 }
 
 export interface WorldObjectsRenderer {
@@ -330,7 +331,7 @@ export async function createWorldObjectsRenderer(
           node.scaling.setAll(s);
           height = (bounds.max.y - bounds.min.y) * s;
         }
-        v = { node, height, scaffold: b.active ? null : makeScaffold(b.size), smoke: null, fire: null };
+        v = { node, height, scaffold: b.active ? null : makeScaffold(b.size), smoke: null, fire: null, chimney: null };
         buildingVisuals.set(b.eid, v);
         for (const m of node.getChildMeshes()) buildingMeshToEid.set(m, b.eid);
       }
@@ -364,6 +365,12 @@ export async function createWorldObjectsRenderer(
         const tNow = performance.now();
         if (v.smoke) animatePuffs(v.smoke, tNow, b.size);
         if (v.fire) animatePuffs(v.fire, tNow + 333, b.size);
+        // homes puff gentle chimney smoke once lived-in (smaller + offset
+        // from the damage smoke so the two never read the same)
+        if (b.buildingId === "house" && !v.chimney) {
+          v.chimney = makePuffs(new Vector3(b.x + b.size * 0.22, ground + v.height * 0.95, b.z - b.size * 0.12), b.size * 0.45, false);
+        }
+        if (v.chimney) animatePuffs(v.chimney, tNow + 777, b.size * 0.45);
       }
     }
     if (buildingVisuals.size > buildings.length) {
@@ -372,8 +379,10 @@ export async function createWorldObjectsRenderer(
         if (!alive.has(eid)) {
           v.smoke?.puffs.forEach((p) => p.mesh.dispose());
           v.fire?.puffs.forEach((p) => p.mesh.dispose());
+          v.chimney?.puffs.forEach((p) => p.mesh.dispose());
           v.smoke?.root.dispose();
           v.fire?.root.dispose();
+          v.chimney?.root.dispose();
           v.scaffold?.dispose();
           v.node.dispose();
           buildingVisuals.delete(eid);

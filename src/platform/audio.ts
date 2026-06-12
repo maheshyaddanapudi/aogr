@@ -30,7 +30,12 @@ export interface AudioSystem {
   collect: (events: SimEvents) => void;
   ack: (unitClass: string) => void;
   uiClick: () => void;
-  readonly debug: { powerPlays: number; hitPlays: number; musicStarted: boolean; ducked: boolean };
+  /** war horn when the player's own units/buildings come under attack */
+  alarm: () => void;
+  /** soft chime when a unit finishes training */
+  trained: (unitClass: string) => void;
+  buildDone: () => void;
+  readonly debug: { powerPlays: number; hitPlays: number; musicStarted: boolean; ducked: boolean; alarmPlays: number; trainedPlays: number; buildDonePlays: number };
 }
 
 export function createAudioSystem(): AudioSystem {
@@ -54,9 +59,14 @@ export function createAudioSystem(): AudioSystem {
     military: sfx("ack_military.ogg", 0.5),
   };
   const click = sfx("ui_click.ogg", 0.4);
+  const buildDoneSfx = sfx("build_done.ogg", 0.55);
+  // war horn: the pillar swell pitched far down reads as a horn blast until a
+  // dedicated sample is sourced (swap the file, keep the hook)
+  const horn = sfx("power_pillar.ogg", 0.85);
   const music = new Howl({ src: [`${BASE}music_main.mp3`], loop: true, volume: settings.musicVol });
 
-  const debug = { powerPlays: 0, hitPlays: 0, musicStarted: false, ducked: false };
+  const debug = { powerPlays: 0, hitPlays: 0, musicStarted: false, ducked: false, alarmPlays: 0, trainedPlays: 0, buildDonePlays: 0 };
+  let lastAlarmMs = -100000;
   let lastCombatMs = -100000;
 
   const startMusic = () => {
@@ -107,6 +117,25 @@ export function createAudioSystem(): AudioSystem {
     },
     ack(unitClass) {
       (acks[unitClass] ?? acks.military)!.play();
+    },
+    alarm() {
+      // AoM-style "town under attack" horn, at most one blast per 15s
+      if (performance.now() - lastAlarmMs < 15000) return;
+      lastAlarmMs = performance.now();
+      const id = horn.play();
+      horn.rate(0.5, id);
+      debug.alarmPlays++;
+    },
+    trained(unitClass) {
+      const h = acks[unitClass] ?? acks.military!;
+      const id = h.play();
+      h.volume(0.3 * settings.sfxVol, id);
+      h.rate(1.15, id);
+      debug.trainedPlays++;
+    },
+    buildDone() {
+      buildDoneSfx.play();
+      debug.buildDonePlays++;
     },
     uiClick() {
       click.play();
