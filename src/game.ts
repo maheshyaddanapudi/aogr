@@ -422,6 +422,8 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     queue.enqueue(sim.tick + 1, { type: "cast_power", playerId: 0, power, x: x * FP_ONE, y: y * FP_ONE });
   };
   (window as unknown as Record<string, unknown>).__agePanel = agePanel;
+  (window as unknown as Record<string, unknown>).__cmd = (cmd: Record<string, unknown>) =>
+    queue.enqueue(sim.tick + 1, cmd as never);
   (window as unknown as Record<string, unknown>).__view = () => {
     refreshViews();
     return { units: unitView, buildings: buildingView, nodes: nodeView };

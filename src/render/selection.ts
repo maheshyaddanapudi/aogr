@@ -158,7 +158,7 @@ export function setupSelection(deps: SelectionDeps): Selection {
         });
       }
     } else if (e.button === 2 && selected.size > 0) {
-      // resource node? → gather order
+      // resource node → gather; enemy unit/building → attack; ground → move
       const nodePick = scene.pick(e.clientX, e.clientY);
       const nodeEid = nodePick?.pickedMesh && deps.isNodeMesh ? deps.isNodeMesh(nodePick.pickedMesh) : null;
       if (nodeEid !== null) {
@@ -167,6 +167,19 @@ export function setupSelection(deps: SelectionDeps): Selection {
           playerId: deps.localPlayerId,
           eids: Array.from(selected),
           nodeEid,
+        });
+        return;
+      }
+      const unitHit = nodePick?.pickedMesh ? deps.isUnitMesh(nodePick.pickedMesh) : null;
+      const buildingHit = nodePick?.pickedMesh && deps.isBuildingMesh ? deps.isBuildingMesh(nodePick.pickedMesh) : null;
+      const enemyUnit = unitHit !== null && deps.unitPositions().find((u) => u.eid === unitHit)?.playerId !== deps.localPlayerId;
+      const enemyBuilding = buildingHit !== null && deps.buildingOwner?.(buildingHit) !== deps.localPlayerId;
+      if ((unitHit !== null && enemyUnit) || (buildingHit !== null && enemyBuilding)) {
+        queue.enqueue(deps.currentTick() + 1, {
+          type: "attack",
+          playerId: deps.localPlayerId,
+          eids: Array.from(selected),
+          targetEid: unitHit !== null && enemyUnit ? unitHit : buildingHit!,
         });
         return;
       }
@@ -236,6 +249,16 @@ export function setupSelection(deps: SelectionDeps): Selection {
         if (ownBuilding) {
           selected.clear();
           selectedBuilding = beid; // switch to the finished building
+          return;
+        }
+        if (eid !== null || beid !== null) {
+          // enemy unit or enemy building → attack it
+          queue.enqueue(deps.currentTick() + 1, {
+            type: "attack",
+            playerId: deps.localPlayerId,
+            eids: Array.from(selected),
+            targetEid: eid ?? beid!,
+          });
           return;
         }
         const ground = scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");

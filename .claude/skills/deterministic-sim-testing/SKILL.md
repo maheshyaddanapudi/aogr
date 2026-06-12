@@ -59,3 +59,17 @@ Every phase gate re-runs the 10k-tick test plus a phase-specific scenario
 10k ticks of an empty sim ≈ ms; 1800 ticks × 200 moving units ≈ seconds — set
 test timeout 60–120s. Add a tick-budget test (`< 20ms/tick` for 200 units) so
 perf regressions fail loudly in CI rather than at the visual gate.
+
+## Play the game before declaring it done
+
+Unit/system tests prove mechanics in isolation; they do NOT prove the game's
+core loop closes. This repo shipped 113 green tests while conquest victory was
+unreachable in actual play: units never auto-acquired buildings (a comment
+claimed they did), the AI's "attack waves" were bare move orders, and no UI
+path could issue an attack command — each gap invisible to its own test
+because tests injected raw `attack` commands. The gate that catches this class
+of failure is a scripted END-TO-END PLAYTHROUGH through the production command
+queue: a macro "human" that gathers, builds, ages up, trains, defends, and
+attacks, run against the live AI until `sim.winner` resolves — in BOTH
+directions (win and lose). Keep it as a repeatable script; rerun it whenever
+combat, AI, or victory logic changes.

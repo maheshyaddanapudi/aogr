@@ -128,6 +128,22 @@ function acquireTarget(sim: Sim, eid: number): number {
     }
   }
   if (best >= 0 && bestD <= los * los) return best;
+  // no enemy unit in sight: siege the nearest enemy building — this is what
+  // lets attack waves (AI and human) actually win by conquest
+  const { Building } = sim.stores;
+  best = -1;
+  bestD = Number.MAX_SAFE_INTEGER;
+  for (const other of query(sim.world, [Building, Health])) {
+    if (Owner.playerId[other] === me || Health.hp100[other]! <= 0) continue;
+    const dx = Position.x[other]! - px;
+    const dy = Position.y[other]! - py;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD) {
+      bestD = d2;
+      best = other;
+    }
+  }
+  if (best >= 0 && bestD <= los * los) return best;
   return -1;
 }
 

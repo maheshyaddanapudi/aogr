@@ -123,6 +123,27 @@ describe("PHASE 4 GATE — combat & counters", () => {
     expect(sim.players[1]!.popUsed).toBe(popBefore - 1);
   });
 
+  it("military auto-acquire enemy BUILDINGS when no enemy units are in sight (sieges work)", () => {
+    const sim = createSim(1234, undefined, { players: 2, skirmish: true });
+    const { Owner, Building, Health, Position } = sim.stores;
+    const enemyTc = sim.players[1]!.townCenterEid;
+    const hpBefore = Health.hp100[enemyTc]!;
+    // drop a war band next to the enemy TC — no explicit attack command
+    const x = Position.x[enemyTc]! / FP_ONE;
+    const y = Position.y[enemyTc]! / FP_ONE;
+    const band = spawnLine(sim, 0, "infantry_base", 4, x - 4, y);
+    stepSim(sim, [{ type: "attack", playerId: 0, eids: band, targetEid: -1 }]); // aggressive stance only
+    // kill the defenders first is not needed: spawn far from enemy villagers? villagers ARE units —
+    // they will be acquired first, which is correct; run long enough to chew through to the TC
+    for (let t = 0; t < 15 * 240; t++) {
+      stepSim(sim, []);
+      if (Health.hp100[enemyTc]! <= 0) break;
+    }
+    expect(Health.hp100[enemyTc]!, "enemy town center takes siege damage").toBeLessThan(hpBefore);
+    void Owner;
+    void Building;
+  });
+
   it("combat with deaths stays deterministic and serializable over 10k ticks", () => {
     const scenario = () => {
       const sim = createSim(99, undefined, OPEN);
