@@ -148,3 +148,13 @@ start the loop) for ALL gate captures with transient FX.
   questionable captures in a plain (non-touch-emulated) context before
   blaming the renderer, and never ship `engine.releaseEffects()` as a "fix"
   (async recompile leaves the scene black in paused captures).
+- **Placement snapping: round, never trunc.** Terrain picks carry ±0.01-tile
+  noise; `trunc(picked - size/2)` flips a whole tile at integer boundaries and
+  silently rejects valid-looking placements (worst on touch — no hover ghost).
+  `Math.round` + a 1-tile neighbor nudge matches the sim's own forgiving
+  relocation.
+- **Touch taps on DOM buttons reach window-level pointer handlers.** A
+  window `pointerup` tap-select handler must check the tap STARTED on the
+  canvas (`e.target === canvas` at pointerdown), or tapping any HUD button
+  clears the selection mid-interaction (classic symptom: build orders enqueue
+  with an empty crew).

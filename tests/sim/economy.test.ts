@@ -73,6 +73,20 @@ describe("PHASE 3 GATE — economy", () => {
     expect(getPlayer(sim, 0).popCap).toBe(25); // 15 (TC) + 10 (house)
   });
 
+  it("a build order with no valid builders is ignored (no cost, no orphan site)", () => {
+    const sim = createSim(42, undefined, SKIRMISH);
+    const woodBefore = getPlayer(sim, 0).woodMilli;
+    const { Building } = sim.stores;
+    const sitesBefore = query(sim.world, [Building]).length;
+    const enemyVillager = ownVillagers(sim, 1)[0]!;
+    stepSim(sim, [
+      { type: "build", playerId: 0, eids: [], building: "house", x: -1, y: -1 },
+      { type: "build", playerId: 0, eids: [enemyVillager], building: "house", x: -1, y: -1 },
+    ]);
+    expect(getPlayer(sim, 0).woodMilli, "no wood spent").toBe(woodBefore);
+    expect(query(sim.world, [Building]).length, "no orphan construction site").toBe(sitesBefore);
+  });
+
   it("town center trains a villager (cost + time + pop)", () => {
     const sim = createSim(42, undefined, SKIRMISH);
     const p = getPlayer(sim, 0);

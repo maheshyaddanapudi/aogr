@@ -48,10 +48,14 @@ export function setupSelection(deps: SelectionDeps): Selection {
   const groups = new Map<number, number[]>();
   let placement: { buildingId: string; size: number } | null = null;
 
-  // touch taps: only treat as select when the finger barely moved
+  // touch taps: only treat as select when the finger barely moved AND the tap
+  // began on the canvas — taps on HUD buttons must never clear the selection
+  // (a build order with the crew cleared mid-tap places a site nobody builds)
   let touchDownAt: { x: number; y: number; t: number } | null = null;
+  let placementConsumedTap = false;
   window.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "touch") touchDownAt = { x: e.clientX, y: e.clientY, t: performance.now() };
+    if (e.pointerType !== "touch") return;
+    touchDownAt = e.target === canvas ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
   });
   const touchTapOk = (e: PointerEvent): boolean =>
     !!touchDownAt && Math.hypot(e.clientX - touchDownAt.x, e.clientY - touchDownAt.y) < 12 && performance.now() - touchDownAt.t < 450;
@@ -64,6 +68,9 @@ export function setupSelection(deps: SelectionDeps): Selection {
   let dragStart: { x: number; y: number } | null = null;
   let dragging = false;
 
+  // Project returns render-BUFFER pixels; events arrive in CSS pixels. On
+  // high-DPI screens (adaptToDeviceRatio) the two differ by the hardware
+  // scaling level — convert so marquee/tap math always compares CSS to CSS.
   const screenPos = (wx: number, wy: number, wz: number) => {
     const engine = scene.getEngine();
     const p = Vector3.Project(
@@ -72,7 +79,8 @@ export function setupSelection(deps: SelectionDeps): Selection {
       scene.getTransformMatrix(),
       deps.camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight()),
     );
-    return { x: p.x, y: p.y };
+    const lvl = engine.getHardwareScalingLevel();
+    return { x: p.x * lvl, y: p.y * lvl };
   };
 
   // Unit models are slim — an exact-pixel ray often slips between limbs.
@@ -96,20 +104,33 @@ export function setupSelection(deps: SelectionDeps): Selection {
     return best;
   };
 
+  // Snap a picked ground point to a placeable footprint corner. round (not
+  // trunc) so sub-tile pick noise can't shift the footprint a whole tile;
+  // when the exact tile ring is blocked, nudge to the nearest neighbor —
+  // taps have no hover-ghost warning, silent rejection feels broken.
+  const snapPlacement = (px: number, pz: number, p: { buildingId: string; size: number }): { tx: number; ty: number } | null => {
+    const bx = Math.round(px - p.size / 2);
+    const by = Math.round(pz - p.size / 2);
+    for (const [ox, oy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]] as const) {
+      if (!deps.canPlace || deps.canPlace(p.buildingId, bx + ox, by + oy)) return { tx: bx + ox, ty: by + oy };
+    }
+    return null;
+  };
+
   canvas.addEventListener("pointerdown", (e) => {
     if (placement && e.button === 0) {
+      placementConsumedTap = e.pointerType === "touch";
       const pick = scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
       if (pick?.pickedPoint) {
-        const tx = Math.trunc(pick.pickedPoint.x - placement.size / 2);
-        const ty = Math.trunc(pick.pickedPoint.z - placement.size / 2);
-        if (!deps.canPlace || deps.canPlace(placement.buildingId, tx, ty)) {
+        const snapped = snapPlacement(pick.pickedPoint.x, pick.pickedPoint.z, placement);
+        if (snapped) {
           queue.enqueue(deps.currentTick() + 1, {
             type: "build",
             playerId: deps.localPlayerId,
             eids: Array.from(selected),
             building: placement.buildingId,
-            x: tx * FP_ONE,
-            y: ty * FP_ONE,
+            x: snapped.tx * FP_ONE,
+            y: snapped.ty * FP_ONE,
           });
           placement = null;
           deps.onGhostEnd?.();
@@ -179,6 +200,10 @@ export function setupSelection(deps: SelectionDeps): Selection {
 
   window.addEventListener("pointerup", (e) => {
     // touch tap = click-select (no marquee path)
+    if (e.pointerType === "touch" && placementConsumedTap) {
+      placementConsumedTap = false; // the tap placed a building; keep the crew selected
+      return;
+    }
     if (e.pointerType === "touch" && e.button === 0 && touchTapOk(e)) {
       const eid = pickUnitNear(e.clientX, e.clientY, 24);
       const pick = eid === null ? scene.pick(e.clientX, e.clientY) : null;
@@ -218,15 +243,15 @@ export function setupSelection(deps: SelectionDeps): Selection {
     dragging = false;
   });
 
-  // placement ghost follows the cursor
+  // placement ghost follows the cursor (same snap+nudge as the click)
   canvas.addEventListener("pointermove", (e) => {
     if (!placement) return;
     const pick = scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
     if (pick?.pickedPoint) {
-      const tx = Math.trunc(pick.pickedPoint.x - placement.size / 2);
-      const ty = Math.trunc(pick.pickedPoint.z - placement.size / 2);
-      const ok = !deps.canPlace || deps.canPlace(placement.buildingId, tx, ty);
-      deps.onGhost?.(placement.size, tx + placement.size / 2, ty + placement.size / 2, ok);
+      const snapped = snapPlacement(pick.pickedPoint.x, pick.pickedPoint.z, placement);
+      const tx = snapped?.tx ?? Math.round(pick.pickedPoint.x - placement.size / 2);
+      const ty = snapped?.ty ?? Math.round(pick.pickedPoint.z - placement.size / 2);
+      deps.onGhost?.(placement.size, tx + placement.size / 2, ty + placement.size / 2, snapped !== null);
     }
   });
 
