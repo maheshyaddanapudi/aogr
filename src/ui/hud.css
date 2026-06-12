@@ -532,6 +532,7 @@ body {
   cursor: pointer;
 }
 .sel-clear:hover { filter: brightness(1.3); }
+.sel-hint { display: block; margin-top: 5px; font-size: 10px; line-height: 1.35; color: var(--parchment-dim); opacity: 0.85; }
 
 /* ── loading overlay ─────────────────────────────────── */
 .loading-overlay {

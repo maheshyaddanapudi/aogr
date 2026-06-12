@@ -243,6 +243,17 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     isBuildingMesh: (m) => objects.isBuildingMesh(m),
     buildingOwner: (eid) => sim.stores.Owner.playerId[eid] ?? -1,
     buildingActive: (eid) => sim.stores.Building.active[eid] === 1,
+    farmFoodNode: (eid) => {
+      const { Position, ResourceNode, Building } = sim.stores;
+      const stats = getBuildingStatsByIndex(Building.typeIndex[eid]!);
+      if (!stats.isFarm || Building.active[eid] !== 1) return null;
+      const half = (stats.size * FP_ONE) / 2;
+      for (const n of query(sim.world, [ResourceNode])) {
+        if (ResourceNode.resType[n] !== 0 || ResourceNode.amountMilli[n]! <= 0) continue;
+        if (Math.abs(Position.x[n]! - Position.x[eid]!) <= half && Math.abs(Position.y[n]! - Position.y[eid]!) <= half) return n;
+      }
+      return null;
+    },
     canPlace: (buildingId, tx, ty) => {
       const size = getBuildingStats(buildingId).size;
       for (let y = ty - 1; y < ty + size + 1; y++) {

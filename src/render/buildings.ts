@@ -389,8 +389,13 @@ export async function createWorldObjectsRenderer(
         }
       }
     }
+    // farm food nodes live ON the field — drawing a berry bush there would
+    // bury the crops; the field itself is the visual
+    const farms = buildings.filter((b) => b.buildingId === "farm");
+    const onFarm = (x: number, z: number) => farms.some((f) => Math.abs(x - f.x) <= f.size / 2 && Math.abs(z - f.z) <= f.size / 2);
     for (const n of nodes) {
       let v = nodeVisuals.get(n.eid);
+      if (!v && !n.depleted && onFarm(n.x, n.z)) continue;
       if (!v && !n.depleted) {
         v = cloneProto(NODE_MODEL[n.resType]!, `node${n.eid}`);
         const bounds = v.getHierarchyBoundingVectors();

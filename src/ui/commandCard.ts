@@ -53,10 +53,14 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
       // selection info refreshes every call; buttons only on change
       if (units.length > 0) {
         selTitle.textContent = units.length === 1 ? units[0]!.name : `${units.length} units`;
+        const verb = coarse ? "Tap" : "Right-click";
+        const hint = units.some((u) => u.unitClass === "villager")
+          ? `<small class="sel-hint">${verb} trees/bushes/gold to gather, a farm to work it, ground to walk</small>`
+          : `<small class="sel-hint">${verb} an enemy to attack, ground to move</small>`;
         selBody.innerHTML =
-          units.length === 1
+          (units.length === 1
             ? `<div class="hpbar"><i style="width:${Math.round((units[0]!.hp / units[0]!.maxHp) * 100)}%"></i></div><span>${units[0]!.hp}/${units[0]!.maxHp} HP</span>`
-            : `<span>${units.map((u) => u.name).slice(0, 4).join(", ")}${units.length > 4 ? "…" : ""}</span>`;
+            : `<span>${units.map((u) => u.name).slice(0, 4).join(", ")}${units.length > 4 ? "…" : ""}</span>`) + hint;
       } else if (building) {
         const stats = getBuildingStats(building.buildingId);
         selTitle.textContent = stats.name;

@@ -25,6 +25,8 @@ export interface SelectionDeps {
   isBuildingMesh?: (mesh: AbstractMesh) => number | null;
   buildingOwner?: (eid: number) => number;
   buildingActive?: (eid: number) => boolean;
+  /** the harvestable food node sitting on a farm, if the building is one */
+  farmFoodNode?: (eid: number) => number | null;
   groundHeightAt: (x: number, z: number) => number;
   /** placement support */
   canPlace?: (buildingId: string, tileX: number, tileY: number) => boolean;
@@ -174,6 +176,14 @@ export function setupSelection(deps: SelectionDeps): Selection {
       const buildingHit = nodePick?.pickedMesh && deps.isBuildingMesh ? deps.isBuildingMesh(nodePick.pickedMesh) : null;
       const enemyUnit = unitHit !== null && deps.unitPositions().find((u) => u.eid === unitHit)?.playerId !== deps.localPlayerId;
       const enemyBuilding = buildingHit !== null && deps.buildingOwner?.(buildingHit) !== deps.localPlayerId;
+      if (buildingHit !== null && !enemyBuilding) {
+        const farmNode = deps.farmFoodNode?.(buildingHit) ?? null;
+        if (farmNode !== null) {
+          // own farm → work the field
+          queue.enqueue(deps.currentTick() + 1, { type: "gather", playerId: deps.localPlayerId, eids: Array.from(selected), nodeEid: farmNode });
+          return;
+        }
+      }
       if ((unitHit !== null && enemyUnit) || (buildingHit !== null && enemyBuilding)) {
         queue.enqueue(deps.currentTick() + 1, {
           type: "attack",
@@ -244,6 +254,12 @@ export function setupSelection(deps: SelectionDeps): Selection {
         if (ownBuilding && deps.buildingActive && !deps.buildingActive(beid)) {
           // unfinished own site → put the crew on it
           queue.enqueue(deps.currentTick() + 1, { type: "work_on", playerId: deps.localPlayerId, eids: Array.from(selected), buildingEid: beid });
+          return;
+        }
+        const farmNode = ownBuilding ? (deps.farmFoodNode?.(beid!) ?? null) : null;
+        if (farmNode !== null) {
+          // own farm → put the crew to work in the field
+          queue.enqueue(deps.currentTick() + 1, { type: "gather", playerId: deps.localPlayerId, eids: Array.from(selected), nodeEid: farmNode });
           return;
         }
         if (ownBuilding) {
