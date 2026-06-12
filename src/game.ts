@@ -241,6 +241,8 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     isUnitMesh: (m) => unitRenderer.isUnitMesh(m),
     isNodeMesh: (m) => objects.isNodeMesh(m),
     isBuildingMesh: (m) => objects.isBuildingMesh(m),
+    buildingOwner: (eid) => sim.stores.Owner.playerId[eid] ?? -1,
+    buildingActive: (eid) => sim.stores.Building.active[eid] === 1,
     canPlace: (buildingId, tx, ty) => {
       const size = getBuildingStats(buildingId).size;
       for (let y = ty - 1; y < ty + size + 1; y++) {
@@ -271,6 +273,10 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     onTrain: (buildingEid, unitId) => {
       audio.uiClick();
       queue.enqueue(sim.tick + 1, { type: "train", playerId: 0, buildingEid, unit: unitId });
+    },
+    onDeselect: () => {
+      audio.uiClick();
+      selection.clear();
     },
   });
   // unit acknowledgment on selection

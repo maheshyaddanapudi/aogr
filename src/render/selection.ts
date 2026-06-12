@@ -23,6 +23,8 @@ export interface SelectionDeps {
   /** resource-node hit test: right-clicking a node issues a gather order */
   isNodeMesh?: (mesh: AbstractMesh) => number | null;
   isBuildingMesh?: (mesh: AbstractMesh) => number | null;
+  buildingOwner?: (eid: number) => number;
+  buildingActive?: (eid: number) => boolean;
   groundHeightAt: (x: number, z: number) => number;
   /** placement support */
   canPlace?: (buildingId: string, tileX: number, tileY: number) => boolean;
@@ -37,6 +39,8 @@ export interface Selection {
   readonly selectedBuilding: () => number | null;
   /** enter placement mode for a building id; clicks place it, Esc cancels */
   enterPlacement: (buildingId: string, size: number) => void;
+  /** drop the current selection (mobile has no empty-ground deselect tap) */
+  clear: () => void;
 }
 
 const DRAG_THRESHOLD_PX = 6;
@@ -199,19 +203,72 @@ export function setupSelection(deps: SelectionDeps): Selection {
   });
 
   window.addEventListener("pointerup", (e) => {
-    // touch tap = click-select (no marquee path)
+    // touch tap = select OR contextual order (mobile has no right-click)
     if (e.pointerType === "touch" && placementConsumedTap) {
       placementConsumedTap = false; // the tap placed a building; keep the crew selected
       return;
     }
     if (e.pointerType === "touch" && e.button === 0 && touchTapOk(e)) {
       const eid = pickUnitNear(e.clientX, e.clientY, 24);
-      const pick = eid === null ? scene.pick(e.clientX, e.clientY) : null;
-      const beid = eid === null && pick?.pickedMesh && deps.isBuildingMesh ? deps.isBuildingMesh(pick.pickedMesh) : null;
+      const unitOwner = (id: number) => deps.unitPositions().find((u) => u.eid === id)?.playerId ?? -1;
+      // tap on an own unit → (re)select it
+      if (eid !== null && unitOwner(eid) === deps.localPlayerId) {
+        selected.clear();
+        selectedBuilding = null;
+        selected.add(eid);
+        return;
+      }
+      const pick = scene.pick(e.clientX, e.clientY);
+      const nodeEid = pick?.pickedMesh && deps.isNodeMesh ? deps.isNodeMesh(pick.pickedMesh) : null;
+      const beid = pick?.pickedMesh && deps.isBuildingMesh ? deps.isBuildingMesh(pick.pickedMesh) : null;
+      const ownBuilding = beid !== null && deps.buildingOwner?.(beid) === deps.localPlayerId;
+      if (selected.size > 0) {
+        // units selected: the tap IS the order
+        if (nodeEid !== null) {
+          queue.enqueue(deps.currentTick() + 1, { type: "gather", playerId: deps.localPlayerId, eids: Array.from(selected), nodeEid });
+          return;
+        }
+        if (ownBuilding && deps.buildingActive && !deps.buildingActive(beid)) {
+          // unfinished own site → put the crew on it
+          queue.enqueue(deps.currentTick() + 1, { type: "work_on", playerId: deps.localPlayerId, eids: Array.from(selected), buildingEid: beid });
+          return;
+        }
+        if (ownBuilding) {
+          selected.clear();
+          selectedBuilding = beid; // switch to the finished building
+          return;
+        }
+        const ground = scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
+        if (ground?.pickedPoint) {
+          // open ground (or toward an enemy — military auto-acquires)
+          const x = Math.round(ground.pickedPoint.x * FP_ONE);
+          const y = Math.round(ground.pickedPoint.z * FP_ONE);
+          deps.onMoveOrder?.(Math.trunc(ground.pickedPoint.x), Math.trunc(ground.pickedPoint.z));
+          queue.enqueue(deps.currentTick() + 1, { type: "move", playerId: deps.localPlayerId, eids: Array.from(selected), x, y });
+        }
+        return;
+      }
+      if (selectedBuilding !== null && beid === null && nodeEid === null && eid === null) {
+        // own production building selected: tap on ground sets its rally
+        const ground = scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
+        if (ground?.pickedPoint) {
+          queue.enqueue(deps.currentTick() + 1, {
+            type: "rally",
+            playerId: deps.localPlayerId,
+            buildingEid: selectedBuilding,
+            x: Math.round(ground.pickedPoint.x * FP_ONE),
+            y: Math.round(ground.pickedPoint.z * FP_ONE),
+          });
+        }
+        return;
+      }
+      // nothing selected: plain select (any unit for info, or a building)
       selected.clear();
-      selectedBuilding = null;
-      if (eid !== null) selected.add(eid);
-      else if (beid !== null) selectedBuilding = beid;
+      selectedBuilding = beid;
+      if (eid !== null) {
+        selectedBuilding = null;
+        selected.add(eid);
+      }
       return;
     }
     if (e.button !== 0 || !dragStart) return;
@@ -283,6 +340,12 @@ export function setupSelection(deps: SelectionDeps): Selection {
     selectedBuilding: () => selectedBuilding,
     enterPlacement(buildingId, size) {
       placement = { buildingId, size };
+    },
+    clear() {
+      selected.clear();
+      selectedBuilding = null;
+      placement = null;
+      deps.onGhostEnd?.();
     },
   };
 }

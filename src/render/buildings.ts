@@ -283,19 +283,54 @@ export async function createWorldObjectsRenderer(
     }
   };
 
+  // farms are fields, not houses: tilled soil + crop rows (no pack model fits)
+  let soilMat: StandardMaterial | null = null;
+  let cropMat: StandardMaterial | null = null;
+  const makeFarmField = (name: string, size: number): TransformNode => {
+    if (!soilMat) {
+      soilMat = new StandardMaterial("farmSoil", scene);
+      soilMat.diffuseColor = new Color3(0.32, 0.21, 0.12);
+      soilMat.specularColor = new Color3(0.02, 0.02, 0.02);
+      cropMat = new StandardMaterial("farmCrop", scene);
+      cropMat.diffuseColor = new Color3(0.78, 0.66, 0.22);
+      cropMat.emissiveColor = new Color3(0.12, 0.1, 0.02);
+      cropMat.specularColor = new Color3(0.02, 0.02, 0.02);
+    }
+    const root = new TransformNode(name, scene);
+    const soil = MeshBuilder.CreateBox(`${name}_soil`, { width: size * 0.96, depth: size * 0.96, height: 0.14 }, scene);
+    soil.material = soilMat;
+    soil.parent = root;
+    soil.position.y = 0.07;
+    for (let r = 0; r < 4; r++) {
+      const row = MeshBuilder.CreateBox(`${name}_row${r}`, { width: size * 0.84, depth: size * 0.12, height: 0.16 }, scene);
+      row.material = cropMat;
+      row.parent = root;
+      row.position.set(0, 0.2, (r - 1.5) * size * 0.22);
+    }
+    return root;
+  };
+
   const update: WorldObjectsRenderer["update"] = (buildings, nodes, groundHeightAt) => {
     for (const b of buildings) {
       let v = buildingVisuals.get(b.eid);
       if (!v) {
-        const model = BUILDING_MODEL[b.buildingId] ?? "home_A";
-        const variant = TEAM_VARIANT[b.playerId % TEAM_VARIANT.length]!;
-        const node = cloneProto(`buildings/building_${model}_${variant}`, `building${b.eid}`);
-        // normalize to footprint size
-        const bounds = node.getHierarchyBoundingVectors();
-        const w = Math.max(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z, 0.001);
-        const s = (b.size * 0.95) / w;
-        node.scaling.setAll(s);
-        v = { node, height: (bounds.max.y - bounds.min.y) * s, scaffold: b.active ? null : makeScaffold(b.size), smoke: null, fire: null };
+        let node: TransformNode;
+        let height: number;
+        if (b.buildingId === "farm") {
+          node = makeFarmField(`building${b.eid}`, b.size);
+          height = 0.3;
+        } else {
+          const model = BUILDING_MODEL[b.buildingId] ?? "home_A";
+          const variant = TEAM_VARIANT[b.playerId % TEAM_VARIANT.length]!;
+          node = cloneProto(`buildings/building_${model}_${variant}`, `building${b.eid}`);
+          // normalize to footprint size
+          const bounds = node.getHierarchyBoundingVectors();
+          const w = Math.max(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z, 0.001);
+          const s = (b.size * 0.95) / w;
+          node.scaling.setAll(s);
+          height = (bounds.max.y - bounds.min.y) * s;
+        }
+        v = { node, height, scaffold: b.active ? null : makeScaffold(b.size), smoke: null, fire: null };
         buildingVisuals.set(b.eid, v);
         for (const m of node.getChildMeshes()) buildingMeshToEid.set(m, b.eid);
       }

@@ -12,6 +12,7 @@ import type { Sim } from "../sim";
 export interface CardCallbacks {
   onBuild: (buildingId: string) => void; // enter placement mode
   onTrain: (buildingEid: number, unitId: string) => void;
+  onDeselect: () => void;
 }
 
 export interface CommandCard {
@@ -29,12 +30,19 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
   const panel = document.createElement("div");
   panel.className = "bottom-panel";
   panel.innerHTML = `
-    <div class="sel-panel"><h3>Nothing selected</h3><div class="sel-body"></div></div>
+    <div class="sel-panel">
+      <button class="sel-clear" title="Deselect" style="display:none">✕</button>
+      <h3>Nothing selected</h3><div class="sel-body"></div>
+    </div>
     <div class="command-card"></div>`;
   root.appendChild(panel);
   const selTitle = panel.querySelector<HTMLElement>(".sel-panel h3")!;
   const selBody = panel.querySelector<HTMLElement>(".sel-body")!;
+  const selClear = panel.querySelector<HTMLButtonElement>(".sel-clear")!;
   const card = panel.querySelector<HTMLElement>(".command-card")!;
+  selClear.addEventListener("click", () => cb.onDeselect());
+  const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  const rallyHint = coarse ? "Tap the map to set a rally point" : "Right-click the map to set a rally point";
 
   let lastKey = "";
 
@@ -50,12 +58,14 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
             ? `<div class="hpbar"><i style="width:${Math.round((units[0]!.hp / units[0]!.maxHp) * 100)}%"></i></div><span>${units[0]!.hp}/${units[0]!.maxHp} HP</span>`
             : `<span>${units.map((u) => u.name).slice(0, 4).join(", ")}${units.length > 4 ? "…" : ""}</span>`;
       } else if (building) {
-        selTitle.textContent = getBuildingStats(building.buildingId).name;
-        selBody.innerHTML = `<span>Right-click the map to set a rally point</span>`;
+        const stats = getBuildingStats(building.buildingId);
+        selTitle.textContent = stats.name;
+        selBody.innerHTML = stats.trains.length > 0 ? `<span>${rallyHint}</span>` : "";
       } else {
         selTitle.textContent = "Nothing selected";
         selBody.innerHTML = "";
       }
+      selClear.style.display = units.length > 0 || building ? "" : "none";
       if (key === lastKey) return;
       lastKey = key;
       card.innerHTML = "";

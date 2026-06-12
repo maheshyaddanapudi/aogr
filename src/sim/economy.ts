@@ -496,11 +496,20 @@ export function economySystem(sim: Sim): void {
         Building.progress[b] = Building.progress[b]! + 1;
         if (Building.progress[b]! >= Building.total[b]!) {
           Building.active[b] = 1;
-          // farms provide a quasi-infinite food node at their center
+          // farms provide a quasi-infinite food node at their center; the
+          // crew that raised the farm starts working it right away (AoE-style)
           if (getBuildingStatsByIndex(Building.typeIndex[b]!).isFarm) {
             const fx = Math.trunc(Position.x[b]! / 1000);
             const fy = Math.trunc(Position.y[b]! / 1000);
-            spawnResourceNode(sim, "food", fx, fy, 1_000_000_000);
+            const farmNode = spawnResourceNode(sim, "food", fx, fy, 1_000_000_000);
+            const crew = Array.from(query(sim.world, [sim.stores.UnitRef, GatherTask]))
+              .filter((w) => GatherTask.phase[w] === 4 && GatherTask.nodeEid[w] === b)
+              .sort((x, y) => x - y);
+            for (const w of crew) {
+              GatherTask.phase[w] = 1;
+              GatherTask.nodeEid[w] = farmNode;
+              setMoveTarget(sim, w, Position.x[farmNode]!, Position.y[farmNode]!);
+            }
           }
         }
       }

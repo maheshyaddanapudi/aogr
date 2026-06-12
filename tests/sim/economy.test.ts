@@ -73,6 +73,21 @@ describe("PHASE 3 GATE — economy", () => {
     expect(getPlayer(sim, 0).popCap).toBe(25); // 15 (TC) + 10 (house)
   });
 
+  it("villagers who finish a farm start farming it automatically (and drop food off)", () => {
+    const sim = createSim(42, undefined, SKIRMISH);
+    const vills = ownVillagers(sim, 0);
+    stepSim(sim, [{ type: "build", playerId: 0, eids: [vills[0]!, vills[1]!], building: "farm", x: -1, y: -1 }]);
+    // run long enough to build the farm and bring in at least one food load
+    const foodAfterBuild = () => getPlayer(sim, 0).foodMilli;
+    run(sim, 15 * 30); // 30s: farm built (no further commands issued)
+    const { GatherTask } = sim.stores;
+    expect([1, 2, 3], "builder 1 auto-farms").toContain(GatherTask.phase[vills[0]!]);
+    expect([1, 2, 3], "builder 2 auto-farms").toContain(GatherTask.phase[vills[1]!]);
+    const before = foodAfterBuild();
+    run(sim, 15 * 90);
+    expect(foodAfterBuild(), "farmed food reaches the stockpile").toBeGreaterThan(before);
+  });
+
   it("a build order with no valid builders is ignored (no cost, no orphan site)", () => {
     const sim = createSim(42, undefined, SKIRMISH);
     const woodBefore = getPlayer(sim, 0).woodMilli;
