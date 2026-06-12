@@ -33,12 +33,21 @@ import { buildTerrainMesh, sampleHeight, type TerrainView } from "./terrainMesh"
 import { createRtsCamera, type RtsCamera } from "./camera";
 
 export async function createEngine(canvas: HTMLCanvasElement): Promise<AbstractEngine> {
-  if (await WebGPUEngine.IsSupportedAsync) {
+  // WebGL2 by default. iOS 18 Safari reports WebGPU support but renders our
+  // materials-library + RawTexture stack black; WebGL2 is the battle-tested
+  // path everywhere. WebGPU stays available behind ?webgpu for testing.
+  if (new URLSearchParams(location.search).has("webgpu") && (await WebGPUEngine.IsSupportedAsync)) {
     const engine = new WebGPUEngine(canvas, { antialias: true });
     await engine.initAsync();
     return engine;
   }
-  return new Engine(canvas, true, { adaptToDeviceRatio: true });
+  const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
+  // Phones: full native DPR (3× on iPhones) is wasted on a bloom+SSAO+CSM
+  // pipeline — cap the backing store at 2× CSS pixels.
+  if (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches && devicePixelRatio > 2) {
+    engine.setHardwareScalingLevel(1 / 2);
+  }
+  return engine;
 }
 
 export interface WorldScene {

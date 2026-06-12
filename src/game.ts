@@ -396,6 +396,16 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     });
   });
   document.querySelector(".age-wrap")?.appendChild(saveBtn);
+
+  // exit to menu (saves first so nothing is lost)
+  const menuBtn = document.createElement("button");
+  menuBtn.className = "age-up-btn save-btn";
+  menuBtn.textContent = "Menu";
+  menuBtn.title = "Save and return to the main menu";
+  menuBtn.addEventListener("click", () => {
+    void saveGame(serializeSim(sim)).finally(() => location.assign(location.pathname));
+  });
+  document.querySelector(".age-wrap")?.appendChild(menuBtn);
   // Debug handles for headless gate probes (harmless in production).
   (window as unknown as Record<string, unknown>).__scene = world.scene;
   (window as unknown as Record<string, unknown>).__sim = sim;
