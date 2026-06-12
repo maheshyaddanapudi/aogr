@@ -30,15 +30,21 @@ export function createRtsCamera(scene: Scene, canvas: HTMLCanvasElement, mapSize
   let mouseY = -1;
   let rotating = false;
 
-  // ── touch: one-finger drag pans, two-finger pinch zooms ──
+  // ── touch: one-finger drag pans, two fingers pinch-zoom and twist-rotate ──
   const touches = new Map<number, { x: number; y: number }>();
   let pinchDist = 0;
+  let pinchAngle = 0;
+  const twoFingerState = () => {
+    const [a, b] = Array.from(touches.values());
+    return { dist: Math.hypot(a!.x - b!.x, a!.y - b!.y), angle: Math.atan2(b!.y - a!.y, b!.x - a!.x) };
+  };
   canvas.addEventListener("pointerdown", (e) => {
     if (e.pointerType !== "touch") return;
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (touches.size === 2) {
-      const [a, b] = Array.from(touches.values());
-      pinchDist = Math.hypot(a!.x - b!.x, a!.y - b!.y);
+      const s = twoFingerState();
+      pinchDist = s.dist;
+      pinchAngle = s.angle;
     }
   });
   canvas.addEventListener("pointermove", (e) => {
@@ -59,12 +65,17 @@ export function createRtsCamera(scene: Scene, canvas: HTMLCanvasElement, mapSize
       camera.target.x = Math.min(Math.max(camera.target.x, 0), mapSize);
       camera.target.z = Math.min(Math.max(camera.target.z, 0), mapSize);
     } else if (touches.size === 2) {
-      const [a, b] = Array.from(touches.values());
-      const d = Math.hypot(a!.x - b!.x, a!.y - b!.y);
+      const s = twoFingerState();
       if (pinchDist > 0) {
-        camera.radius = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, camera.radius * (pinchDist / d)));
+        camera.radius = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, camera.radius * (pinchDist / s.dist)));
       }
-      pinchDist = d;
+      // twist: rotate the view around the focal point (wrap-safe delta)
+      let dAngle = s.angle - pinchAngle;
+      if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
+      if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
+      camera.alpha += dAngle;
+      pinchDist = s.dist;
+      pinchAngle = s.angle;
     }
   });
   const endTouch = (e: PointerEvent) => {

@@ -296,6 +296,11 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
         const existing = buildingsOf(sim, cmd.playerId, (s) => s.id === stats.id, false).length;
         if (existing >= stats.buildLimit) return true;
       }
+      // a site without builders would never rise — ignore crewless orders
+      const builders = [...cmd.eids]
+        .sort((a, b) => a - b)
+        .filter((eid) => Owner.playerId[eid] === cmd.playerId && hasComponent(sim.world, eid, GatherTask));
+      if (builders.length === 0) return true;
       let site: { x: number; y: number } | null;
       if (cmd.x < 0 || cmd.y < 0) {
         const tc = p.townCenterEid;
@@ -310,9 +315,7 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
       if (!site) return true;
       payCost(p, stats.cost);
       const beid = spawnBuilding(sim, cmd.playerId, cmd.building, site.x, site.y, false);
-      const sorted = [...cmd.eids].sort((a, b) => a - b);
-      for (const eid of sorted) {
-        if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, GatherTask)) continue;
+      for (const eid of builders) {
         GatherTask.phase[eid] = 4;
         GatherTask.nodeEid[eid] = beid;
         setMoveTarget(sim, eid, Position.x[beid]!, Position.y[beid]!);
