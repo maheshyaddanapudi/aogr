@@ -137,3 +137,19 @@ Verified: 111/111 tests green, sim purity clean, AI match runs 6 game-minutes he
 - Manually play-tested headless (desktop 1280×720 + phone 844×390/390×844): menu→boot, click-select, marquee, move/gather orders, TC select, train villager, rally point, build placement + completion, minimap pan, save button, touch pan/pinch/tap — all verified, zero console errors
 
 Verified: 111/111 tests green, sim purity clean, build clean.
+
+## Gap-fix pass (post-AoM-audit)
+
+Closed every "unreachable" finding from the AoM capability audit except garrisoning:
+
+- [x] Defensive buildings fire (TC/tower/fortress, data-driven; tick-phase cooldown — no new serialized state)
+- [x] God-power casting UI (HUD bar: cost/cooldown per power, click-to-arm, click-map-to-cast)
+- [x] Buildable fortress/walls/gates/wonder + per-pantheon favor buildings; ram/catapult trainable
+- [x] Stances (aggressive/hold/passive), villager repair, caravan trade routes, wild-game hunting, rally-onto-resource auto-task, hero heal aura
+- [x] Production queue UI with cancel+refund; building tech-research buttons; major-god menu choice (shapes minor pools)
+- [x] Idle-villager finder, minimap attack pings, pause + 2× speed, end-of-match stats; AI builds a wonder at Mythic
+- [ ] Descoped, still missing: garrison, myth-unit specials, formations, naval, herdables, settlements, relics, campaign, MP
+
+Verified: 123/123 tests (10 new TDD tests in tests/sim/gaps.test.ts), sim purity clean, full end-to-end
+playthrough re-run with all systems live — conquest victory at game-minute 27 vs the easy AI (defensive
+fire makes sieges realistically slower than the pre-fix 16-minute win).

@@ -44,6 +44,8 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 
 | 2026-06-11 | Session 1 / Mobile + manual playtest pass | babylon-integration-pitfalls | `.claude/skills/babylon-integration-pitfalls/` | authored in-repo | Consulted for the headless playtest harness (§7 capture recipe, §11 remat) while manually exercising every desktop/mobile interaction; **updated** with §12 (plain-object Ray garbage, pickable water swallowing clicks, slim-part pick forgiveness, building center positions, per-pool-load remat, releaseEffects trap) | Root-caused the demo-script-in-real-games bug, water-blocked click-select, and the white-capture flakiness triage | src/render/selection.ts, terrainMesh.ts, units.ts, src/game.ts, SKILL.md §12 |
 
+| 2026-07-06 | Session 2 / Gap-fix pass | deterministic-sim-testing | (vendored) | authored in-repo | Applied to 10 new mechanics in one TDD batch (building fire, stances, repair, caravans, hunting, rally auto-task, heal aura, cancel-refund, walls/gates); tick-phase cooldown pattern avoided a snapshot format bump | All 10 landed red→green; zero determinism regressions across 123 tests | tests/sim/gaps.test.ts, src/sim/* |
+
 ## SESSION 1 FINAL ROLLUP (Phases 0–10 complete)
 
 **Skills used:** frontend-design (4 uses), deterministic-sim-testing (authored Phase 2; used at every gate after), babylon-integration-pitfalls (authored Phase 1; used + updated through Phase 9), docx + deep-research (pre-repo provenance).
