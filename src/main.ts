@@ -23,7 +23,7 @@ function armMenuMusic(): void {
     if (!menuMusicWanted || vol <= 0) return;
     void import("howler").then(({ Howl }) => {
       if (!menuMusicWanted) return;
-      const h = new Howl({ src: [`${import.meta.env.BASE_URL}audio/music_main.mp3`], loop: true, volume: vol });
+      const h = new Howl({ src: [`${import.meta.env.BASE_URL}audio/music_menu.mp3`], loop: true, volume: vol });
       h.play();
       menuMusic = h;
     });
@@ -111,7 +111,7 @@ function renderMenu(): void {
         <button id="m-replay" class="age-up-btn">Watch replay</button>
         <input id="m-replay-file" type="file" accept=".json" style="display:none" />
       </div>
-      <p class="menu-credits">CC0 art by Kay Lousberg, Kenney, ambientCG · Music: Kevin MacLeod (CC-BY) · Built with Babylon.js + bitECS</p>
+      <p class="menu-credits">CC0 art by Kay Lousberg, Kenney, ambientCG · Music: Kevin MacLeod — incompetech.com (CC-BY 4.0) · Built with Babylon.js + bitECS</p>
     </div>`;
   document.body.appendChild(menu);
 

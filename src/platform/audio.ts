@@ -70,6 +70,7 @@ export function createAudioSystem(): AudioSystem {
   // dedicated sample is sourced (swap the file, keep the hook)
   const horn = sfx("power_pillar.ogg", 0.85);
   const music = new Howl({ src: [`${BASE}music_main.mp3`], loop: true, volume: settings.musicVol });
+  const battleMusic = new Howl({ src: [`${BASE}music_battle.mp3`], loop: true, volume: 0 });
 
   const debug = { powerPlays: 0, hitPlays: 0, musicStarted: false, ducked: false, alarmPlays: 0, trainedPlays: 0, buildDonePlays: 0 };
   let lastAlarmMs = -100000;
@@ -79,6 +80,7 @@ export function createAudioSystem(): AudioSystem {
     if (!debug.musicStarted) {
       debug.musicStarted = true;
       music.play();
+      battleMusic.play(); // runs silent until combat swells it in
       // iOS: if the tap didn't unlock the context yet, retry once it does
       music.once("playerror", () => music.once("unlock", () => music.play()));
     }
@@ -86,14 +88,14 @@ export function createAudioSystem(): AudioSystem {
   };
   window.addEventListener("pointerdown", startMusic);
 
-  // combat ducking: drop the music while fighting is fresh
+  // war drums: crossfade to the battle theme while fighting is fresh
   setInterval(() => {
-    const fighting = performance.now() - lastCombatMs < 2500;
+    const fighting = performance.now() - lastCombatMs < 6000;
     if (fighting !== debug.ducked) {
       debug.ducked = fighting;
-      const hi = settings.musicVol;
-      const lo = settings.musicVol * 0.5;
-      music.fade(fighting ? hi : lo, fighting ? lo : hi, 450);
+      const v = settings.musicVol;
+      music.fade(fighting ? v : v * 0.15, fighting ? v * 0.15 : v, 900);
+      battleMusic.fade(fighting ? 0 : v * 0.9, fighting ? v * 0.9 : 0, 900);
     }
   }, 300);
 
@@ -127,7 +129,8 @@ export function createAudioSystem(): AudioSystem {
     setVolumes(musicVol, sfxVol) {
       settings.musicVol = musicVol;
       settings.sfxVol = sfxVol;
-      music.volume(debug.ducked ? musicVol * 0.5 : musicVol);
+      music.volume(debug.ducked ? musicVol * 0.15 : musicVol);
+      battleMusic.volume(debug.ducked ? musicVol * 0.9 : 0);
       for (const { h, base } of sfxRegistry) h.volume(base * sfxVol);
     },
     alarm() {

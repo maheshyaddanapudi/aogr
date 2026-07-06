@@ -20,3 +20,8 @@ CC0 assets are credited as a courtesy; CC-BY assets are credited as a requiremen
 Fonts: [Cinzel](https://fonts.google.com/specimen/Cinzel) and
 [Alegreya Sans](https://fonts.google.com/specimen/Alegreya+Sans) served via Google
 Fonts (SIL Open Font License 1.1).
+
+
+## Music (Kevin MacLeod — incompetech.com, CC-BY 4.0)
+- music_menu.mp3 — "Lord of the Land"
+- music_battle.mp3 — "Five Armies"
