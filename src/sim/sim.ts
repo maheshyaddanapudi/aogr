@@ -162,6 +162,12 @@ export interface Sim {
   readonly stunnedUntil: Map<number, number>;
   /** neutral settlement sites (tile coords) — town centers may only rise here */
   settlements: Array<{ x: number; y: number }>;
+  /** herd eid → owner playerId (defects to whoever grazes nearby) */
+  readonly herdOwner: Map<number, number>;
+  /** herd eid → leash anchor */
+  readonly herdHome: Map<number, { x: number; y: number }>;
+  /** unit eid → attack-move destination (resumes after each fight) */
+  readonly attackMoves: Map<number, { x: number; y: number }>;
   readonly matchOptions: MatchOptions;
   /** transient per-tick outputs for the render layer; never hashed/serialized */
   events: SimEvents;
@@ -213,6 +219,9 @@ export function createSim(
     relicHolder: new Map(),
     stunnedUntil: new Map(),
     settlements: [],
+    herdOwner: new Map(),
+    herdHome: new Map(),
+    attackMoves: new Map(),
     matchOptions,
     events: emptyEvents(),
     activeEffects: [],
@@ -403,9 +412,14 @@ function applyCommand(sim: Sim, cmd: Command): void {
       const key = tileKey(sim, tile.x, tile.y);
       const targetX = tile.x * 1000 + 500;
       const targetY = tile.y * 1000 + 500;
-      const sorted = [...cmd.eids].sort((a, b) => a - b);
-      // formation: spread the group into a square grid around the target
-      const w = (cmd as { formation?: number }).formation === 1 ? sorted.length : Math.ceil(Math.sqrt(sorted.length));
+      let sorted = [...cmd.eids].sort((a, b) => a - b);
+      const formation = (cmd as { formation?: number }).formation ?? 0;
+      // battle order: melee take the leading rows (slots fill toward the target)
+      if (formation === 2) {
+        const rangedOf = (e: number) => (getUnitStatsByIndex(sim.stores.UnitRef.typeIndex[e]!).attack?.rangeFp ?? 0) > 0;
+        sorted = [...sorted.filter((e) => !rangedOf(e)), ...sorted.filter(rangedOf)];
+      }
+      const w = formation === 1 ? sorted.length : Math.ceil(Math.sqrt(sorted.length));
       let slot = 0;
       for (const eid of sorted) {
         if (Owner.playerId[eid] !== cmd.playerId) continue;
@@ -416,7 +430,8 @@ function applyCommand(sim: Sim, cmd: Command): void {
         let ukey = key;
         if (sorted.length > 1) {
           const dx = (slot % w) - Math.trunc((w - 1) / 2);
-          const dy = Math.trunc(slot / w) - Math.trunc((w - 1) / 2);
+          let dy = Math.trunc(slot / w) - Math.trunc((w - 1) / 2);
+          if ((cmd as { formation?: number }).formation === 2) dy = -dy; // front rows face the approach
           const t = nearestPassableTile(sim, tile.x + dx, tile.y + dy);
           ux = t.x * 1000 + 500;
           uy = t.y * 1000 + 500;
@@ -712,6 +727,33 @@ function handleGarrisonCommand(sim: Sim, cmd: Command): boolean {
     releaseGarrison(sim, beid);
     return true;
   }
+  if (cmd.type === "attack_move") {
+    const { CombatState } = sim.stores;
+    for (const eid of [...cmd.eids].sort((a, b) => a - b)) {
+      if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, UnitRef)) continue;
+      sim.attackMoves.set(eid, { x: cmd.x | 0, y: cmd.y | 0 });
+      if (hasComponent(sim.world, eid, CombatState)) CombatState.aggressive[eid] = 1;
+      setMoveTarget(sim, eid, cmd.x, cmd.y);
+    }
+    return true;
+  }
+  if (cmd.type === "toggle_gate") {
+    const beid = cmd.buildingEid;
+    if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
+    const stats = getBuildingStatsByIndex(Building.typeIndex[beid]!);
+    if (!stats.passable) return true; // only gates toggle
+    const g = sim.navGrid;
+    const tx = Building.tileX[beid]!;
+    const ty = Building.tileY[beid]!;
+    const open = g.passable[ty * g.size + tx] === 1;
+    for (let y = ty; y < ty + stats.size; y++) {
+      for (let x = tx; x < tx + stats.size; x++) {
+        if (x >= 0 && y >= 0 && x < g.size && y < g.size) g.passable[y * g.size + x] = open ? 0 : 1;
+      }
+    }
+    sim.flowFields.clear();
+    return true;
+  }
   if (cmd.type === "patrol") {
     for (const eid of [...cmd.eids].sort((a, b) => a - b)) {
       if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, UnitRef)) continue;
@@ -791,7 +833,24 @@ function garrisonSystem(sim: Sim): void {
 
 /** Patrol: arrived units turn around and walk the other leg. */
 function patrolSystem(sim: Sim): void {
-  const { MoveState, CombatState } = sim.stores;
+  const { MoveState, CombatState, Position } = sim.stores;
+  // attack-move: fights interrupt; idleness resumes the march
+  for (const eid of Array.from(sim.attackMoves.keys()).sort((a, b) => a - b)) {
+    if (!entityExists(sim.world, eid)) {
+      sim.attackMoves.delete(eid);
+      continue;
+    }
+    const dest = sim.attackMoves.get(eid)!;
+    const dx = Position.x[eid]! - dest.x;
+    const dy = Position.y[eid]! - dest.y;
+    if (dx * dx + dy * dy <= 2500 * 2500) {
+      sim.attackMoves.delete(eid); // arrived
+      continue;
+    }
+    if (hasComponent(sim.world, eid, CombatState) && targetAliveAndValid(sim, CombatState.targetEid[eid]!)) continue;
+    if (MoveState.active[eid] === 1) continue;
+    setMoveTarget(sim, eid, dest.x, dest.y);
+  }
   const ids = Array.from(sim.patrols.keys()).sort((a, b) => a - b);
   for (const eid of ids) {
     if (!entityExists(sim.world, eid)) {
@@ -811,10 +870,11 @@ export function stepSim(sim: Sim, commands: readonly Command[]): void {
   sim.events = emptyEvents();
   for (const cmd of commands) {
     // a fresh order supersedes an existing patrol/garrison-walk
-    if (cmd.type !== "patrol" && "eids" in cmd) {
+    if (cmd.type !== "patrol" && cmd.type !== "attack_move" && "eids" in cmd) {
       for (const eid of cmd.eids) {
         sim.patrols.delete(eid);
         sim.garrisonIntent.delete(eid);
+        sim.attackMoves.delete(eid);
       }
     }
     applyCommand(sim, cmd);
@@ -877,6 +937,14 @@ export function simChecksum(sim: Sim): number {
     const stKeys = Array.from(sim.stunnedUntil.keys()).sort((a, b) => a - b);
     c.addI32(stKeys.length);
     for (const k of stKeys) c.addI32(sim.stunnedUntil.get(k)!);
+    c.addI32(sim.herdOwner.size);
+    for (const k of Array.from(sim.herdOwner.keys()).sort((a, b) => a - b)) c.addI32(sim.herdOwner.get(k)!);
+    c.addI32(sim.attackMoves.size);
+    for (const k of Array.from(sim.attackMoves.keys()).sort((a, b) => a - b)) {
+      const v = sim.attackMoves.get(k)!;
+      c.addI32(v.x);
+      c.addI32(v.y);
+    }
   }
   hashCombat(sim, c);
   hashResearch(sim, c);
@@ -928,6 +996,9 @@ interface SimSnapshot {
   patrols?: Array<[number, { ax: number; ay: number; bx: number; by: number; leg: number }]>;
   relicHolder?: Array<[number, number]>;
   stunnedUntil?: Array<[number, number]>;
+  herdOwner?: Array<[number, number]>;
+  herdHome?: Array<[number, { x: number; y: number }]>;
+  attackMoves?: Array<[number, { x: number; y: number }]>;
   activeEffects: ActiveEffect[];
   winner: number;
   wonderTicksLeft: number[];
@@ -960,6 +1031,9 @@ export function serializeSim(sim: Sim): string {
     patrols: Array.from(sim.patrols.entries()).map(([k, v]) => [k, { ...v }]),
     relicHolder: Array.from(sim.relicHolder.entries()),
     stunnedUntil: Array.from(sim.stunnedUntil.entries()),
+    herdOwner: Array.from(sim.herdOwner.entries()),
+    herdHome: Array.from(sim.herdHome.entries()).map(([k, v]) => [k, { ...v }]),
+    attackMoves: Array.from(sim.attackMoves.entries()).map(([k, v]) => [k, { ...v }]),
     trainQueues: Array.from(sim.trainQueues.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([k, v]) => [k, v.map((e) => ({ ...e }))]),
@@ -1106,6 +1180,12 @@ export function deserializeSim(json: string): Sim {
   for (const [k, v] of snapshot.relicHolder ?? []) sim.relicHolder.set(r(k), v);
   sim.stunnedUntil.clear();
   for (const [k, v] of snapshot.stunnedUntil ?? []) sim.stunnedUntil.set(r(k), v);
+  sim.herdOwner.clear();
+  for (const [k, v] of snapshot.herdOwner ?? []) sim.herdOwner.set(r(k), v);
+  sim.herdHome.clear();
+  for (const [k, v] of snapshot.herdHome ?? []) sim.herdHome.set(r(k), { ...v });
+  sim.attackMoves.clear();
+  for (const [k, v] of snapshot.attackMoves ?? []) sim.attackMoves.set(r(k), { ...v });
   sim.settlements = computeSettlements(sim);
   sim.winner = snapshot.winner ?? -1;
   sim.wonderTicksLeft.length = 0;

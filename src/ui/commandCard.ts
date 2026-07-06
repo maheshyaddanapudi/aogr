@@ -18,6 +18,8 @@ export interface CardCallbacks {
   onStance: (stance: number) => void;
   onFormation: (formation: number) => void;
   onPatrol: () => void;
+  onAttackMove: () => void;
+  onToggleGate: (buildingEid: number) => void;
   onUnload: (shipEid: number) => void;
   onUngarrison: (buildingEid: number) => void;
   onDeselect: () => void;
@@ -140,6 +142,8 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
         addBtn("Box Formation", "Group moves arrange in a compact square", () => cb.onFormation(0), true);
         addBtn("Line Formation", "Group moves string out in a battle line", () => cb.onFormation(1), true);
         addBtn("Patrol", "Click/tap the map: walk there and back until ordered otherwise", () => cb.onPatrol(), true);
+        addBtn("Attack-Move", "Click/tap the map: fight everything en route, then arrive", () => cb.onAttackMove(), true);
+        addBtn("Battle Order", "Group moves put melee in front, archers behind", () => cb.onFormation(2), true);
         if (units.length === 1 && (garrisoned ?? 0) > 0) {
           addBtn(`Unload (${garrisoned})`, "Set the passengers ashore", () => cb.onUnload(units[0]!.eid), true);
         }
@@ -163,6 +167,9 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
           const us = getUnitStats(u);
           const ageOk = (AGE_INDEX[us.age] ?? 0) <= p.age;
           addBtn(us.name, `${us.name} — ${us.cost.food}f ${us.cost.gold}g ${us.cost.favor}fv · pop ${us.pop}`, () => cb.onTrain(building.eid, u), ageOk);
+        }
+        if (building.buildingId === "gate") {
+          addBtn("Open / Close", "Toggle the gate — closed blocks everyone, including you", () => cb.onToggleGate(building.eid), true);
         }
         // techs researched at this building
         for (const tid of listTechIds()) {

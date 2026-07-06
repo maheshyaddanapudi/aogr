@@ -12,6 +12,7 @@ import type { Sim } from "../sim/sim";
 import { getPlayer, findResourceNodes } from "../sim/economy";
 import { getTechStats } from "../sim/techdata";
 import { getMinorPool, getMinor, getPantheon } from "../sim/pantheondata";
+import { isWaterTile } from "../sim/sim";
 import { getPower, nextCastCostMilli } from "../sim/powers";
 import { getUnitStats } from "../sim/unitdata";
 import { getBuildingStats } from "../sim/buildingdata";
@@ -164,6 +165,45 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
   if (foodNodesNearBase < 6 && anyOf("farm").length < 8 && p.woodMilli >= 80_000 && underConstruction("farm") === 0) {
     const builder = idleVillagers[0] ?? villagers[0];
     if (builder !== undefined) cmds.push({ type: "build", playerId: pid, eids: [builder], building: "farm", x: -1, y: -1 });
+  }
+  // navy: a coastal base builds a dock and works the fish
+  if (anyOf("dock").length === 0 && underConstruction("dock") === 0 && p.woodMilli >= 200_000) {
+    const btx = Math.trunc(Position.x[tc]! / 1000);
+    const bty = Math.trunc(Position.y[tc]! / 1000);
+    let dockSite: { x: number; y: number } | null = null;
+    outer: for (let r = 4; r < 34; r += 2) {
+      for (let a = 0; a < 12; a++) {
+        const x = btx + Math.trunc(Math.cos((a / 12) * 6.283) * r);
+        const y = bty + Math.trunc(Math.sin((a / 12) * 6.283) * r);
+        let coastal = false;
+        for (let dy = -2; dy <= 3 && !coastal; dy++) for (let dx = -2; dx <= 3; dx++) if (isWaterTile(sim, x + dx, y + dy)) { coastal = true; break; }
+        if (coastal && !isWaterTile(sim, x, y)) { dockSite = { x, y }; break outer; }
+      }
+    }
+    const builder = idleVillagers[0] ?? villagers[0];
+    if (dockSite && builder !== undefined) {
+      cmds.push({ type: "build", playerId: pid, eids: [builder], building: "dock", x: dockSite.x * 1000, y: dockSite.y * 1000 });
+    }
+  }
+  {
+    const dock = anyOf("dock")[0];
+    const boats = myUnits.filter((e) => sim.unitStats(e).id === "fishing_boat");
+    if (dock !== undefined && boats.length < 2 && p.woodMilli >= 100_000) {
+      cmds.push({ type: "train", playerId: pid, buildingEid: dock, unit: "fishing_boat" });
+    }
+    // idle boats work the nearest fish school
+    for (const boat of boats) {
+      if (GatherTask.phase[boat] !== 0) continue;
+      let best = -1;
+      let bd = Number.MAX_SAFE_INTEGER;
+      for (const n of query(sim.world, [sim.stores.ResourceNode])) {
+        if (sim.stores.ResourceNode.resType[n] !== 6 || sim.stores.ResourceNode.amountMilli[n]! <= 0) continue;
+        const dx = Position.x[n]! - Position.x[boat]!;
+        const dy = Position.y[n]! - Position.y[boat]!;
+        if (dx * dx + dy * dy < bd) { bd = dx * dx + dy * dy; best = n; }
+      }
+      if (best >= 0) cmds.push({ type: "gather", playerId: pid, eids: [boat], nodeEid: best });
+    }
   }
   // expansion: claim a free settlement with a second town center when rich
   // never at the cost of the age ladder: expand only from a deep surplus

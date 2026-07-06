@@ -65,6 +65,13 @@
               ],
               "stat": "gatherRates.goldPerSec",
               "multiplier": 1.15
+            },
+            {
+              "appliesTo": [
+                "hero"
+              ],
+              "stat": "attack.damage",
+              "multiplier": 1.1
             }
           ]
         },
@@ -98,6 +105,13 @@
               ],
               "stat": "attack.damage",
               "multiplier": 1.08
+            },
+            {
+              "appliesTo": [
+                "infantry"
+              ],
+              "stat": "armor.hack",
+              "add": 5
             }
           ]
         },
@@ -131,6 +145,13 @@
               ],
               "stat": "armor.hack",
               "add": 5
+            },
+            {
+              "appliesTo": [
+                "villager"
+              ],
+              "stat": "gatherRates.forageFoodPerSec",
+              "multiplier": 1.1
             }
           ]
         }
@@ -277,6 +298,13 @@
               ],
               "stat": "gatherRates.forageFoodPerSec",
               "multiplier": 1.15
+            },
+            {
+              "appliesTo": [
+                "myth"
+              ],
+              "stat": "attack.damage",
+              "multiplier": 1.06
             }
           ]
         },
@@ -310,6 +338,13 @@
               ],
               "stat": "gatherRates.woodPerSec",
               "multiplier": 1.15
+            },
+            {
+              "appliesTo": [
+                "archer"
+              ],
+              "stat": "armor.pierce",
+              "add": 5
             }
           ]
         },
@@ -343,6 +378,13 @@
               ],
               "stat": "attack.damage",
               "multiplier": 1.08
+            },
+            {
+              "appliesTo": [
+                "villager"
+              ],
+              "stat": "gatherRates.goldPerSec",
+              "multiplier": 1.1
             }
           ]
         }
@@ -489,6 +531,13 @@
               ],
               "stat": "attack.damage",
               "multiplier": 1.1
+            },
+            {
+              "appliesTo": [
+                "myth"
+              ],
+              "stat": "attack.damage",
+              "multiplier": 1.08
             }
           ]
         },
@@ -522,6 +571,13 @@
               ],
               "stat": "armor.hack",
               "add": 5
+            },
+            {
+              "appliesTo": [
+                "siege"
+              ],
+              "stat": "attack.damage",
+              "multiplier": 1.1
             }
           ]
         },
@@ -555,6 +611,13 @@
               ],
               "stat": "gatherRates.goldPerSec",
               "multiplier": 1.15
+            },
+            {
+              "appliesTo": [
+                "cavalry"
+              ],
+              "stat": "attack.damage",
+              "multiplier": 1.06
             }
           ]
         }
@@ -700,6 +763,13 @@
               ],
               "stat": "attack.damage",
               "multiplier": 1.08
+            },
+            {
+              "appliesTo": [
+                "archer"
+              ],
+              "stat": "attack.damage",
+              "multiplier": 1.05
             }
           ]
         },
@@ -740,6 +810,14 @@
               ],
               "stat": "gatherRates.forageFoodPerSec",
               "multiplier": 1.15
+            },
+            {
+              "appliesTo": [
+                "scout",
+                "cavalry"
+              ],
+              "stat": "gatherRates.woodPerSec",
+              "multiplier": 1.0
             }
           ]
         },
@@ -773,6 +851,13 @@
               ],
               "stat": "armor.pierce",
               "add": 5
+            },
+            {
+              "appliesTo": [
+                "villager"
+              ],
+              "stat": "armor.pierce",
+              "add": 10
             }
           ]
         }

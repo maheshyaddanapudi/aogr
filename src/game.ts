@@ -28,6 +28,8 @@ import { setupSelection } from "./render/selection";
 import { createPathService } from "./platform/pathService";
 import { createAiService } from "./platform/aiService";
 import { createAudioSystem } from "./platform/audio";
+import { speakMythic } from "./platform/voice";
+import { createAmbience } from "./platform/ambience";
 import { startLoop } from "./platform/loop";
 import { createHud } from "./ui/hud";
 import { createAgePanel } from "./ui/agePanel";
@@ -39,6 +41,7 @@ import { getBuildingStats } from "./sim/buildingdata";
 import { VIS_VISIBLE } from "./sim/visibility";
 import { getTechStats } from "./sim/techdata";
 import { canAfford } from "./sim/economy";
+import campaignJson from "../data/campaign.json";
 
 const DEFAULT_SEED = 20260611;
 
@@ -49,7 +52,10 @@ export interface GameConfig {
   aiDifficulty: "easiest" | "easy" | "medium" | "hard" | "titan" | "off";
   loadSnapshot?: string;
   replay?: { seed: number; pantheon?: string; majorGod?: string; commands: Array<{ t: number; cmds: unknown[] }> };
-  mapType?: "island" | "inland";
+  mapType?: "island" | "inland" | "archipelago";
+  opponents?: 1 | 2;
+  /** campaign mission index */
+  mission?: number;
 }
 
 export async function boot(config?: Partial<GameConfig>): Promise<void> {
@@ -57,6 +63,21 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const hudRoot = document.getElementById("hud-root")!;
 
   const params = new URLSearchParams(location.search);
+  const missions = (campaignJson as { missions: Array<Record<string, unknown>> }).missions;
+  const mission = config?.mission !== undefined ? (missions[config.mission] as {
+    id: string; title: string; pantheon: string; majorGod: string; seed: number;
+    mapType: "island" | "inland" | "archipelago"; aiDifficulty: GameConfig["aiDifficulty"];
+    opponents: 1 | 2; objective: { type: string; minutes?: number; count?: number };
+    story: string; hint: string;
+  } | undefined) : undefined;
+  if (mission && config) {
+    config.seed = mission.seed;
+    config.pantheon = mission.pantheon;
+    config.majorGod = mission.majorGod;
+    config.mapType = mission.mapType;
+    config.aiDifficulty = mission.aiDifficulty;
+    config.opponents = mission.opponents;
+  }
   const replayFeed = config?.replay
     ? new Map(config.replay.commands.map((e) => [e.t, e.cmds]))
     : null;
@@ -65,10 +86,12 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   // spawns battle lines — must never run in a real menu-started match.
   const demo = params.has("demo") && !config?.loadSnapshot;
 
-  const terrainCfg = config?.mapType === "inland" ? { waterLevelFp: -3000 } : undefined;
+  const terrainCfg =
+    config?.mapType === "inland" ? { waterLevelFp: -3000 } : config?.mapType === "archipelago" ? { waterLevelFp: 200 } : undefined;
+  const playerCount = 1 + Math.max(1, Math.min(2, config?.opponents ?? 1));
   const sim = config?.loadSnapshot
     ? deserializeSim(config.loadSnapshot)
-    : createSim(seed, terrainCfg as never, { players: 2, skirmish: true });
+    : createSim(seed, terrainCfg as never, { players: playerCount, skirmish: true });
   if (!config?.loadSnapshot && config?.pantheon) {
     getPlayer(sim, 0).pantheon = config.pantheon;
     getPlayer(sim, 0).majorGod = config.majorGod ?? getPantheon(config.pantheon).majors[0]!.id;
@@ -149,9 +172,19 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const powerFx = createPowerFx(world.scene);
   const fog = createFogRenderer(world.scene, sim.terrain.size, sim.terrain);
   const audio = createAudioSystem();
+  const ambience = createAmbience(config?.mapType !== "inland");
+  window.addEventListener("pointerdown", function startAmb() {
+    window.removeEventListener("pointerdown", startAmb);
+    ambience.start();
+  });
   const pathService = createPathService(sim);
   const aiChoice = config?.replay ? "off" : (config?.aiDifficulty ?? ((params.get("ai") ?? "medium") as "easiest" | "easy" | "medium" | "hard" | "titan" | "off"));
-  const aiService = aiChoice === "off" || params.get("ai") === "off" ? null : createAiService(1, aiChoice as "easiest" | "easy" | "medium" | "hard" | "titan", seed);
+  const aiServices =
+    aiChoice === "off" || params.get("ai") === "off"
+      ? []
+      : Array.from({ length: sim.players.length - 1 }, (_, i) =>
+          createAiService(i + 1, aiChoice as "easiest" | "easy" | "medium" | "hard" | "titan", seed ^ (i * 0x9e37)));
+  const aiService = aiServices[0] ?? null;
   const hud = createHud(hudRoot);
   const agePanel = createAgePanel((tech, minorGod) => {
     queue.enqueue(sim.tick + 1, { type: "research", playerId: 0, tech, minorGod });
@@ -339,6 +372,14 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       audio.uiClick();
       pendingPatrol = true;
     },
+    onAttackMove: () => {
+      audio.uiClick();
+      pendingAttackMove = true;
+    },
+    onToggleGate: (buildingEid) => {
+      audio.uiClick();
+      queue.enqueue(sim.tick + 1, { type: "toggle_gate", playerId: 0, buildingEid });
+    },
     onUnload: (shipEid) => {
       audio.uiClick();
       queue.enqueue(sim.tick + 1, { type: "ungarrison", playerId: 0, buildingEid: shipEid });
@@ -359,6 +400,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   hudRoot.appendChild(powerBar);
   let pendingPower: string | null = null;
   let pendingPatrol = false;
+  let pendingAttackMove = false;
   const refreshPowerBar = () => {
     const p = getPlayer(sim, 0);
     powerBar.innerHTML = "";
@@ -392,10 +434,19 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   canvas.addEventListener(
     "pointerdown",
     (e) => {
-      if ((!pendingPower && !pendingPatrol) || e.button !== 0) return;
+      if ((!pendingPower && !pendingPatrol && !pendingAttackMove) || e.button !== 0) return;
       const pick = world.scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
       if (pick?.pickedPoint) {
-        if (pendingPatrol) {
+        if (pendingAttackMove) {
+          queue.enqueue(sim.tick + 1, {
+            type: "attack_move",
+            playerId: 0,
+            eids: Array.from(selection.selected),
+            x: Math.round(pick.pickedPoint.x * FP_ONE),
+            y: Math.round(pick.pickedPoint.z * FP_ONE),
+          });
+          pendingAttackMove = false;
+        } else if (pendingPatrol) {
           queue.enqueue(sim.tick + 1, {
             type: "patrol",
             playerId: 0,
@@ -422,9 +473,10 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     { capture: true },
   );
   window.addEventListener("keydown", (e) => {
-    if (e.code === "Escape" && (pendingPower || pendingPatrol)) {
+    if (e.code === "Escape" && (pendingPower || pendingPatrol || pendingAttackMove)) {
       pendingPower = null;
       pendingPatrol = false;
+      pendingAttackMove = false;
       refreshPowerBar();
     }
   });
@@ -435,7 +487,9 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     if (size > 0 && size !== lastSelSize) {
       const first = selection.selected.values().next().value as number;
       try {
-        audio.ack(["villager", "scout"].includes(sim.unitStats(first).unitClass) ? sim.unitStats(first).unitClass : sim.unitStats(first).unitClass === "hero" ? "hero" : "military");
+        const cls = sim.unitStats(first).unitClass;
+        audio.ack(["villager", "scout"].includes(cls) ? cls : cls === "hero" ? "hero" : "military");
+        speakMythic(getPlayer(sim, 0).pantheon, cls.length * 131 + cls.charCodeAt(0));
       } catch { /* entity died */ }
     }
     lastSelSize = size;
@@ -464,7 +518,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
         .map((u) => ({
           eid: u.eid,
           unitClass: u.unitClass,
-          name: sim.unitStats(u.eid).name,
+          name: tierName(sim.unitStats(u.eid).name, u.unitClass),
           hp: Math.ceil((sim.stores.Health.hp100[u.eid] ?? 0) / 100),
           maxHp: Math.ceil(sim.unitStats(u.eid).hp100 / 100),
         }));
@@ -498,6 +552,12 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   let knownOwnUnits = new Set<number>();
   let knownActiveBuildings = new Set<number>();
   let notifyArmed = false; // skip the initial population
+  // armory progress renames the line: 2+ techs = Veteran, 4+ = Champion
+  const tierName = (base: string, unitClass: string): string => {
+    if (!["infantry", "archer", "cavalry", "siege"].includes(unitClass)) return base;
+    const n = getPlayer(sim, 0).researchedTechs.filter((t) => getTechStats(t).researchedAt === "armory").length;
+    return n >= 4 ? `Champion ${base}` : n >= 2 ? `Veteran ${base}` : base;
+  };
   const matchStats = { kills: 0, losses: 0, razed: 0, startedAt: Date.now() };
   const samples: Array<{ food: number; wood: number; gold: number; pop: number }> = [];
   const replayLog: Array<{ t: number; cmds: unknown[] }> = [];
@@ -536,7 +596,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   // ?paused: gate-capture mode — sim/render driven only via __step/__forceFrame
   const loopCtl = params.has("paused") ? null : startLoop({
     onTick: () => {
-      aiService?.onTick(sim, queue);
+      for (const svc of aiServices) svc.onTick(sim, queue);
       if (replayFeed) for (const rc of replayFeed.get(sim.tick) ?? []) queue.enqueue(sim.tick, rc as never);
       {
         const drained = queue.drain(sim.tick);
@@ -545,6 +605,10 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       }
       combatFx.collect(sim.events, world.groundHeightAt);
       powerFx.collect(sim.events, world.groundHeightAt);
+      for (const d of sim.events.deaths) {
+        if (!d.unitId) continue;
+        unitRenderer.spawnCorpse(d.unitId, d.unitClass ?? "infantry", sim.players[d.playerId]?.pantheon ?? "storm_concord", d.playerId, d.x / FP_ONE, d.y / FP_ONE, world.groundHeightAt(d.x / FP_ONE, d.y / FP_ONE));
+      }
       audio.collect(sim.events);
       collectNotifications();
       if (sim.tick % 15 === 0) checksum = simChecksum(sim);
@@ -593,6 +657,53 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   };
   for (const t of [1500, 4000, 9000, 16000]) setTimeout(remat, t);
   (window as unknown as Record<string, unknown>).__remat = remat;
+
+  // ── campaign: story interlude + objective tracking ──
+  let missionWon = false;
+  if (mission) {
+    const story = document.createElement("div");
+    story.className = "age-overlay";
+    story.innerHTML = `
+      <div class="age-panel" style="max-width:620px">
+        <h1>${mission.title}</h1>
+        <p class="mission-story">${mission.story}</p>
+        <p class="mission-hint">Objective: ${
+          mission.objective.type === "conquest" ? "destroy every enemy town center" :
+          mission.objective.type === "survive" ? `survive ${mission.objective.minutes} minutes` :
+          mission.objective.type === "relics" ? `bank ${mission.objective.count} relics in a temple` :
+          "build a Wonder"} · ${mission.hint}</p>
+        <div class="god-cards"><button class="god-card" id="mission-begin"><h2>Begin</h2></button></div>
+      </div>`;
+    document.body.appendChild(story);
+    loopCtl?.setPaused(true);
+    story.querySelector("#mission-begin")!.addEventListener("click", () => {
+      story.remove();
+      loopCtl?.setPaused(false);
+    });
+    const checkObjective = () => {
+      if (missionWon) return;
+      const o = mission.objective;
+      const p = getPlayer(sim, 0);
+      const won =
+        (o.type === "conquest" && sim.winner === 0) ||
+        (o.type === "survive" && sim.tick >= (o.minutes ?? 10) * 900 && p.townCenterEid >= 0 && sim.winner !== 1) ||
+        (o.type === "relics" && p.relicsStored >= (o.count ?? 3)) ||
+        (o.type === "wonder" && (() => {
+          const { Owner, Building } = sim.stores;
+          for (const eid of query(sim.world, [Building])) {
+            if (Owner.playerId[eid] === 0 && Building.active[eid] === 1 && getBuildingStatsByIndex(Building.typeIndex[eid]!).id === "wonder") return true;
+          }
+          return false;
+        })());
+      if (won) {
+        missionWon = true;
+        const prev = Number(localStorage.getItem("aogr-campaign") ?? 0);
+        localStorage.setItem("aogr-campaign", String(Math.max(prev, (config?.mission ?? 0) + 1)));
+        if (sim.winner < 0) sim.winner = 0; // triggers the victory overlay
+      }
+    };
+    setInterval(checkObjective, 500);
+  }
 
   // victory / defeat overlay
   let endShown = false;
@@ -686,6 +797,35 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   });
   document.querySelector(".age-wrap")?.appendChild(idleBtn);
 
+  // in-game audio settings (⚙): live volume control
+  {
+    const cog = document.createElement("button");
+    cog.className = "age-up-btn save-btn";
+    cog.textContent = "⚙";
+    cog.title = "Audio settings";
+    const pop = document.createElement("div");
+    pop.className = "settings-pop";
+    pop.style.display = "none";
+    pop.innerHTML = `
+      <label>Music <input type="range" id="ig-music" min="0" max="100"></label>
+      <label>Sound <input type="range" id="ig-sfx" min="0" max="100"></label>`;
+    document.getElementById("hud-root")!.appendChild(pop);
+    const { loadSettings, saveSettings } = await import("./platform/storage");
+    const st = loadSettings();
+    (pop.querySelector("#ig-music") as HTMLInputElement).value = String(Math.round(st.musicVol * 100));
+    (pop.querySelector("#ig-sfx") as HTMLInputElement).value = String(Math.round(st.sfxVol * 100));
+    cog.addEventListener("click", () => {
+      pop.style.display = pop.style.display === "none" ? "" : "none";
+    });
+    pop.addEventListener("input", () => {
+      const musicVol = Number((pop.querySelector("#ig-music") as HTMLInputElement).value) / 100;
+      const sfxVol = Number((pop.querySelector("#ig-sfx") as HTMLInputElement).value) / 100;
+      saveSettings({ musicVol, sfxVol });
+      audio.setVolumes(musicVol, sfxVol);
+    });
+    document.querySelector(".age-wrap")?.appendChild(cog);
+  }
+
   // exit to menu (saves first so nothing is lost)
   const menuBtn = document.createElement("button");
   menuBtn.className = "age-up-btn save-btn";
@@ -716,7 +856,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   if (params.has("paused")) renderFrame(); // after ALL UI closures exist
   (window as unknown as Record<string, unknown>).__step = (n: number) => {
     for (let i = 0; i < n; i++) {
-      aiService?.decideSyncNow(sim, queue);
+      for (const svc of aiServices) svc.decideSyncNow(sim, queue);
       stepSim(sim, queue.drain(sim.tick));
       if (i >= n - 3) combatFx.collect(sim.events, world.groundHeightAt); // only recent FX
       powerFx.collect(sim.events, world.groundHeightAt);
@@ -727,4 +867,5 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   };
 }
 
-void boot();
+// boot() is invoked exclusively by main.ts (menu or direct-boot params) —
+// a module-level auto-boot here once ran a SECOND hidden sim behind every match.

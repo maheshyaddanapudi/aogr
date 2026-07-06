@@ -9,7 +9,7 @@ import { VIS_EXPLORED, VIS_VISIBLE } from "../sim/visibility";
 import { query } from "bitecs";
 
 const SIZE = 176;
-const TEAM = ["#e8c558", "#4d9fd6"];
+const TEAM = ["#e8c558", "#4d9fd6", "#c04890"];
 
 export interface Minimap {
   refresh: (sim: Sim, playerId: number) => void;

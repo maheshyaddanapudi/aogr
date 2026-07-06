@@ -743,3 +743,22 @@ body {
   .power-btn { padding: 4px 8px; }
   .power-btn b { font-size: 10px; }
 }
+
+.settings-pop {
+  position: absolute; top: 56px; right: 16px; z-index: 30; pointer-events: auto;
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 16px;
+  background: linear-gradient(160deg, rgba(64, 46, 22, 0.96), rgba(34, 24, 11, 0.97));
+  border: 1px solid var(--bronze); border-radius: 3px; font-size: 12px; color: var(--parchment-dim);
+}
+.settings-pop input[type="range"] { width: 130px; accent-color: var(--bronze-bright); }
+
+.mission-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.mission-chip {
+  padding: 8px 14px; font-family: "Alegreya Sans", sans-serif; font-size: 13px;
+  color: var(--parchment); background: rgba(26, 18, 8, 0.8);
+  border: 1px solid var(--bronze); border-radius: 3px; cursor: pointer;
+}
+.mission-chip.done { border-color: #6fae5b; color: #b9d8a8; }
+.mission-chip.locked { opacity: 0.35; cursor: default; }
+.mission-story { margin: 12px auto 0; max-width: 56ch; font-size: 14.5px; line-height: 1.6; color: var(--parchment); text-align: left; }
+.mission-hint { margin: 12px auto 0; max-width: 56ch; font-size: 12px; color: var(--parchment-dim); text-align: left; }

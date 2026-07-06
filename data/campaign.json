@@ -1,0 +1,97 @@
+{
+  "$comment": "Campaign missions: scripted scenarios with objectives and story interludes. Progress in localStorage 'aogr-campaign'.",
+  "missions": [
+    {
+      "id": "m1",
+      "title": "Embers of the Forge",
+      "pantheon": "ashen_forge",
+      "majorGod": "ogarun",
+      "seed": 11711,
+      "mapType": "island",
+      "aiDifficulty": "easiest",
+      "opponents": 1,
+      "objective": {
+        "type": "conquest"
+      },
+      "story": "The old gods burned away in the Sundering. From the ash-choked valleys of Kor, the Forge-Sworn light their first pyres. A rival warband squats on the far shore of your island, worshipping a god you mean to prove false. Raise your people, arm them in bronze, and cast down their town center.",
+      "hint": "Task villagers on food and wood, build a Barracks after reaching the Classical Age, and march on the enemy throne."
+    },
+    {
+      "id": "m2",
+      "title": "The Grain and the Grave",
+      "pantheon": "verdant_deep",
+      "majorGod": "varendra",
+      "seed": 22822,
+      "mapType": "island",
+      "aiDifficulty": "easy",
+      "opponents": 1,
+      "objective": {
+        "type": "survive",
+        "minutes": 12
+      },
+      "story": "The Deep Ones ask only patience. Raiders will come with the tides \u2014 again and again \u2014 hungry for your granaries. You need not defeat them. Endure twelve minutes of the long season, and the sea itself will turn them away.",
+      "hint": "Walls, towers, and a garrisoned town center weather a raid better than a thin line of spearmen. Keep villagers alive."
+    },
+    {
+      "id": "m3",
+      "title": "Relics of the High Vale",
+      "pantheon": "auryan_dawn",
+      "majorGod": "suryan",
+      "seed": 33933,
+      "mapType": "inland",
+      "aiDifficulty": "easy",
+      "opponents": 1,
+      "objective": {
+        "type": "relics",
+        "count": 3
+      },
+      "story": "Before the Sundering, the Dawn Court bound its power into relics and scattered them across the vale. Your rival hunts them too. Send a hero to gather three relics and bank them in a temple before the enemy grows too strong to pass.",
+      "hint": "Heroes scoop relics by walking over them. Build a temple early; escort your hero with soldiers."
+    },
+    {
+      "id": "m4",
+      "title": "Tides of Bronze",
+      "pantheon": "storm_concord",
+      "majorGod": "indravan",
+      "seed": 44144,
+      "mapType": "archipelago",
+      "aiDifficulty": "medium",
+      "opponents": 1,
+      "objective": {
+        "type": "conquest"
+      },
+      "story": "The Concord's dominion is the open sky over open water. The enemy holds an island throne and believes the channel keeps them safe. Build docks, sweep the strait with war galleys, and land your army on their beach with transport barges.",
+      "hint": "Fishing boats feed a war economy. Load soldiers onto barges, escort them with galleys, and unload on the enemy shore."
+    },
+    {
+      "id": "m5",
+      "title": "The Silent Choir",
+      "pantheon": "verdant_deep",
+      "majorGod": "oyandi",
+      "seed": 55255,
+      "mapType": "island",
+      "aiDifficulty": "medium",
+      "opponents": 1,
+      "objective": {
+        "type": "wonder"
+      },
+      "story": "Conquest proves nothing to the drowned gods. Raise a Wonder in their honor \u2014 a choir of stone that sings below hearing \u2014 and defend the ground it stands on while the enemy does everything to stop you.",
+      "hint": "The Wonder costs 1000 of each resource and needs the Mythic Age. Trade caravans and relics fund the late game."
+    },
+    {
+      "id": "m6",
+      "title": "Crown of the Reforged",
+      "pantheon": "ashen_forge",
+      "majorGod": "shangor",
+      "seed": 66366,
+      "mapType": "island",
+      "aiDifficulty": "hard",
+      "opponents": 2,
+      "objective": {
+        "type": "conquest"
+      },
+      "story": "Two pretender pantheons remain, and neither will kneel. There are three thrones on this island and the gods will suffer only one. Whatever you have learned of war, economy, sea, and heaven \u2014 spend all of it. The age that follows takes your name.",
+      "hint": "In a three-way war, the patient throne often wins. Let your rivals bleed each other \u2014 then finish both."
+    }
+  ]
+}

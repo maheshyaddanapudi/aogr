@@ -25,7 +25,9 @@ export type Command =
   | { type: "cancel_train"; playerId: number; buildingEid: number; index: number }
   | { type: "garrison"; playerId: number; eids: number[]; buildingEid: number }
   | { type: "ungarrison"; playerId: number; buildingEid: number }
-  | { type: "patrol"; playerId: number; eids: number[]; x: number; y: number };
+  | { type: "patrol"; playerId: number; eids: number[]; x: number; y: number }
+  | { type: "attack_move"; playerId: number; eids: number[]; x: number; y: number }
+  | { type: "toggle_gate"; playerId: number; buildingEid: number };
 
 interface Pending {
   tick: number;

@@ -7,6 +7,7 @@
 import "./ui/hud.css";
 import { listPantheonIds, getPantheon } from "./sim/pantheondata";
 import { loadGame, loadSettings, saveSettings } from "./platform/storage";
+import campaignJson from "../data/campaign.json";
 
 const params = new URLSearchParams(location.search);
 
@@ -73,6 +74,10 @@ function renderMenu(): void {
         <h2>Choose your major god</h2>
         <div class="major-row"></div>
       </div>
+      <div class="menu-section">
+        <h2>Campaign — The Reforging</h2>
+        <div class="mission-row"></div>
+      </div>
       <div class="menu-section menu-opts">
         <label>Opponent
           <select id="m-ai">
@@ -88,6 +93,13 @@ function renderMenu(): void {
           <select id="m-map">
             <option value="island" selected>Island</option>
             <option value="inland">Inland plain</option>
+            <option value="archipelago">Archipelago</option>
+          </select>
+        </label>
+        <label>Opponents
+          <select id="m-opp">
+            <option value="1" selected>1</option>
+            <option value="2">2 (free-for-all)</option>
           </select>
         </label>
         <label>Music <input id="m-music" type="range" min="0" max="100" value="${Math.round(settings.musicVol * 100)}" /></label>
@@ -155,9 +167,31 @@ function renderMenu(): void {
       pantheon: chosen,
       majorGod: chosenMajor,
       aiDifficulty: (menu.querySelector("#m-ai") as HTMLSelectElement).value as "easiest" | "easy" | "medium" | "hard" | "titan",
-      mapType: (menu.querySelector("#m-map") as HTMLSelectElement).value as "island" | "inland",
+      mapType: (menu.querySelector("#m-map") as HTMLSelectElement).value as "island" | "inland" | "archipelago",
+      opponents: Number((menu.querySelector("#m-opp") as HTMLSelectElement).value) as 1 | 2,
     } as never);
   });
+
+  // campaign missions: sequential unlock, progress in localStorage
+  {
+    const missions = (campaignJson as { missions: Array<{ id: string; title: string; objective: { type: string } }> }).missions;
+    const progress = Number(localStorage.getItem("aogr-campaign") ?? 0);
+    const row = menu.querySelector(".mission-row")!;
+    missions.forEach((ms, i) => {
+      const b = document.createElement("button");
+      const done = i < progress;
+      const locked = i > progress;
+      b.className = "mission-chip" + (done ? " done" : "") + (locked ? " locked" : "");
+      b.textContent = `${done ? "✓ " : ""}${i + 1}. ${ms.title}`;
+      b.disabled = locked;
+      b.title = locked ? "Finish the previous mission first" : ms.title;
+      b.addEventListener("click", () => {
+        persist();
+        void startGame({ mission: i } as never);
+      });
+      row.appendChild(b);
+    });
+  }
 
   const replayFile = menu.querySelector("#m-replay-file") as HTMLInputElement;
   menu.querySelector("#m-replay")!.addEventListener("click", () => replayFile.click());

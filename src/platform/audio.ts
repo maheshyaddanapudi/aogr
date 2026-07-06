@@ -32,6 +32,7 @@ export interface AudioSystem {
   uiClick: () => void;
   /** war horn when the player's own units/buildings come under attack */
   alarm: () => void;
+  setVolumes: (musicVol: number, sfxVol: number) => void;
   /** soft chime when a unit finishes training */
   trained: (unitClass: string) => void;
   buildDone: () => void;
@@ -40,7 +41,12 @@ export interface AudioSystem {
 
 export function createAudioSystem(): AudioSystem {
   const settings = loadSettings();
-  const sfx = (file: string, volume = 0.6) => new Howl({ src: [`${BASE}${file}`], volume: volume * settings.sfxVol });
+  const sfxRegistry: Array<{ h: Howl; base: number }> = [];
+  const sfx = (file: string, volume = 0.6) => {
+    const h = new Howl({ src: [`${BASE}${file}`], volume: volume * settings.sfxVol });
+    sfxRegistry.push({ h, base: volume });
+    return h;
+  };
   const powers: Record<string, Howl> = {
     pillar: sfx("power_pillar.ogg", 0.7),
     bolt: sfx("power_bolt.ogg", 0.7),
@@ -117,6 +123,12 @@ export function createAudioSystem(): AudioSystem {
     },
     ack(unitClass) {
       (acks[unitClass] ?? acks.military)!.play();
+    },
+    setVolumes(musicVol, sfxVol) {
+      settings.musicVol = musicVol;
+      settings.sfxVol = sfxVol;
+      music.volume(debug.ducked ? musicVol * 0.5 : musicVol);
+      for (const { h, base } of sfxRegistry) h.volume(base * sfxVol);
     },
     alarm() {
       // AoM-style "town under attack" horn, at most one blast per 15s

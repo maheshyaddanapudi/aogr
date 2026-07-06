@@ -247,6 +247,7 @@ export function setupSkirmish(sim: Sim): void {
   const starts = [
     { x: 48, y: 100 },
     { x: 152, y: 100 },
+    { x: 100, y: 152 },
   ];
   for (let pid = 0; pid < sim.players.length; pid++) {
     const start = starts[pid] ?? starts[0]!;
@@ -316,6 +317,10 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
     case "gather": {
       if (!hasComponent(sim.world, cmd.nodeEid, ResourceNode)) return true;
       if (ResourceNode.resType[cmd.nodeEid] === RES_INDEX.relic) return true;
+      if (ResourceNode.resType[cmd.nodeEid] === RES_INDEX.herd) {
+        const owner = sim.herdOwner.get(cmd.nodeEid);
+        if (owner !== undefined && owner !== cmd.playerId) return true;
+      }
       const sorted = [...cmd.eids].sort((a, b) => a - b);
       for (const eid of sorted) {
         if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, UnitRef)) continue;
@@ -681,12 +686,37 @@ export function economySystem(sim: Sim): void {
     }
   }
 
-  // herdables fatten toward their cap (120 food)
+  // herdables fatten, wander near home, and defect to nearby grazers
   if (sim.tick % 15 === 0) {
     for (const n of Array.from(query(sim.world, [ResourceNode])).sort((a, b) => a - b)) {
-      if (ResourceNode.resType[n] === 5 && ResourceNode.amountMilli[n]! > 0 && ResourceNode.amountMilli[n]! < 120_000) {
+      if (ResourceNode.resType[n] !== 5 || ResourceNode.amountMilli[n]! <= 0) continue;
+      if (ResourceNode.amountMilli[n]! < 120_000) {
         ResourceNode.amountMilli[n] = Math.min(120_000, ResourceNode.amountMilli[n]! + 400);
       }
+      let home = sim.herdHome.get(n);
+      if (!home) {
+        home = { x: Position.x[n]!, y: Position.y[n]! };
+        sim.herdHome.set(n, home);
+      }
+      // deterministic drift, leashed to home
+      const dx = sim.prng.nextInt(1601) - 800;
+      const dy = sim.prng.nextInt(1601) - 800;
+      const nx = Position.x[n]! + dx;
+      const ny = Position.y[n]! + dy;
+      if (Math.abs(nx - home.x) < 6000 && Math.abs(ny - home.y) < 6000 && isPassable(sim.navGrid, Math.trunc(nx / 1000), Math.trunc(ny / 1000))) {
+        Position.x[n] = nx;
+        Position.y[n] = ny;
+      }
+      // capture: nearest player unit within 2 tiles claims the herd
+      let claimant = -1;
+      let bestD = 2000 * 2000;
+      for (const w of Array.from(query(sim.world, [sim.stores.UnitRef])).sort((a, b) => a - b)) {
+        const ddx = Position.x[w]! - Position.x[n]!;
+        const ddy = Position.y[w]! - Position.y[n]!;
+        const d2 = ddx * ddx + ddy * ddy;
+        if (d2 < bestD) { bestD = d2; claimant = sim.stores.Owner.playerId[w]!; }
+      }
+      if (claimant >= 0) sim.herdOwner.set(n, claimant);
     }
   }
 

@@ -18,7 +18,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { CascadedShadowGenerator } from "@babylonjs/core/Lights/Shadows/cascadedShadowGenerator";
 
-export const TEAM_COLORS = [new Color3(0.93, 0.72, 0.18), new Color3(0.16, 0.55, 0.78)];
+export const TEAM_COLORS = [new Color3(0.93, 0.72, 0.18), new Color3(0.16, 0.55, 0.78), new Color3(0.75, 0.25, 0.55)];
 const PANTHEON_TINTS: Record<string, Color3> = {
   auryan_dawn: new Color3(1.0, 0.72, 0.25),
   verdant_deep: new Color3(0.2, 0.85, 0.7),
@@ -176,6 +176,8 @@ export interface UnitRenderer {
     isVisible?: (u: UnitView) => boolean,
   ) => void;
   isUnitMesh: (mesh: AbstractMesh) => number | null;
+  /** brief death visual: the fallen unit tips over and sinks away */
+  spawnCorpse: (unitId: string, unitClass: string, pantheon: string, team: number, x: number, z: number, groundY: number) => void;
 }
 
 /** One GLB import at a time: parallel imports contend on texture decode
@@ -353,8 +355,45 @@ export async function createUnitRenderer(scene: Scene, shadows: CascadedShadowGe
     }
   };
 
+  const corpses: Array<{ node: TransformNode; born: number }> = [];
+  const spawnCorpse: UnitRenderer["spawnCorpse"] = (unitId, unitClass, pantheon, team, x, z, groundY) => {
+    const { key, cfg: c } = resolveModelCfg(unitId, unitClass);
+    const pool = pools.get(`${key}_${team % TEAM_COLORS.length}_${c.mythTint ? pantheon : "x"}`);
+    if (!pool || pool === "loading") return;
+    const node = new TransformNode(`corpse${corpses.length}`, scene);
+    for (const m of pool[0]!.meshes) {
+      const inst = m.createInstance(`c${corpses.length}_${m.name}`);
+      inst.parent = node;
+      inst.scaling = pool[0]!.scaling.clone();
+      inst.rotationQuaternion = null;
+      inst.isPickable = false;
+    }
+    node.position.set(x, groundY, z);
+    node.rotation.z = Math.PI / 2; // fallen
+    corpses.push({ node, born: performance.now() });
+  };
+  // corpses sink and vanish over ~1.6s (driven from update())
+  const updateCorpses = () => {
+    const now = performance.now();
+    for (let i = corpses.length - 1; i >= 0; i--) {
+      const age = (now - corpses[i]!.born) / 1600;
+      if (age >= 1) {
+        corpses[i]!.node.dispose();
+        corpses.splice(i, 1);
+        continue;
+      }
+      corpses[i]!.node.position.y -= 0.006;
+    }
+  };
+
+  const wrappedUpdate: UnitRenderer["update"] = (units, groundHeightAt, selected, isVisible) => {
+    update(units, groundHeightAt, selected, isVisible);
+    updateCorpses();
+  };
+
   return {
-    update,
+    update: wrappedUpdate,
     isUnitMesh: (mesh) => meshToEid.get(mesh) ?? null,
+    spawnCorpse,
   };
 }

@@ -2,6 +2,15 @@
   "$comment": "SOURCE OF TRUTH for unit balance (KICKOFF.md §5). Human-readable units: hp = hit points, damage = per hit, speed = tiles/sec, trainTime = seconds, range/los = tiles, armor = % damage reduction (divine ignores armor). The sim loader converts to fixed-point integers (HP ×100, millitiles, ticks). Seeded from §7 anchors — tune here, never in code.",
   "version": 1,
   "units": {
+    "mender": {
+      "name": "Mender", "class": "villager", "pantheon": "all", "age": "classical",
+      "hp": 55, "speed": 3.8, "los": 12, "pop": 1, "trainTime": 18,
+      "healAuraPerSec": 3.0,
+      "cost": { "food": 60, "wood": 0, "gold": 40, "favor": 0 },
+      "armor": { "hack": 10, "pierce": 15, "crush": 99 },
+      "multipliers": {},
+      "trainedAt": "temple"
+    },
     "villager": {
       "name": "Villager", "class": "villager", "pantheon": "all", "age": "archaic",
       "hp": 65, "speed": 4.0, "los": 12, "pop": 1, "trainTime": 14,
@@ -177,6 +186,7 @@
     },
 
     "sunhawk": {
+      "specialCombat": { "regenPerSec": 2.0 },
       "name": "Sunhawk", "class": "myth", "pantheon": "auryan_dawn", "age": "classical",
       "hp": 200, "speed": 6.5, "los": 22, "pop": 3, "trainTime": 16, "flying": true,
       "cost": { "food": 120, "wood": 0, "gold": 0, "favor": 8 },
@@ -232,7 +242,7 @@
       "trainedAt": "temple"
     },
     "stormserpent": {
-      "specialCombat": { "splashRadius": 1.8, "splashPercent": 45 },
+      "specialCombat": { "chainRange": 6.0, "chainPercent": 70 },
       "name": "Stormserpent", "class": "myth", "pantheon": "verdant_deep", "age": "heroic",
       "hp": 320, "speed": 4.8, "los": 14, "pop": 4, "trainTime": 22,
       "cost": { "food": 180, "wood": 0, "gold": 0, "favor": 15 },
@@ -243,6 +253,7 @@
       "trainedAt": "temple"
     },
     "deepcaller_naiad": {
+      "healAuraPerSec": 2.5,
       "name": "Deepcaller Naiad", "class": "myth", "pantheon": "verdant_deep", "age": "heroic",
       "hp": 220, "speed": 4.0, "los": 16, "pop": 3, "trainTime": 20,
       "cost": { "food": 0, "wood": 0, "gold": 170, "favor": 14 },

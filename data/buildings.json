@@ -1,5 +1,5 @@
 {
-  "$comment": "SOURCE OF TRUTH for building balance. hp = hit points, buildTime = seconds at 1 builder, armor = % damage reduction. Buildings take full crush (≈5% crush armor per KICKOFF §6); walls/gates are fortifications and may differ.",
+  "$comment": "SOURCE OF TRUTH for building balance. hp = hit points, buildTime = seconds at 1 builder, armor = % damage reduction. Buildings take full crush (\u22485% crush armor per KICKOFF \u00a76); walls/gates are fortifications and may differ.",
   "version": 1,
   "buildings": {
     "town_center": {
@@ -138,6 +138,7 @@
         "crush": 5
       },
       "trains": [
+        "mender",
         "heroes",
         "myth_units"
       ],
@@ -262,7 +263,7 @@
         "baseRate": 100,
         "spreadPercent": 15
       },
-      "notes": "Required to advance to Mythic. Favor is never tradeable (KICKOFF §6).",
+      "notes": "Required to advance to Mythic. Favor is never tradeable (KICKOFF \u00a76).",
       "size": 3
     },
     "dock": {
@@ -424,7 +425,7 @@
       },
       "buildLimit": 5,
       "pantheon": "auryan_dawn",
-      "notes": "Devotion Pyres favor source — escalating passive favor per altar (see pantheons.json).",
+      "notes": "Devotion Pyres favor source \u2014 escalating passive favor per altar (see pantheons.json).",
       "size": 2
     },
     "sky_temple": {
@@ -444,7 +445,7 @@
         "crush": 5
       },
       "pantheon": "storm_concord",
-      "notes": "Skyward Chants prayer site — villagers task here to pray (see pantheons.json).",
+      "notes": "Skyward Chants prayer site \u2014 villagers task here to pray (see pantheons.json).",
       "size": 2
     }
   }

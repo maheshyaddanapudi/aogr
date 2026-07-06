@@ -22,7 +22,8 @@ interface RawUnit {
   multipliers?: Record<string, number>;
   flying?: boolean;
   tradeGoldPerTile?: number;
-  specialCombat?: { splashRadius?: number; splashPercent?: number; regenPerSec?: number; lifestealPercent?: number; stunSeconds?: number; executeBelowPercent?: number };
+  specialCombat?: { splashRadius?: number; splashPercent?: number; regenPerSec?: number; lifestealPercent?: number; stunSeconds?: number; executeBelowPercent?: number; chainRange?: number; chainPercent?: number };
+  healAuraPerSec?: number;
   transportCapacity?: number;
   gatherRates?: {
     huntFoodPerSec?: number;
@@ -65,7 +66,8 @@ export interface UnitStats {
   gatherMicroPerSec: [number, number, number, number] | null;
   /** caravans: gold (milli) earned per tile of one-way route distance */
   tradeGoldMilliPerTile: number;
-  special: { splashRadiusFp: number; splashPermille: number; regenPer15T100: number; lifestealPermille: number; stunTicks: number; executePermille: number } | null;
+  special: { splashRadiusFp: number; splashPermille: number; regenPer15T100: number; lifestealPermille: number; stunTicks: number; executePermille: number; chainRangeFp: number; chainPermille: number } | null;
+  healAuraPer15T100: number;
   transportCapacity: number;
   naval: boolean;
 }
@@ -140,6 +142,7 @@ function load(): Map<string, UnitStats> {
       tradeGoldMilliPerTile: Math.round((raw.tradeGoldPerTile ?? 0) * 1000),
       naval: raw.class === "ship",
       transportCapacity: raw.transportCapacity ?? 0,
+      healAuraPer15T100: Math.round((raw.healAuraPerSec ?? 0) * 100),
       special: raw.specialCombat
         ? {
             splashRadiusFp: Math.round((raw.specialCombat.splashRadius ?? 0) * 1000),
@@ -148,6 +151,8 @@ function load(): Map<string, UnitStats> {
             lifestealPermille: Math.round((raw.specialCombat.lifestealPercent ?? 0) * 10),
             stunTicks: Math.round((raw.specialCombat.stunSeconds ?? 0) * TICK_RATE),
             executePermille: Math.round((raw.specialCombat.executeBelowPercent ?? 0) * 10),
+            chainRangeFp: Math.round((raw.specialCombat.chainRange ?? 0) * 1000),
+            chainPermille: Math.round((raw.specialCombat.chainPercent ?? 0) * 10),
           }
         : null,
     });

@@ -199,6 +199,23 @@ export function combatSystem(sim: Sim): void {
           if (special.lifestealPermille > 0) {
             Health.hp100[eid] = Math.min(stats.hp100, Health.hp100[eid]! + Math.trunc((dmg * special.lifestealPermille) / 1000));
           }
+          if (special.chainRangeFp > 0) {
+            const { Owner: O2, UnitRef: U2, Position: P2 } = sim.stores;
+            const me2 = O2.playerId[eid]!;
+            let arc = -1;
+            let arcD = special.chainRangeFp * special.chainRangeFp;
+            for (const other of Array.from(query(sim.world, [U2, Health])).sort((a, b) => a - b)) {
+              if (other === target || O2.playerId[other] === me2 || Health.hp100[other]! <= 0 || sim.garrisonOf.has(other)) continue;
+              const cdx = P2.x[other]! - P2.x[target]!;
+              const cdy = P2.y[other]! - P2.y[target]!;
+              const d2 = cdx * cdx + cdy * cdy;
+              if (d2 < arcD) { arcD = d2; arc = other; }
+            }
+            if (arc >= 0) {
+              Health.hp100[arc] = Health.hp100[arc]! - Math.trunc((dmg * special.chainPermille) / 1000);
+              sim.events.hits.push({ x: sim.stores.Position.x[arc]!, y: sim.stores.Position.y[arc]! });
+            }
+          }
           if (special.splashRadiusFp > 0) {
             const { Owner: Own, UnitRef: UR, Position: Pos } = sim.stores;
             const me = Own.playerId[eid]!;
@@ -276,7 +293,9 @@ export function combatSystem(sim: Sim): void {
       }
     }
     for (const h of all) {
-      if (Health.hp100[h]! <= 0 || sim.unitStats(h).unitClass !== "hero") continue;
+      const healer = sim.unitStats(h).unitClass === "hero" || sim.unitStats(h).healAuraPer15T100 > 0;
+      if (Health.hp100[h]! <= 0 || !healer || sim.garrisonOf.has(h)) continue;
+      const rate = Math.max(200, sim.unitStats(h).healAuraPer15T100);
       for (const u of all) {
         if (u === h || Owner.playerId[u] !== Owner.playerId[h] || Health.hp100[u]! <= 0) continue;
         const max = sim.unitStats(u).hp100;
@@ -284,7 +303,7 @@ export function combatSystem(sim: Sim): void {
         const dx = Position.x[u]! - Position.x[h]!;
         const dy = Position.y[u]! - Position.y[h]!;
         if (dx * dx + dy * dy > 6000 * 6000) continue;
-        Health.hp100[u] = Math.min(max, Health.hp100[u]! + 200);
+        Health.hp100[u] = Math.min(max, Health.hp100[u]! + rate);
       }
     }
   }
