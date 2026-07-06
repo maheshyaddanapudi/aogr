@@ -165,6 +165,22 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
     const builder = idleVillagers[0] ?? villagers[0];
     if (builder !== undefined) cmds.push({ type: "build", playerId: pid, eids: [builder], building: "farm", x: -1, y: -1 });
   }
+  // expansion: claim a free settlement with a second town center when rich
+  // never at the cost of the age ladder: expand only from a deep surplus
+  if (p.age >= 2 && anyOf("town_center").length < 2 && underConstruction("town_center") === 0 &&
+      p.woodMilli >= 800_000 && p.goldMilli >= 1_500_000 && p.foodMilli >= 1_500_000) {
+    const taken = (st: { x: number; y: number }) =>
+      Array.from(query(sim.world, [Building])).some((e) => {
+        const bx = Math.trunc(Position.x[e]! / 1000);
+        const by = Math.trunc(Position.y[e]! / 1000);
+        return sim.buildingIdOf(e) === "town_center" && Math.abs(bx - st.x) <= 6 && Math.abs(by - st.y) <= 6;
+      });
+    const free = sim.settlements.find((st) => !taken(st));
+    const builder = idleVillagers[0] ?? villagers[0];
+    if (free && builder !== undefined) {
+      cmds.push({ type: "build", playerId: pid, eids: [builder], building: "town_center", x: free.x * 1000, y: free.y * 1000 });
+    }
+  }
   // mythic endgame: a rich AI reaches for the wonder (second victory path)
   if (p.age >= 3 && anyOf("wonder").length === 0 && underConstruction("wonder") === 0 &&
       p.foodMilli >= 1_400_000 && p.woodMilli >= 1_400_000 && p.goldMilli >= 1_400_000) {

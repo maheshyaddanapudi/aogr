@@ -84,12 +84,20 @@ function renderMenu(): void {
           </select>
         </label>
         <label>Map seed <input id="m-seed" type="number" value="${Math.trunc(Math.random() * 1_000_000)}" /></label>
+        <label>Map
+          <select id="m-map">
+            <option value="island" selected>Island</option>
+            <option value="inland">Inland plain</option>
+          </select>
+        </label>
         <label>Music <input id="m-music" type="range" min="0" max="100" value="${Math.round(settings.musicVol * 100)}" /></label>
         <label>Sound <input id="m-sfx" type="range" min="0" max="100" value="${Math.round(settings.sfxVol * 100)}" /></label>
       </div>
       <div class="menu-actions">
         <button id="m-start" class="age-up-btn">Begin the Age</button>
         <button id="m-continue" class="age-up-btn" disabled>Continue saved match</button>
+        <button id="m-replay" class="age-up-btn">Watch replay</button>
+        <input id="m-replay-file" type="file" accept=".json" style="display:none" />
       </div>
       <p class="menu-credits">CC0 art by Kay Lousberg, Kenney, ambientCG · Music: Kevin MacLeod (CC-BY) · Built with Babylon.js + bitECS</p>
     </div>`;
@@ -147,6 +155,22 @@ function renderMenu(): void {
       pantheon: chosen,
       majorGod: chosenMajor,
       aiDifficulty: (menu.querySelector("#m-ai") as HTMLSelectElement).value as "easiest" | "easy" | "medium" | "hard" | "titan",
+      mapType: (menu.querySelector("#m-map") as HTMLSelectElement).value as "island" | "inland",
+    } as never);
+  });
+
+  const replayFile = menu.querySelector("#m-replay-file") as HTMLInputElement;
+  menu.querySelector("#m-replay")!.addEventListener("click", () => replayFile.click());
+  replayFile.addEventListener("change", () => {
+    const f = replayFile.files?.[0];
+    if (!f) return;
+    void f.text().then((txt) => {
+      try {
+        const replay = JSON.parse(txt);
+        void startGame({ replay } as never);
+      } catch {
+        alert("Not a Pantheons replay file.");
+      }
     });
   });
 

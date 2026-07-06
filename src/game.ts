@@ -48,6 +48,8 @@ export interface GameConfig {
   majorGod: string;
   aiDifficulty: "easiest" | "easy" | "medium" | "hard" | "titan" | "off";
   loadSnapshot?: string;
+  replay?: { seed: number; pantheon?: string; majorGod?: string; commands: Array<{ t: number; cmds: unknown[] }> };
+  mapType?: "island" | "inland";
 }
 
 export async function boot(config?: Partial<GameConfig>): Promise<void> {
@@ -55,14 +57,18 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const hudRoot = document.getElementById("hud-root")!;
 
   const params = new URLSearchParams(location.search);
-  const seed = (config?.seed ?? Number(params.get("seed") ?? DEFAULT_SEED)) >>> 0;
+  const replayFeed = config?.replay
+    ? new Map(config.replay.commands.map((e) => [e.t, e.cmds]))
+    : null;
+  const seed = ((config?.replay ? config.replay.seed : config?.seed) ?? Number(params.get("seed") ?? DEFAULT_SEED)) >>> 0;
   // Demo script is OPT-IN (?demo): it commandeers player 0's villagers and
   // spawns battle lines — must never run in a real menu-started match.
   const demo = params.has("demo") && !config?.loadSnapshot;
 
+  const terrainCfg = config?.mapType === "inland" ? { waterLevelFp: -3000 } : undefined;
   const sim = config?.loadSnapshot
     ? deserializeSim(config.loadSnapshot)
-    : createSim(seed, undefined, { players: 2, skirmish: true });
+    : createSim(seed, terrainCfg as never, { players: 2, skirmish: true });
   if (!config?.loadSnapshot && config?.pantheon) {
     getPlayer(sim, 0).pantheon = config.pantheon;
     getPlayer(sim, 0).majorGod = config.majorGod ?? getPantheon(config.pantheon).majors[0]!.id;
@@ -144,7 +150,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const fog = createFogRenderer(world.scene, sim.terrain.size, sim.terrain);
   const audio = createAudioSystem();
   const pathService = createPathService(sim);
-  const aiChoice = config?.aiDifficulty ?? ((params.get("ai") ?? "medium") as "easiest" | "easy" | "medium" | "hard" | "titan" | "off");
+  const aiChoice = config?.replay ? "off" : (config?.aiDifficulty ?? ((params.get("ai") ?? "medium") as "easiest" | "easy" | "medium" | "hard" | "titan" | "off"));
   const aiService = aiChoice === "off" || params.get("ai") === "off" ? null : createAiService(1, aiChoice as "easiest" | "easy" | "medium" | "hard" | "titan", seed);
   const hud = createHud(hudRoot);
   const agePanel = createAgePanel((tech, minorGod) => {
@@ -269,6 +275,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     buildingActive: (eid) => sim.stores.Building.active[eid] === 1,
     garrisonCapacity: (eid) => getBuildingStatsByIndex(sim.stores.Building.typeIndex[eid]!).garrisonCapacity,
     formation: () => formationPref,
+    unitTransportCapacity: (eid) => sim.unitStats(eid).transportCapacity,
     unitTypeOf: (eid) => (sim.stores.UnitRef.typeIndex[eid] !== undefined ? sim.unitStats(eid).id : null),
     farmFoodNode: (eid) => {
       const { Position, ResourceNode, Building } = sim.stores;
@@ -328,6 +335,14 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       audio.uiClick();
       formationPref = f;
     },
+    onPatrol: () => {
+      audio.uiClick();
+      pendingPatrol = true;
+    },
+    onUnload: (shipEid) => {
+      audio.uiClick();
+      queue.enqueue(sim.tick + 1, { type: "ungarrison", playerId: 0, buildingEid: shipEid });
+    },
     onUngarrison: (buildingEid) => {
       audio.uiClick();
       queue.enqueue(sim.tick + 1, { type: "ungarrison", playerId: 0, buildingEid });
@@ -343,6 +358,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   powerBar.className = "power-bar";
   hudRoot.appendChild(powerBar);
   let pendingPower: string | null = null;
+  let pendingPatrol = false;
   const refreshPowerBar = () => {
     const p = getPlayer(sim, 0);
     powerBar.innerHTML = "";
@@ -376,18 +392,29 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   canvas.addEventListener(
     "pointerdown",
     (e) => {
-      if (!pendingPower || e.button !== 0) return;
+      if ((!pendingPower && !pendingPatrol) || e.button !== 0) return;
       const pick = world.scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
       if (pick?.pickedPoint) {
-        queue.enqueue(sim.tick + 1, {
-          type: "cast_power",
-          playerId: 0,
-          power: pendingPower,
-          x: Math.round(pick.pickedPoint.x * FP_ONE),
-          y: Math.round(pick.pickedPoint.z * FP_ONE),
-        });
-        pendingPower = null;
-        refreshPowerBar();
+        if (pendingPatrol) {
+          queue.enqueue(sim.tick + 1, {
+            type: "patrol",
+            playerId: 0,
+            eids: Array.from(selection.selected),
+            x: Math.round(pick.pickedPoint.x * FP_ONE),
+            y: Math.round(pick.pickedPoint.z * FP_ONE),
+          });
+          pendingPatrol = false;
+        } else if (pendingPower) {
+          queue.enqueue(sim.tick + 1, {
+            type: "cast_power",
+            playerId: 0,
+            power: pendingPower,
+            x: Math.round(pick.pickedPoint.x * FP_ONE),
+            y: Math.round(pick.pickedPoint.z * FP_ONE),
+          });
+          pendingPower = null;
+          refreshPowerBar();
+        }
       }
       e.stopPropagation();
       e.preventDefault();
@@ -395,8 +422,9 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     { capture: true },
   );
   window.addEventListener("keydown", (e) => {
-    if (e.code === "Escape" && pendingPower) {
+    if (e.code === "Escape" && (pendingPower || pendingPatrol)) {
       pendingPower = null;
+      pendingPatrol = false;
       refreshPowerBar();
     }
   });
@@ -441,7 +469,12 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
           maxHp: Math.ceil(sim.unitStats(u.eid).hp100 / 100),
         }));
       const selB = selection.selectedBuilding();
-      commandCard.refresh(sim, 0, selUnits, selB !== null ? { eid: selB, buildingId: sim.buildingIdOf(selB) } : null, selB !== null ? sim.trainQueues.get(selB) ?? null : null, selB !== null ? (sim.garrisons.get(selB) ?? []).length : 0);
+      commandCard.refresh(sim, 0, selUnits, selB !== null ? { eid: selB, buildingId: sim.buildingIdOf(selB) } : null, selB !== null ? sim.trainQueues.get(selB) ?? null : null,
+        selB !== null
+          ? (sim.garrisons.get(selB) ?? []).length
+          : selUnits.length === 1
+            ? (sim.garrisons.get(selUnits[0]!.eid) ?? []).length
+            : 0);
       refreshPowerBar();
       updateIdleBtn();
     }
@@ -466,8 +499,14 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   let knownActiveBuildings = new Set<number>();
   let notifyArmed = false; // skip the initial population
   const matchStats = { kills: 0, losses: 0, razed: 0, startedAt: Date.now() };
+  const samples: Array<{ food: number; wood: number; gold: number; pop: number }> = [];
+  const replayLog: Array<{ t: number; cmds: unknown[] }> = [];
   const collectNotifications = () => {
     const { Owner, UnitRef, Building } = sim.stores;
+    if (sim.tick % 450 === 0) {
+      const p = getPlayer(sim, 0);
+      samples.push({ food: Math.trunc(p.foodMilli / 1000), wood: Math.trunc(p.woodMilli / 1000), gold: Math.trunc(p.goldMilli / 1000), pop: p.popUsed });
+    }
     for (const f of sim.events.fired) {
       if (Owner.playerId[f.to] === 0) {
         audio.alarm();
@@ -498,7 +537,12 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const loopCtl = params.has("paused") ? null : startLoop({
     onTick: () => {
       aiService?.onTick(sim, queue);
-      stepSim(sim, queue.drain(sim.tick));
+      if (replayFeed) for (const rc of replayFeed.get(sim.tick) ?? []) queue.enqueue(sim.tick, rc as never);
+      {
+        const drained = queue.drain(sim.tick);
+        if (drained.length > 0) replayLog.push({ t: sim.tick, cmds: drained });
+        stepSim(sim, drained);
+      }
       combatFx.collect(sim.events, world.groundHeightAt);
       powerFx.collect(sim.events, world.groundHeightAt);
       audio.collect(sim.events);
@@ -562,10 +606,41 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
         <h1>${sim.winner === 0 ? "VICTORY" : "DEFEAT"}</h1>
         <p class="age-sub">${sim.winner === 0 ? "The reforged gods favor you" : "Your pantheon falls silent"}</p>
         <p class="end-stats">${Math.trunc(sim.tick / 900)} min · ${["Archaic", "Classical", "Heroic", "Mythic"][getPlayer(sim, 0).age]} Age · ${matchStats.kills} kills · ${matchStats.losses} losses</p>
-        <div class="god-cards"><button class="god-card" id="end-menu"><h2>Return to Menu</h2></button></div>
+        <canvas id="end-graph" width="420" height="110" style="margin:6px 0"></canvas>
+        <div class="god-cards">
+          <button class="god-card" id="end-menu"><h2>Return to Menu</h2></button>
+          <button class="god-card" id="end-replay"><h2>Download Replay</h2></button>
+        </div>
       </div>`;
     document.body.appendChild(overlay);
     overlay.querySelector("#end-menu")!.addEventListener("click", () => location.assign(location.pathname));
+    overlay.querySelector("#end-replay")!.addEventListener("click", () => {
+      const blob = new Blob(
+        [JSON.stringify({ seed, pantheon: getPlayer(sim, 0).pantheon, majorGod: getPlayer(sim, 0).majorGod, commands: replayLog })],
+        { type: "application/json" },
+      );
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `pantheons-replay-${seed}.json`;
+      a.click();
+    });
+    // economy timeline: food/wood/gold/pop per half-minute
+    const cv = overlay.querySelector("#end-graph") as HTMLCanvasElement;
+    const ctx2 = cv.getContext("2d")!;
+    const series: Array<[keyof (typeof samples)[0], string]> = [["food", "#d8865a"], ["wood", "#7da45c"], ["gold", "#e8c558"], ["pop", "#9fd2ff"]];
+    const maxV = Math.max(1, ...samples.flatMap((sm) => series.map(([k]) => sm[k])));
+    ctx2.fillStyle = "rgba(0,0,0,0.25)";
+    ctx2.fillRect(0, 0, cv.width, cv.height);
+    for (const [k, color] of series) {
+      ctx2.strokeStyle = color;
+      ctx2.beginPath();
+      samples.forEach((sm, i) => {
+        const x = (i / Math.max(1, samples.length - 1)) * (cv.width - 8) + 4;
+        const y = cv.height - 6 - (sm[k] / maxV) * (cv.height - 14);
+        i === 0 ? ctx2.moveTo(x, y) : ctx2.lineTo(x, y);
+      });
+      ctx2.stroke();
+    }
   }, 500);
 
   // save button

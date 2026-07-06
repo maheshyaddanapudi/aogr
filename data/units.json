@@ -39,6 +39,15 @@
       "multipliers": { "ship": 1.5 },
       "trainedAt": "dock"
     },
+    "transport_barge": {
+      "name": "Transport Barge", "class": "ship", "pantheon": "all", "age": "archaic",
+      "hp": 200, "speed": 4.2, "los": 12, "pop": 2, "trainTime": 20,
+      "transportCapacity": 6,
+      "cost": { "food": 0, "wood": 100, "gold": 0, "favor": 0 },
+      "armor": { "hack": 15, "pierce": 15, "crush": 99 },
+      "multipliers": {},
+      "trainedAt": "dock"
+    },
     "fishing_boat": {
       "name": "Fishing Boat", "class": "ship", "pantheon": "all", "age": "archaic",
       "hp": 120, "speed": 5.0, "los": 14, "pop": 1, "trainTime": 16,
@@ -267,6 +276,7 @@
       "trainedAt": "temple"
     },
     "cyclorn": {
+      "specialCombat": { "executeBelowPercent": 20 },
       "name": "Cyclorn", "class": "myth", "pantheon": "ashen_forge", "age": "heroic",
       "hp": 350, "speed": 4.3, "los": 12, "pop": 4, "trainTime": 22,
       "cost": { "food": 210, "wood": 0, "gold": 0, "favor": 17 },
@@ -332,7 +342,7 @@
       "trainedAt": "temple"
     },
     "sky_manticore": {
-      "specialCombat": { "splashRadius": 2.0, "splashPercent": 40 },
+      "specialCombat": { "splashRadius": 2.0, "splashPercent": 40, "executeBelowPercent": 15 },
       "name": "Sky Manticore", "class": "myth", "pantheon": "storm_concord", "age": "mythic",
       "hp": 420, "speed": 5.6, "los": 18, "pop": 5, "trainTime": 28, "flying": true,
       "cost": { "food": 260, "wood": 0, "gold": 0, "favor": 22 },

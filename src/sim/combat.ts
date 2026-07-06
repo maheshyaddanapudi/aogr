@@ -190,6 +190,9 @@ export function combatSystem(sim: Sim): void {
         creditCombatFavor(sim, sim.stores.Owner.playerId[eid]!, dmg);
         const special = stats.special;
         if (special) {
+          if (special.executePermille > 0 && Health.hp100[target]! > 0 && Health.hp100[target]! * 1000 < sim.unitStats(target).hp100 * special.executePermille && hasComponent(sim.world, target, sim.stores.UnitRef)) {
+            Health.hp100[target] = 0; // devoured whole
+          }
           if (special.stunTicks > 0 && Math.trunc(sim.tick / stats.attack!.cooldownTicks) % 4 === 0) {
             sim.stunnedUntil.set(target, sim.tick + special.stunTicks);
           }
@@ -293,8 +296,20 @@ export function combatSystem(sim: Sim): void {
   }
   dead.sort((a, b) => a - b);
   for (const eid of dead) {
-    // razed building: occupants step out before the walls come down
-    if (sim.garrisons.has(eid)) releaseGarrison(sim, eid);
+    // razed building: occupants step out; sunk transport: passengers drown
+    if (sim.garrisons.has(eid)) {
+      if (hasComponent(sim.world, eid, sim.stores.UnitRef)) {
+        for (const m of [...(sim.garrisons.get(eid) ?? [])].sort((a, b) => a - b)) {
+          if (Health.hp100[m]! > 0) {
+            Health.hp100[m] = 0;
+            dead.push(m);
+          }
+        }
+        sim.garrisons.delete(eid);
+      } else {
+        releaseGarrison(sim, eid);
+      }
+    }
     // dead unit: drop out of any garrison bookkeeping + patrols + relics
     const home = sim.garrisonOf.get(eid);
     if (home !== undefined) {

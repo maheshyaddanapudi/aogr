@@ -691,10 +691,12 @@ function handleGarrisonCommand(sim: Sim, cmd: Command): boolean {
   const { Owner, UnitRef, Building, Position, MoveState } = sim.stores;
   if (cmd.type === "garrison") {
     const beid = cmd.buildingEid;
-    if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
-    if (Building.active[beid] !== 1) return true;
-    const cap = getBuildingStatsByIndex(Building.typeIndex[beid]!).garrisonCapacity;
-    if (cap <= 0) return true;
+    if (Owner.playerId[beid] !== cmd.playerId) return true;
+    const isTransport = hasComponent(sim.world, beid, UnitRef) && getUnitStats(sim.unitStats(beid).id).transportCapacity > 0;
+    if (!isTransport) {
+      if (!hasComponent(sim.world, beid, Building) || Building.active[beid] !== 1) return true;
+      if (getBuildingStatsByIndex(Building.typeIndex[beid]!).garrisonCapacity <= 0) return true;
+    }
     for (const eid of [...cmd.eids].sort((a, b) => a - b)) {
       if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, UnitRef)) continue;
       if (sim.garrisonOf.has(eid)) continue;
@@ -705,7 +707,8 @@ function handleGarrisonCommand(sim: Sim, cmd: Command): boolean {
   }
   if (cmd.type === "ungarrison") {
     const beid = cmd.buildingEid;
-    if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
+    if (Owner.playerId[beid] !== cmd.playerId) return true;
+    if (!hasComponent(sim.world, beid, Building) && !hasComponent(sim.world, beid, UnitRef)) return true;
     releaseGarrison(sim, beid);
     return true;
   }
@@ -727,6 +730,11 @@ export function releaseGarrison(sim: Sim, beid: number): void {
   const members = sim.garrisons.get(beid) ?? [];
   const bx = Math.trunc(Position.x[beid]! / 1000);
   const by = Math.trunc(Position.y[beid]! / 1000);
+  // a transport mid-ocean cannot unload: require land within 3 tiles
+  if (hasComponent(sim.world, beid, sim.stores.UnitRef)) {
+    const near = nearestPassableTile(sim, bx, by);
+    if (Math.max(Math.abs(near.x - bx), Math.abs(near.y - by)) > 3) return;
+  }
   for (const eid of members) {
     if (!entityExists(sim.world, eid)) continue;
     const t = nearestPassableTile(sim, bx, by);
@@ -740,23 +748,35 @@ export function releaseGarrison(sim: Sim, beid: number): void {
 /** Walk-in absorption: intents become garrison membership on arrival. */
 function garrisonSystem(sim: Sim): void {
   const { Position, Building, MoveState } = sim.stores;
+  // occupants of moving transports ride along (positions stay coherent)
+  for (const [container, members] of Array.from(sim.garrisons.entries()).sort((a, b) => a[0] - b[0])) {
+    if (!hasComponent(sim.world, container, sim.stores.UnitRef)) continue;
+    for (const m of members) {
+      Position.x[m] = Position.x[container]!;
+      Position.y[m] = Position.y[container]!;
+    }
+  }
   const intents = Array.from(sim.garrisonIntent.keys()).sort((a, b) => a - b);
   for (const eid of intents) {
     const beid = sim.garrisonIntent.get(eid)!;
-    if (!entityExists(sim.world, eid) || !hasComponent(sim.world, beid, Building) || Building.active[beid] !== 1) {
+    const shipHost = hasComponent(sim.world, beid, sim.stores.UnitRef);
+    if (!entityExists(sim.world, eid) || !entityExists(sim.world, beid) || (!shipHost && (!hasComponent(sim.world, beid, Building) || Building.active[beid] !== 1))) {
       sim.garrisonIntent.delete(eid);
       continue;
     }
-    const cap = getBuildingStatsByIndex(Building.typeIndex[beid]!).garrisonCapacity;
+    const isShip = hasComponent(sim.world, beid, sim.stores.UnitRef);
+    const cap = isShip
+      ? getUnitStats(sim.unitStats(beid).id).transportCapacity
+      : getBuildingStatsByIndex(Building.typeIndex[beid]!).garrisonCapacity;
     const members = sim.garrisons.get(beid) ?? [];
     if (members.length >= cap) {
       sim.garrisonIntent.delete(eid);
       continue;
     }
-    const size = getBuildingStatsByIndex(Building.typeIndex[beid]!).size;
+    const reach = isShip ? 5000 : getBuildingStatsByIndex(Building.typeIndex[beid]!).size * 800 + 1200;
     const dx = Position.x[eid]! - Position.x[beid]!;
     const dy = Position.y[eid]! - Position.y[beid]!;
-    if (dx * dx + dy * dy <= (size * 800 + 1200) ** 2) {
+    if (dx * dx + dy * dy <= reach * reach) {
       sim.garrisonIntent.delete(eid);
       members.push(eid);
       members.sort((a, b) => a - b);

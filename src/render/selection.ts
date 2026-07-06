@@ -31,6 +31,8 @@ export interface SelectionDeps {
   /** unit id lookup for double-click select-all-of-type */
   unitTypeOf?: (eid: number) => string | null;
   formation?: () => number;
+  /** transport capacity of a UNIT (0 for non-ships) — boarding orders */
+  unitTransportCapacity?: (eid: number) => number;
   groundHeightAt: (x: number, z: number) => number;
   /** placement support */
   canPlace?: (buildingId: string, tileX: number, tileY: number) => boolean;
@@ -179,6 +181,10 @@ export function setupSelection(deps: SelectionDeps): Selection {
       const unitHit = nodePick?.pickedMesh ? deps.isUnitMesh(nodePick.pickedMesh) : null;
       const buildingHit = nodePick?.pickedMesh && deps.isBuildingMesh ? deps.isBuildingMesh(nodePick.pickedMesh) : null;
       const enemyUnit = unitHit !== null && deps.unitPositions().find((u) => u.eid === unitHit)?.playerId !== deps.localPlayerId;
+      if (unitHit !== null && !enemyUnit && (deps.unitTransportCapacity?.(unitHit) ?? 0) > 0 && !selected.has(unitHit)) {
+        queue.enqueue(deps.currentTick() + 1, { type: "garrison", playerId: deps.localPlayerId, eids: Array.from(selected), buildingEid: unitHit });
+        return;
+      }
       const enemyBuilding = buildingHit !== null && deps.buildingOwner?.(buildingHit) !== deps.localPlayerId;
       if (buildingHit !== null && !enemyBuilding) {
         const farmNode = deps.farmFoodNode?.(buildingHit) ?? null;
@@ -243,8 +249,12 @@ export function setupSelection(deps: SelectionDeps): Selection {
     if (e.pointerType === "touch" && e.button === 0 && touchTapOk(e)) {
       const eid = pickUnitNear(e.clientX, e.clientY, 24);
       const unitOwner = (id: number) => deps.unitPositions().find((u) => u.eid === id)?.playerId ?? -1;
-      // tap on an own unit → (re)select it
+      // tap on an own unit → board it (transport, with a crew selected) or (re)select
       if (eid !== null && unitOwner(eid) === deps.localPlayerId) {
+        if (selected.size > 0 && !selected.has(eid) && (deps.unitTransportCapacity?.(eid) ?? 0) > 0) {
+          queue.enqueue(deps.currentTick() + 1, { type: "garrison", playerId: deps.localPlayerId, eids: Array.from(selected), buildingEid: eid });
+          return;
+        }
         selected.clear();
         selectedBuilding = null;
         selected.add(eid);

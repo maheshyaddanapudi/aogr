@@ -22,7 +22,8 @@ interface RawUnit {
   multipliers?: Record<string, number>;
   flying?: boolean;
   tradeGoldPerTile?: number;
-  specialCombat?: { splashRadius?: number; splashPercent?: number; regenPerSec?: number; lifestealPercent?: number; stunSeconds?: number };
+  specialCombat?: { splashRadius?: number; splashPercent?: number; regenPerSec?: number; lifestealPercent?: number; stunSeconds?: number; executeBelowPercent?: number };
+  transportCapacity?: number;
   gatherRates?: {
     huntFoodPerSec?: number;
     forageFoodPerSec?: number;
@@ -64,7 +65,8 @@ export interface UnitStats {
   gatherMicroPerSec: [number, number, number, number] | null;
   /** caravans: gold (milli) earned per tile of one-way route distance */
   tradeGoldMilliPerTile: number;
-  special: { splashRadiusFp: number; splashPermille: number; regenPer15T100: number; lifestealPermille: number; stunTicks: number } | null;
+  special: { splashRadiusFp: number; splashPermille: number; regenPer15T100: number; lifestealPermille: number; stunTicks: number; executePermille: number } | null;
+  transportCapacity: number;
   naval: boolean;
 }
 
@@ -137,6 +139,7 @@ function load(): Map<string, UnitStats> {
         : null,
       tradeGoldMilliPerTile: Math.round((raw.tradeGoldPerTile ?? 0) * 1000),
       naval: raw.class === "ship",
+      transportCapacity: raw.transportCapacity ?? 0,
       special: raw.specialCombat
         ? {
             splashRadiusFp: Math.round((raw.specialCombat.splashRadius ?? 0) * 1000),
@@ -144,6 +147,7 @@ function load(): Map<string, UnitStats> {
             regenPer15T100: Math.round((raw.specialCombat.regenPerSec ?? 0) * 100),
             lifestealPermille: Math.round((raw.specialCombat.lifestealPercent ?? 0) * 10),
             stunTicks: Math.round((raw.specialCombat.stunSeconds ?? 0) * TICK_RATE),
+            executePermille: Math.round((raw.specialCombat.executeBelowPercent ?? 0) * 10),
           }
         : null,
     });

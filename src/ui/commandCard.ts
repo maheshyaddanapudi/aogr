@@ -17,6 +17,8 @@ export interface CardCallbacks {
   onCancelTrain: (buildingEid: number, index: number) => void;
   onStance: (stance: number) => void;
   onFormation: (formation: number) => void;
+  onPatrol: () => void;
+  onUnload: (shipEid: number) => void;
   onUngarrison: (buildingEid: number) => void;
   onDeselect: () => void;
 }
@@ -137,6 +139,10 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
         for (const s of STANCES) addBtn(s.label, s.hint, () => cb.onStance(s.v), true);
         addBtn("Box Formation", "Group moves arrange in a compact square", () => cb.onFormation(0), true);
         addBtn("Line Formation", "Group moves string out in a battle line", () => cb.onFormation(1), true);
+        addBtn("Patrol", "Click/tap the map: walk there and back until ordered otherwise", () => cb.onPatrol(), true);
+        if (units.length === 1 && (garrisoned ?? 0) > 0) {
+          addBtn(`Unload (${garrisoned})`, "Set the passengers ashore", () => cb.onUnload(units[0]!.eid), true);
+        }
       } else if (building) {
         const stats = getBuildingStats(building.buildingId);
         const trains: string[] = [];
