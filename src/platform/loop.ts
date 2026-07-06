@@ -14,16 +14,27 @@ export interface LoopHooks {
 
 const MAX_FRAME_DT_MS = 250; // avoid spiral-of-death after tab switches
 
-export function startLoop(hooks: LoopHooks): () => void {
+export interface LoopControls {
+  stop: () => void;
+  setPaused: (paused: boolean) => void;
+  isPaused: () => boolean;
+  setSpeed: (mult: number) => void;
+  speed: () => number;
+}
+
+export function startLoop(hooks: LoopHooks): LoopControls {
   let last = performance.now();
   let accumulator = 0;
   let running = true;
+  let paused = false;
+  let speed = 1;
 
   const frame = (now: number) => {
     if (!running) return;
     const dt = Math.min(now - last, MAX_FRAME_DT_MS);
     last = now;
-    accumulator += dt;
+    if (!paused) accumulator += dt * speed;
+    else accumulator = 0;
     while (accumulator >= MS_PER_TICK) {
       hooks.onTick();
       accumulator -= MS_PER_TICK;
@@ -33,7 +44,11 @@ export function startLoop(hooks: LoopHooks): () => void {
   };
   requestAnimationFrame(frame);
 
-  return () => {
-    running = false;
+  return {
+    stop: () => { running = false; },
+    setPaused: (p) => { paused = p; },
+    isPaused: () => paused,
+    setSpeed: (m) => { speed = Math.max(0.25, Math.min(4, m)); },
+    speed: () => speed,
   };
 }

@@ -165,6 +165,12 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
     const builder = idleVillagers[0] ?? villagers[0];
     if (builder !== undefined) cmds.push({ type: "build", playerId: pid, eids: [builder], building: "farm", x: -1, y: -1 });
   }
+  // mythic endgame: a rich AI reaches for the wonder (second victory path)
+  if (p.age >= 3 && anyOf("wonder").length === 0 && underConstruction("wonder") === 0 &&
+      p.foodMilli >= 1_400_000 && p.woodMilli >= 1_400_000 && p.goldMilli >= 1_400_000) {
+    const builder = idleVillagers[0] ?? villagers[0];
+    if (builder !== undefined) cmds.push({ type: "build", playerId: pid, eids: [builder], building: "wonder", x: -1, y: -1 });
+  }
   if (p.age >= 1) {
     buildIfMissing("barracks", 10);
     buildIfMissing("armory", 12);

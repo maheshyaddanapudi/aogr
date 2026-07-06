@@ -13,6 +13,8 @@ const TEAM = ["#e8c558", "#4d9fd6"];
 
 export interface Minimap {
   refresh: (sim: Sim, playerId: number) => void;
+  /** flash an attack warning ring at a world position */
+  ping: (x: number, z: number) => void;
 }
 
 export function createMinimap(root: HTMLElement, sim: Sim, onJump: (x: number, z: number) => void): Minimap {
@@ -26,6 +28,7 @@ export function createMinimap(root: HTMLElement, sim: Sim, onJump: (x: number, z
   const ctx = canvas.getContext("2d")!;
   const mapSize = sim.navGrid.size;
   const k = SIZE / mapSize;
+  const pings: Array<{ x: number; z: number; at: number }> = [];
 
   // terrain base layer (once)
   const base = document.createElement("canvas");
@@ -86,6 +89,22 @@ export function createMinimap(root: HTMLElement, sim: Sim, onJump: (x: number, z
           }
         }
       }
+      // attack pings: expanding red rings that fade over 3s
+      const now = performance.now();
+      for (let i = pings.length - 1; i >= 0; i--) {
+        const age = (now - pings[i]!.at) / 3000;
+        if (age >= 1) { pings.splice(i, 1); continue; }
+        ctx.strokeStyle = `rgba(224, 70, 50, ${1 - age})`;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(pings[i]!.x * k, pings[i]!.z * k, 3 + age * 9, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    },
+    ping(x, z) {
+      // one live ping per neighborhood — don't strobe under sustained fire
+      if (pings.some((p) => Math.hypot(p.x - x, p.z - z) < 12)) return;
+      pings.push({ x, z, at: performance.now() });
     },
   };
 }

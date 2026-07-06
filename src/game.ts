@@ -13,7 +13,8 @@ import {
 } from "./sim";
 import { findResourceNodes, getPlayer } from "./sim/economy";
 import { deserializeSim, serializeSim } from "./sim/sim";
-import { getPantheon } from "./sim/pantheondata";
+import { getMinor, getPantheon } from "./sim/pantheondata";
+import { getPower, nextCastCostMilli } from "./sim/powers";
 import { saveGame } from "./platform/storage";
 import { spawnUnitEntity } from "./sim";
 import { getBuildingStatsByIndex } from "./sim/buildingdata";
@@ -285,10 +286,85 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       audio.uiClick();
       queue.enqueue(sim.tick + 1, { type: "train", playerId: 0, buildingEid, unit: unitId });
     },
+    onResearch: (techId) => {
+      audio.uiClick();
+      queue.enqueue(sim.tick + 1, { type: "research", playerId: 0, tech: techId });
+    },
+    onCancelTrain: (buildingEid, index) => {
+      audio.uiClick();
+      queue.enqueue(sim.tick + 1, { type: "cancel_train", playerId: 0, buildingEid, index });
+    },
+    onStance: (stance) => {
+      audio.uiClick();
+      queue.enqueue(sim.tick + 1, { type: "stance", playerId: 0, eids: Array.from(selection.selected), stance });
+    },
     onDeselect: () => {
       audio.uiClick();
       selection.clear();
     },
+  });
+
+  // ── god-power bar: the player's unlocked powers, cast by click/tap ──
+  const powerBar = document.createElement("div");
+  powerBar.className = "power-bar";
+  hudRoot.appendChild(powerBar);
+  let pendingPower: string | null = null;
+  const refreshPowerBar = () => {
+    const p = getPlayer(sim, 0);
+    powerBar.innerHTML = "";
+    for (const minorId of p.minorGods) {
+      let powerId: string;
+      try {
+        powerId = getMinor(p.pantheon, minorId).grants.power;
+      } catch {
+        continue;
+      }
+      const power = getPower(powerId);
+      const cost = nextCastCostMilli(power, p.castCounts[powerId] ?? 0);
+      const cdLeft = Math.max(0, (p.powerReadyTick[powerId] ?? 0) - sim.tick);
+      const ready = p.favorMilli >= cost && cdLeft === 0;
+      const btn = document.createElement("button");
+      btn.className = "power-btn" + (pendingPower === powerId ? " armed" : "");
+      btn.disabled = !ready && pendingPower !== powerId;
+      btn.innerHTML = `<b>${power.name}</b><small>${cdLeft > 0 ? `${Math.ceil(cdLeft / 15)}s` : `${Math.ceil(cost / 1000)} favor`}</small>`;
+      btn.title = `${power.name} — click, then click the map to target`;
+      btn.addEventListener("click", () => {
+        audio.uiClick();
+        pendingPower = pendingPower === powerId ? null : powerId;
+        refreshPowerBar();
+      });
+      powerBar.appendChild(btn);
+    }
+    powerBar.style.display = powerBar.childElementCount > 0 ? "" : "none";
+  };
+  // targeting: an armed power consumes the next map click/tap (capture phase
+  // so selection/orders never see it)
+  canvas.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (!pendingPower || e.button !== 0) return;
+      const pick = world.scene.pick(e.clientX, e.clientY, (m) => m.name === "terrain");
+      if (pick?.pickedPoint) {
+        queue.enqueue(sim.tick + 1, {
+          type: "cast_power",
+          playerId: 0,
+          power: pendingPower,
+          x: Math.round(pick.pickedPoint.x * FP_ONE),
+          y: Math.round(pick.pickedPoint.z * FP_ONE),
+        });
+        pendingPower = null;
+        refreshPowerBar();
+      }
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    { capture: true },
+  );
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Escape" && pendingPower) {
+      pendingPower = null;
+      refreshPowerBar();
+    }
   });
   // unit acknowledgment on selection
   let lastSelSize = 0;
@@ -331,7 +407,9 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
           maxHp: Math.ceil(sim.unitStats(u.eid).hp100 / 100),
         }));
       const selB = selection.selectedBuilding();
-      commandCard.refresh(sim, 0, selUnits, selB !== null ? { eid: selB, buildingId: sim.buildingIdOf(selB) } : null);
+      commandCard.refresh(sim, 0, selUnits, selB !== null ? { eid: selB, buildingId: sim.buildingIdOf(selB) } : null, selB !== null ? sim.trainQueues.get(selB) ?? null : null);
+      refreshPowerBar();
+      updateIdleBtn();
     }
     world.scene.render();
     const p = getPlayer(sim, 0);
@@ -353,9 +431,20 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   let knownOwnUnits = new Set<number>();
   let knownActiveBuildings = new Set<number>();
   let notifyArmed = false; // skip the initial population
+  const matchStats = { kills: 0, losses: 0, razed: 0, startedAt: Date.now() };
   const collectNotifications = () => {
     const { Owner, UnitRef, Building } = sim.stores;
-    if (sim.events.fired.some((f) => Owner.playerId[f.to] === 0)) audio.alarm();
+    for (const f of sim.events.fired) {
+      if (Owner.playerId[f.to] === 0) {
+        audio.alarm();
+        minimap.ping(f.toX / FP_ONE, f.toY / FP_ONE);
+        break;
+      }
+    }
+    for (const d of sim.events.deaths) {
+      if (d.playerId === 0) matchStats.losses++;
+      else matchStats.kills++;
+    }
     const units = new Set<number>();
     for (const eid of query(sim.world, [UnitRef])) if (Owner.playerId[eid] === 0) units.add(eid);
     const actives = new Set<number>();
@@ -372,7 +461,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   };
 
   // ?paused: gate-capture mode — sim/render driven only via __step/__forceFrame
-  if (!params.has("paused")) startLoop({
+  const loopCtl = params.has("paused") ? null : startLoop({
     onTick: () => {
       aiService?.onTick(sim, queue);
       stepSim(sim, queue.drain(sim.tick));
@@ -388,7 +477,26 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       renderFrame();
     },
   });
-  if (params.has("paused")) renderFrame();
+  if (loopCtl) {
+    const pauseBtn = document.createElement("button");
+    pauseBtn.className = "age-up-btn save-btn";
+    pauseBtn.textContent = "⏸";
+    pauseBtn.title = "Pause / resume";
+    pauseBtn.addEventListener("click", () => {
+      loopCtl.setPaused(!loopCtl.isPaused());
+      pauseBtn.textContent = loopCtl.isPaused() ? "▶" : "⏸";
+    });
+    const speedBtn = document.createElement("button");
+    speedBtn.className = "age-up-btn save-btn";
+    speedBtn.textContent = "1×";
+    speedBtn.title = "Game speed";
+    speedBtn.addEventListener("click", () => {
+      const next = loopCtl.speed() >= 2 ? 1 : loopCtl.speed() * 2;
+      loopCtl.setSpeed(next);
+      speedBtn.textContent = `${next}×`;
+    });
+    document.querySelector(".age-wrap")?.append(pauseBtn, speedBtn);
+  }
 
   window.addEventListener("resize", () => engine.resize());
 
@@ -419,6 +527,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       <div class="age-panel">
         <h1>${sim.winner === 0 ? "VICTORY" : "DEFEAT"}</h1>
         <p class="age-sub">${sim.winner === 0 ? "The reforged gods favor you" : "Your pantheon falls silent"}</p>
+        <p class="end-stats">${Math.trunc(sim.tick / 900)} min · ${["Archaic", "Classical", "Heroic", "Mythic"][getPlayer(sim, 0).age]} Age · ${matchStats.kills} kills · ${matchStats.losses} losses</p>
         <div class="god-cards"><button class="god-card" id="end-menu"><h2>Return to Menu</h2></button></div>
       </div>`;
     document.body.appendChild(overlay);
@@ -437,6 +546,36 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     });
   });
   document.querySelector(".age-wrap")?.appendChild(saveBtn);
+
+  // idle villager finder (💤): click cycles through workless villagers
+  const idleBtn = document.createElement("button");
+  idleBtn.className = "age-up-btn save-btn idle-btn";
+  idleBtn.title = "Select the next idle villager";
+  idleBtn.textContent = "💤 0";
+  let idleCursor = 0;
+  const idleVillagers = (): number[] => {
+    const { GatherTask, MoveState, Owner, UnitRef } = sim.stores;
+    return Array.from(query(sim.world, [UnitRef, GatherTask]))
+      .filter((e) => Owner.playerId[e] === 0 && sim.unitStats(e).unitClass === "villager" && GatherTask.phase[e] === 0 && MoveState.active[e] !== 1)
+      .sort((a, b) => a - b);
+  };
+  const updateIdleBtn = () => {
+    const n = idleVillagers().length;
+    idleBtn.textContent = `💤 ${n}`;
+    idleBtn.disabled = n === 0;
+  };
+  idleBtn.addEventListener("click", () => {
+    const idle = idleVillagers();
+    if (idle.length === 0) return;
+    const eid = idle[idleCursor++ % idle.length]!;
+    selection.clear();
+    (selection.selected as Set<number>).add(eid);
+    const { Position } = sim.stores;
+    world.rtsCamera.camera.target.x = Position.x[eid]! / FP_ONE;
+    world.rtsCamera.camera.target.z = Position.y[eid]! / FP_ONE;
+    audio.uiClick();
+  });
+  document.querySelector(".age-wrap")?.appendChild(idleBtn);
 
   // exit to menu (saves first so nothing is lost)
   const menuBtn = document.createElement("button");
@@ -465,6 +604,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   };
   (window as unknown as Record<string, unknown>).__spawn = (playerId: number, unit: string, x: number, y: number) =>
     spawnUnitEntity(sim, playerId, unit, x * FP_ONE, y * FP_ONE);
+  if (params.has("paused")) renderFrame(); // after ALL UI closures exist
   (window as unknown as Record<string, unknown>).__step = (n: number) => {
     for (let i = 0; i < n; i++) {
       aiService?.decideSyncNow(sim, queue);

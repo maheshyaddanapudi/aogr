@@ -69,6 +69,10 @@ function renderMenu(): void {
         <h2>Choose your pantheon</h2>
         <div class="pantheon-row"></div>
       </div>
+      <div class="menu-section">
+        <h2>Choose your major god</h2>
+        <div class="major-row"></div>
+      </div>
       <div class="menu-section menu-opts">
         <label>Opponent
           <select id="m-ai">
@@ -90,6 +94,23 @@ function renderMenu(): void {
   document.body.appendChild(menu);
 
   let chosen = "storm_concord";
+  let chosenMajor = getPantheon(chosen).majors[0]!.id;
+  const majorRow = menu.querySelector(".major-row")!;
+  const renderMajors = () => {
+    majorRow.innerHTML = "";
+    for (const mg of getPantheon(chosen).majors) {
+      const b = document.createElement("button");
+      b.className = "major-chip" + (mg.id === chosenMajor ? " chosen" : "");
+      b.textContent = mg.name;
+      b.title = (mg as { title?: string }).title ?? mg.name;
+      b.addEventListener("click", () => {
+        chosenMajor = mg.id;
+        majorRow.querySelectorAll(".major-chip").forEach((c) => c.classList.remove("chosen"));
+        b.classList.add("chosen");
+      });
+      majorRow.appendChild(b);
+    }
+  };
   const row = menu.querySelector(".pantheon-row")!;
   for (const id of listPantheonIds()) {
     const p = getPantheon(id);
@@ -99,11 +120,14 @@ function renderMenu(): void {
     card.innerHTML = `<h2>${p.name.replace("The ", "")}</h2><h3>${p.theme}</h3><p class="god-blurb">${(p.favorMechanic as { description?: string }).description ?? ""}</p>`;
     card.addEventListener("click", () => {
       chosen = id;
+      chosenMajor = getPantheon(id).majors[0]!.id;
       row.querySelectorAll(".pantheon-card").forEach((c) => c.classList.remove("chosen"));
       card.classList.add("chosen");
+      renderMajors();
     });
     row.appendChild(card);
   }
+  renderMajors();
 
   const persist = () => {
     saveSettings({
@@ -119,7 +143,7 @@ function renderMenu(): void {
     void startGame({
       seed: Number((menu.querySelector("#m-seed") as HTMLInputElement).value) >>> 0,
       pantheon: chosen,
-      majorGod: getPantheon(chosen).majors[0]!.id,
+      majorGod: chosenMajor,
       aiDifficulty: (menu.querySelector("#m-ai") as HTMLSelectElement).value as "easy" | "medium" | "hard",
     });
   });
