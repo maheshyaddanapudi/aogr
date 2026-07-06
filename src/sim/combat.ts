@@ -32,6 +32,17 @@ export function emptyEvents(): SimEvents {
 }
 
 export function handleCombatCommand(sim: Sim, cmd: Command): boolean {
+  if (cmd.type === "stance") {
+    const { CombatState, Owner, UnitRef } = sim.stores;
+    const stance = Math.max(0, Math.min(2, cmd.stance | 0));
+    for (const eid of [...cmd.eids].sort((a, b) => a - b)) {
+      if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, UnitRef)) continue;
+      if (!hasComponent(sim.world, eid, CombatState)) continue;
+      CombatState.aggressive[eid] = stance;
+      if (stance === 0) CombatState.targetEid[eid] = -1;
+    }
+    return true;
+  }
   if (cmd.type !== "attack") return false;
   const { CombatState, Owner, UnitRef, MoveState } = sim.stores;
   const sorted = [...cmd.eids].sort((a, b) => a - b);
@@ -154,7 +165,7 @@ export function combatSystem(sim: Sim): void {
   for (const eid of fighters) {
     if (Health.hp100[eid]! <= 0) continue;
     if (CombatState.cooldown[eid]! > 0) CombatState.cooldown[eid] = CombatState.cooldown[eid]! - 1;
-    if (CombatState.aggressive[eid] !== 1) continue;
+    if (CombatState.aggressive[eid] === 0) continue; // 1 aggressive, 2 hold-ground
 
     let target = CombatState.targetEid[eid]!;
     if (!targetAliveAndValid(sim, target)) {
@@ -188,6 +199,54 @@ export function combatSystem(sim: Sim): void {
       }
     }
     // out of reach: chase steering happens in the movement system (state-derived)
+  }
+
+  // defensive buildings fire (tick-phase cooldown — no extra serialized state)
+  {
+    const { Position, Owner, UnitRef, Building } = sim.stores;
+    const bldgs = Array.from(query(sim.world, [Building, Health])).sort((a, b) => a - b);
+    for (const b of bldgs) {
+      if (Building.active[b] !== 1 || Health.hp100[b]! <= 0) continue;
+      const bstats = getBuildingStatsByIndex(Building.typeIndex[b]!);
+      const atk = bstats.attack;
+      if (!atk) continue;
+      if (sim.tick % atk.cooldownTicks !== b % atk.cooldownTicks) continue;
+      const me = Owner.playerId[b]!;
+      let best = -1;
+      let bestD = Number.MAX_SAFE_INTEGER;
+      for (const u of query(sim.world, [UnitRef, Health])) {
+        if (Owner.playerId[u] === me || Health.hp100[u]! <= 0) continue;
+        const dx = Position.x[u]! - Position.x[b]!;
+        const dy = Position.y[u]! - Position.y[b]!;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestD) { bestD = d2; best = u; }
+      }
+      if (best < 0 || bestD > atk.rangeFp * atk.rangeFp) continue;
+      const armor = sim.unitStats(best).armor;
+      const reduce = atk.type === "pierce" ? armor.pierce : atk.type === "crush" ? armor.crush : armor.hack;
+      const dmg = Math.max(100, Math.trunc((atk.damage100 * (100 - reduce)) / 100));
+      Health.hp100[best] = Health.hp100[best]! - dmg;
+      sim.events.fired.push({ from: b, to: best, fromX: Position.x[b]!, fromY: Position.y[b]!, toX: Position.x[best]!, toY: Position.y[best]!, ranged: true });
+      sim.events.hits.push({ x: Position.x[best]!, y: Position.y[best]! });
+    }
+  }
+
+  // hero heal aura: every second, heroes mend nearby wounded allies
+  if (sim.tick % 15 === 0) {
+    const { Position, Owner, UnitRef } = sim.stores;
+    const all = Array.from(query(sim.world, [UnitRef, Health])).sort((a, b) => a - b);
+    for (const h of all) {
+      if (Health.hp100[h]! <= 0 || sim.unitStats(h).unitClass !== "hero") continue;
+      for (const u of all) {
+        if (u === h || Owner.playerId[u] !== Owner.playerId[h] || Health.hp100[u]! <= 0) continue;
+        const max = sim.unitStats(u).hp100;
+        if (Health.hp100[u]! >= max) continue;
+        const dx = Position.x[u]! - Position.x[h]!;
+        const dy = Position.y[u]! - Position.y[h]!;
+        if (dx * dx + dy * dy > 6000 * 6000) continue;
+        Health.hp100[u] = Math.min(max, Health.hp100[u]! + 200);
+      }
+    }
   }
 
   // deaths after all attacks, ascending order

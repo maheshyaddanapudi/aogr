@@ -22,6 +22,7 @@
       "trainedAt": "town_center"
     },
     "caravan": {
+      "tradeGoldPerTile": 0.5,
       "name": "Trade Caravan", "class": "caravan", "pantheon": "all", "age": "mythic",
       "hp": 100, "speed": 4.5, "los": 10, "pop": 1, "trainTime": 15,
       "cost": { "food": 0, "wood": 0, "gold": 100, "favor": 0 },

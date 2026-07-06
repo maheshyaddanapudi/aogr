@@ -6,6 +6,7 @@ import buildingsJson from "../../data/buildings.json";
 import { TICK_RATE } from "./sim";
 
 interface RawBuilding {
+  passable?: boolean;
   name: string;
   hp: number;
   buildTime: number;
@@ -42,6 +43,8 @@ export interface BuildingStats {
   attack: { type: string; damage100: number; rangeFp: number; cooldownTicks: number } | null;
   trade: { spreadPercent: number } | null;
   isFarm: boolean;
+  /** gates: footprint never blocks the nav grid */
+  passable: boolean;
 }
 
 let cache: Map<string, BuildingStats> | null = null;
@@ -78,6 +81,7 @@ function load(): Map<string, BuildingStats> {
         : null,
       trade: raw.trade ? { spreadPercent: raw.trade.spreadPercent } : null,
       isFarm: raw.provides === "infinite_farm_food",
+      passable: raw.passable === true,
     });
   }
   return cache;

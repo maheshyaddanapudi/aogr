@@ -125,6 +125,7 @@ export function applyModifiers(sim: Sim, playerId: number, targetKeys: readonly 
 
 const RES_STAT: Record<number, string> = {
   0: "gatherRates.forageFoodPerSec",
+  3: "gatherRates.huntFoodPerSec",
   1: "gatherRates.woodPerSec",
   2: "gatherRates.goldPerSec",
 };

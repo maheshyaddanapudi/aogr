@@ -336,6 +336,7 @@
       "size": 1
     },
     "gate": {
+      "passable": true,
       "name": "Gate",
       "hp": 900,
       "buildTime": 8,

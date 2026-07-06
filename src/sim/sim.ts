@@ -294,7 +294,7 @@ export function spawnUnitEntity(sim: Sim, playerId: number, unitId: string, x: n
     const passive = stats.unitClass === "villager" || stats.unitClass === "scout" || stats.unitClass === "caravan" || stats.unitClass === "ship";
     CombatState.aggressive[eid] = passive ? 0 : 1;
   }
-  if (stats.gatherMicroPerTick) {
+  if (stats.gatherMicroPerTick || stats.tradeGoldMilliPerTile > 0) {
     addComponent(sim.world, eid, GatherTask);
     GatherTask.phase[eid] = 0;
     GatherTask.nodeEid[eid] = -1;
@@ -742,7 +742,7 @@ export function deserializeSim(json: string): Sim {
   const remap = new Map<number, number>();
   for (const e of snapshot.entities) {
     if (e.node) {
-      const eid = spawnResourceNode(sim, (["food", "wood", "gold"] as const)[e.node.resType]!, 0, 0, e.node.amountMilli);
+      const eid = spawnResourceNode(sim, (["food", "wood", "gold", "game"] as const)[e.node.resType]!, 0, 0, e.node.amountMilli);
       Position.x[eid] = e.x;
       Position.y[eid] = e.y;
       sim.stores.ResourceNode.resType[eid] = e.node.resType;

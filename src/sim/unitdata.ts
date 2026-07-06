@@ -21,6 +21,7 @@ interface RawUnit {
   attack?: { type: string; damage: number; crushDamage?: number; range: number; minRange?: number; splashRadius?: number; cooldown: number };
   multipliers?: Record<string, number>;
   flying?: boolean;
+  tradeGoldPerTile?: number;
   gatherRates?: {
     huntFoodPerSec?: number;
     forageFoodPerSec?: number;
@@ -57,9 +58,11 @@ export interface UnitStats {
   multipliers1000: Record<string, number>;
   flying: boolean;
   /** micro-resource per tick by node kind index (0 food/forage, 1 wood, 2 gold); null = can't gather */
-  gatherMicroPerTick: [number, number, number] | null;
+  gatherMicroPerTick: [number, number, number, number] | null;
   /** micro-resource per SECOND (modifiers apply here, then ÷ TICK_RATE) */
-  gatherMicroPerSec: [number, number, number] | null;
+  gatherMicroPerSec: [number, number, number, number] | null;
+  /** caravans: gold (milli) earned per tile of one-way route distance */
+  tradeGoldMilliPerTile: number;
 }
 
 const RADIUS_BY_CLASS: Record<string, number> = {
@@ -118,6 +121,7 @@ function load(): Map<string, UnitStats> {
             Math.trunc(((raw.gatherRates.forageFoodPerSec ?? 0) * 1_000_000) / TICK_RATE),
             Math.trunc(((raw.gatherRates.woodPerSec ?? 0) * 1_000_000) / TICK_RATE),
             Math.trunc(((raw.gatherRates.goldPerSec ?? 0) * 1_000_000) / TICK_RATE),
+            Math.trunc(((raw.gatherRates.huntFoodPerSec ?? 0) * 1_000_000) / TICK_RATE),
           ]
         : null,
       gatherMicroPerSec: raw.gatherRates
@@ -125,8 +129,10 @@ function load(): Map<string, UnitStats> {
             Math.round((raw.gatherRates.forageFoodPerSec ?? 0) * 1_000_000),
             Math.round((raw.gatherRates.woodPerSec ?? 0) * 1_000_000),
             Math.round((raw.gatherRates.goldPerSec ?? 0) * 1_000_000),
+            Math.round((raw.gatherRates.huntFoodPerSec ?? 0) * 1_000_000),
           ]
         : null,
+      tradeGoldMilliPerTile: Math.round((raw.tradeGoldPerTile ?? 0) * 1000),
     });
   }
   return cache;

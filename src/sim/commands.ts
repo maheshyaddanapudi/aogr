@@ -18,7 +18,11 @@ export type Command =
   | { type: "research"; playerId: number; tech: string; minorGod?: string }
   | { type: "cast_power"; playerId: number; power: string; x: number; y: number }
   | { type: "work_on"; playerId: number; eids: number[]; buildingEid: number }
-  | { type: "rally"; playerId: number; buildingEid: number; x: number; y: number };
+  | { type: "rally"; playerId: number; buildingEid: number; x: number; y: number }
+  | { type: "stance"; playerId: number; eids: number[]; stance: number }
+  | { type: "repair"; playerId: number; eids: number[]; buildingEid: number }
+  | { type: "trade_route"; playerId: number; eids: number[]; buildingEid: number }
+  | { type: "cancel_train"; playerId: number; buildingEid: number; index: number };
 
 interface Pending {
   tick: number;

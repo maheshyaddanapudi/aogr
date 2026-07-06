@@ -21,9 +21,10 @@ export const CARRY_CAPACITY_MILLI = 10_000;
 const GATHER_REACH_FP = 1700;
 const PRAY_REACH_FP = 3000;
 
-export type ResourceKind = "food" | "wood" | "gold";
-const RES_INDEX: Record<ResourceKind, number> = { food: 0, wood: 1, gold: 2 };
-const RES_BY_INDEX: ResourceKind[] = ["food", "wood", "gold"];
+export type ResourceKind = "food" | "wood" | "gold" | "game";
+const RES_INDEX: Record<ResourceKind, number> = { food: 0, wood: 1, gold: 2, game: 3 };
+// index 3 (wild game) banks as food and drops off at food depots
+const RES_BY_INDEX: ResourceKind[] = ["food", "wood", "gold", "food"];
 
 export interface PlayerState {
   foodMilli: number;
@@ -135,7 +136,7 @@ export function spawnBuilding(sim: Sim, playerId: number, buildingId: string, ti
   Building.tileY[eid] = tileY;
   addComponent(sim.world, eid, sim.stores.Health);
   sim.stores.Health.hp100[eid] = stats.hp100;
-  blockFootprint(sim, tileX, tileY, stats.size);
+  if (!stats.passable) blockFootprint(sim, tileX, tileY, stats.size);
   return eid;
 }
 
@@ -200,7 +201,11 @@ export function findBuildSite(sim: Sim, nearX: number, nearY: number, size: numb
 export function findResourceNodes(sim: Sim, kind: ResourceKind): number[] {
   const { ResourceNode } = sim.stores;
   return Array.from(query(sim.world, [ResourceNode]))
-    .filter((e) => ResourceNode.resType[e] === RES_INDEX[kind] && ResourceNode.amountMilli[e]! > 0)
+    .filter(
+      (e) =>
+        (ResourceNode.resType[e] === RES_INDEX[kind] || (kind === "food" && ResourceNode.resType[e] === RES_INDEX.game)) &&
+        ResourceNode.amountMilli[e]! > 0,
+    )
     .sort((a, b) => a - b);
 }
 
@@ -264,6 +269,8 @@ export function setupSkirmish(sim: Sim): void {
     place("food", -10, 8, 6, 500_000, 3);
     place("wood", -9, -7, 12, 200_000, 4);
     place("gold", 9, -8, 3, 1_500_000, 3);
+    place("game", 14, 12, 4, 400_000, 2);
+    place("game", -14, -12, 3, 400_000, 3);
   }
 }
 
@@ -367,6 +374,47 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
       if (amount <= 0) return true;
       stockAdd(p, sell, -amount);
       stockAdd(p, buy, Math.trunc((amount * (100 - spread)) / 100));
+      return true;
+    }
+    case "repair": {
+      const beid = cmd.buildingEid;
+      if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
+      if (Building.active[beid] !== 1) return true;
+      for (const eid of [...cmd.eids].sort((a, b) => a - b)) {
+        if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, GatherTask)) continue;
+        GatherTask.phase[eid] = 6;
+        GatherTask.nodeEid[eid] = beid;
+        setMoveTarget(sim, eid, Position.x[beid]!, Position.y[beid]!);
+      }
+      return true;
+    }
+    case "trade_route": {
+      const beid = cmd.buildingEid;
+      if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
+      if (Building.active[beid] !== 1 || getBuildingStatsByIndex(Building.typeIndex[beid]!).trade === null) return true;
+      for (const eid of [...cmd.eids].sort((a, b) => a - b)) {
+        if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, GatherTask)) continue;
+        if (getUnitStats(sim.unitStats(eid).id).tradeGoldMilliPerTile <= 0) continue;
+        GatherTask.phase[eid] = 7; // leg 1: to the market
+        GatherTask.nodeEid[eid] = beid;
+        setMoveTarget(sim, eid, Position.x[beid]!, Position.y[beid]!);
+      }
+      return true;
+    }
+    case "cancel_train": {
+      const beid = cmd.buildingEid;
+      if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
+      const q = sim.trainQueues.get(beid);
+      const entry = q?.[cmd.index];
+      if (!q || !entry) return true;
+      q.splice(cmd.index, 1);
+      if (q.length === 0) sim.trainQueues.delete(beid);
+      const cost = getUnitStats(entry.unitId).cost;
+      const p = getPlayer(sim, cmd.playerId);
+      p.foodMilli += cost.food * 1000;
+      p.woodMilli += cost.wood * 1000;
+      p.goldMilli += cost.gold * 1000;
+      p.favorMilli += cost.favor * 1000;
       return true;
     }
     case "rally": {
@@ -528,6 +576,52 @@ export function economySystem(sim: Sim): void {
         const pid = Owner.playerId[eid]!;
         prayingByPlayer.set(pid, (prayingByPlayer.get(pid) ?? 0) + 1);
       }
+    } else if (phase === 6) {
+      // repairing an own building
+      const b = GatherTask.nodeEid[eid]!;
+      if (!hasComponent(sim.world, b, Building) || Building.active[b] !== 1) {
+        GatherTask.phase[eid] = 0;
+        continue;
+      }
+      const bstats = getBuildingStatsByIndex(Building.typeIndex[b]!);
+      if (sim.stores.Health.hp100[b]! >= bstats.hp100) {
+        GatherTask.phase[eid] = 0;
+        MoveState.active[eid] = 0;
+        continue;
+      }
+      const reach = buildingReach(bstats.size);
+      if (dist(px, py, Position.x[b]!, Position.y[b]!) > reach && MoveState.active[eid] !== 1) {
+        setMoveTarget(sim, eid, Position.x[b]!, Position.y[b]!);
+      }
+      if (dist(px, py, Position.x[b]!, Position.y[b]!) <= reach) {
+        MoveState.active[eid] = 0;
+        sim.stores.Health.hp100[b] = Math.min(bstats.hp100, sim.stores.Health.hp100[b]! + Math.max(1, Math.trunc(bstats.hp100 / bstats.buildTicks)));
+      }
+    } else if (phase === 7 || phase === 8) {
+      // caravan trade route: market (7) ↔ own town center (8)
+      const market = GatherTask.nodeEid[eid]!;
+      const pid = Owner.playerId[eid]!;
+      const tcEid = getPlayer(sim, pid).townCenterEid;
+      if (!hasComponent(sim.world, market, Building) || Building.active[market] !== 1 || tcEid < 0 || !hasComponent(sim.world, tcEid, Building)) {
+        GatherTask.phase[eid] = 0;
+        continue;
+      }
+      const dest = phase === 7 ? market : tcEid;
+      const reach = buildingReach(getBuildingStatsByIndex(Building.typeIndex[dest]!).size);
+      if (dist(px, py, Position.x[dest]!, Position.y[dest]!) > reach) {
+        if (MoveState.active[eid] !== 1) setMoveTarget(sim, eid, Position.x[dest]!, Position.y[dest]!);
+        continue;
+      }
+      MoveState.active[eid] = 0;
+      if (phase === 7) {
+        GatherTask.phase[eid] = 8; // loaded — head for the town center
+      } else {
+        const routeFp = dist(Position.x[market]!, Position.y[market]!, Position.x[tcEid]!, Position.y[tcEid]!);
+        const rate = sim.unitStats(eid).tradeGoldMilliPerTile;
+        getPlayer(sim, pid).goldMilli += Math.max(rate, Math.trunc((routeFp * rate) / 1000));
+        GatherTask.phase[eid] = 7; // back to the market
+      }
+      setMoveTarget(sim, eid, Position.x[phase === 7 ? tcEid : market]!, Position.y[phase === 7 ? tcEid : market]!);
     }
   }
 
@@ -554,6 +648,24 @@ export function economySystem(sim: Sim): void {
       const eid = spawnUnitEntity(sim, Owner.playerId[beid]!, head.unitId, t.x * 1000 + 500, t.y * 1000 + 500);
       if (Building.rallyX[beid] !== 0 || Building.rallyY[beid] !== 0) {
         setMoveTarget(sim, eid, Building.rallyX[beid]!, Building.rallyY[beid]!);
+        // rally on a resource: gatherers go straight to work
+        if (hasComponent(sim.world, eid, GatherTask)) {
+          let node = -1;
+          for (const n of Array.from(query(sim.world, [ResourceNode])).sort((a, b) => a - b)) {
+            if (ResourceNode.amountMilli[n]! <= 0) continue;
+            const dx = Position.x[n]! - Building.rallyX[beid]!;
+            const dy = Position.y[n]! - Building.rallyY[beid]!;
+            if (dx * dx + dy * dy <= 2000 * 2000) { node = n; break; }
+          }
+          if (node >= 0) {
+            GatherTask.phase[eid] = 1;
+            GatherTask.nodeEid[eid] = node;
+            GatherTask.carriedMilli[eid] = 0;
+            GatherTask.carryMicro[eid] = 0;
+            GatherTask.carriedType[eid] = ResourceNode.resType[node]!;
+            setMoveTarget(sim, eid, Position.x[node]!, Position.y[node]!);
+          }
+        }
       }
     }
   }
