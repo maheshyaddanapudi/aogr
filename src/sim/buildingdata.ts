@@ -7,6 +7,7 @@ import { TICK_RATE } from "./sim";
 
 interface RawBuilding {
   passable?: boolean;
+  garrisonCapacity?: number;
   name: string;
   hp: number;
   buildTime: number;
@@ -45,6 +46,7 @@ export interface BuildingStats {
   isFarm: boolean;
   /** gates: footprint never blocks the nav grid */
   passable: boolean;
+  garrisonCapacity: number;
 }
 
 let cache: Map<string, BuildingStats> | null = null;
@@ -82,6 +84,7 @@ function load(): Map<string, BuildingStats> {
       trade: raw.trade ? { spreadPercent: raw.trade.spreadPercent } : null,
       isFarm: raw.provides === "infinite_farm_food",
       passable: raw.passable === true,
+      garrisonCapacity: raw.garrisonCapacity ?? 0,
     });
   }
   return cache;

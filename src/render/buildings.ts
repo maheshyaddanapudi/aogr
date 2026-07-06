@@ -42,6 +42,7 @@ const NODE_MODEL: Record<number, string> = {
   1: "nature/tree_single_A", // wood forest
   2: "nature/rock_single_A", // gold outcrop
   3: "stag", // wild game herds (hunted for food)
+  4: "nature/rock_single_D", // relics — heroes carry them to temples
 };
 
 interface PuffFx {
@@ -401,7 +402,7 @@ export async function createWorldObjectsRenderer(
         v = cloneProto(NODE_MODEL[n.resType]!, `node${n.eid}`);
         const bounds = v.getHierarchyBoundingVectors();
         const h = Math.max(bounds.max.y - bounds.min.y, 0.001);
-        const target = n.resType === 2 ? 0.9 : n.resType === 3 ? 1.3 : 2.2;
+        const target = n.resType === 2 ? 0.9 : n.resType === 3 ? 1.3 : n.resType === 4 ? 0.7 : 2.2;
         v.scaling.setAll(target / h);
         v.position.set(n.x, groundHeightAt(n.x, n.z), n.z);
         // deterministic-ish variety from eid (render-side, floats fine)

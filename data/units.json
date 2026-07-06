@@ -169,6 +169,7 @@
       "trainedAt": "temple"
     },
     "sandlion": {
+      "specialCombat": { "lifestealPercent": 25 },
       "name": "Sandlion", "class": "myth", "pantheon": "auryan_dawn", "age": "classical",
       "hp": 280, "speed": 4.6, "los": 12, "pop": 3, "trainTime": 18,
       "cost": { "food": 160, "wood": 0, "gold": 0, "favor": 12 },
@@ -179,6 +180,7 @@
       "trainedAt": "temple"
     },
     "emberbull": {
+      "specialCombat": { "splashRadius": 2.5, "splashPercent": 60 },
       "name": "Emberbull", "class": "myth", "pantheon": "auryan_dawn", "age": "heroic",
       "hp": 300, "speed": 4.4, "los": 12, "pop": 4, "trainTime": 20,
       "cost": { "food": 200, "wood": 0, "gold": 0, "favor": 16 },
@@ -189,6 +191,7 @@
       "trainedAt": "temple"
     },
     "ashen_phoenix": {
+      "specialCombat": { "regenPerSec": 3.0 },
       "name": "Ashen Phoenix", "class": "myth", "pantheon": "auryan_dawn", "age": "mythic",
       "hp": 380, "speed": 5.8, "los": 18, "pop": 5, "trainTime": 28, "flying": true,
       "cost": { "food": 0, "wood": 0, "gold": 250, "favor": 25 },
@@ -200,6 +203,7 @@
     },
 
     "rivermaw": {
+      "specialCombat": { "regenPerSec": 2.5 },
       "name": "Rivermaw", "class": "myth", "pantheon": "verdant_deep", "age": "classical",
       "hp": 260, "speed": 4.2, "los": 12, "pop": 3, "trainTime": 18,
       "cost": { "food": 150, "wood": 0, "gold": 0, "favor": 10 },
@@ -210,6 +214,7 @@
       "trainedAt": "temple"
     },
     "stormserpent": {
+      "specialCombat": { "splashRadius": 1.8, "splashPercent": 45 },
       "name": "Stormserpent", "class": "myth", "pantheon": "verdant_deep", "age": "heroic",
       "hp": 320, "speed": 4.8, "los": 14, "pop": 4, "trainTime": 22,
       "cost": { "food": 180, "wood": 0, "gold": 0, "favor": 15 },
@@ -230,6 +235,7 @@
       "trainedAt": "temple"
     },
     "coral_golem": {
+      "specialCombat": { "regenPerSec": 2.0 },
       "name": "Coral Golem", "class": "myth", "pantheon": "verdant_deep", "age": "mythic",
       "hp": 500, "speed": 3.2, "los": 10, "pop": 5, "trainTime": 30,
       "cost": { "food": 0, "wood": 0, "gold": 280, "favor": 22 },
@@ -241,6 +247,7 @@
     },
 
     "forgehound": {
+      "specialCombat": { "lifestealPercent": 30 },
       "name": "Forgehound", "class": "myth", "pantheon": "ashen_forge", "age": "classical",
       "hp": 240, "speed": 5.2, "los": 12, "pop": 3, "trainTime": 16,
       "cost": { "food": 0, "wood": 0, "gold": 140, "favor": 9 },
@@ -261,6 +268,7 @@
       "trainedAt": "temple"
     },
     "thunder_jotun": {
+      "specialCombat": { "splashRadius": 2.5, "splashPercent": 55 },
       "name": "Thunder Jotun", "class": "myth", "pantheon": "ashen_forge", "age": "heroic",
       "hp": 330, "speed": 4.0, "los": 13, "pop": 4, "trainTime": 22,
       "cost": { "food": 0, "wood": 0, "gold": 200, "favor": 16 },
@@ -271,6 +279,7 @@
       "trainedAt": "temple"
     },
     "bronze_colossus": {
+      "specialCombat": { "splashRadius": 2.0, "splashPercent": 50 },
       "name": "Bronze Colossus", "class": "myth", "pantheon": "ashen_forge", "age": "mythic",
       "hp": 600, "speed": 3.0, "los": 10, "pop": 5, "trainTime": 32,
       "cost": { "food": 0, "wood": 0, "gold": 300, "favor": 25 },
@@ -292,6 +301,7 @@
       "trainedAt": "temple"
     },
     "wind_djinn": {
+      "specialCombat": { "regenPerSec": 2.0 },
       "name": "Wind Djinn", "class": "myth", "pantheon": "storm_concord", "age": "heroic",
       "hp": 270, "speed": 5.0, "los": 14, "pop": 4, "trainTime": 20,
       "cost": { "food": 0, "wood": 0, "gold": 180, "favor": 14 },
@@ -302,6 +312,7 @@
       "trainedAt": "temple"
     },
     "stonegaze_naga": {
+      "specialCombat": { "lifestealPercent": 20 },
       "name": "Stonegaze Naga", "class": "myth", "pantheon": "storm_concord", "age": "heroic",
       "hp": 240, "speed": 4.2, "los": 16, "pop": 4, "trainTime": 20,
       "cost": { "food": 0, "wood": 0, "gold": 190, "favor": 15 },
@@ -312,6 +323,7 @@
       "trainedAt": "temple"
     },
     "sky_manticore": {
+      "specialCombat": { "splashRadius": 2.0, "splashPercent": 40 },
       "name": "Sky Manticore", "class": "myth", "pantheon": "storm_concord", "age": "mythic",
       "hp": 420, "speed": 5.6, "los": 18, "pop": 5, "trainTime": 28, "flying": true,
       "cost": { "food": 260, "wood": 0, "gold": 0, "favor": 22 },

@@ -16,6 +16,7 @@ export interface CardCallbacks {
   onResearch: (techId: string) => void;
   onCancelTrain: (buildingEid: number, index: number) => void;
   onStance: (stance: number) => void;
+  onUngarrison: (buildingEid: number) => void;
   onDeselect: () => void;
 }
 
@@ -26,6 +27,7 @@ export interface CommandCard {
     selectedUnits: ReadonlyArray<{ eid: number; unitClass: string; name: string; hp: number; maxHp: number }>,
     selectedBuilding: { eid: number; buildingId: string } | null,
     queue?: TrainEntry[] | null,
+    garrisoned?: number,
   ) => void;
 }
 
@@ -61,7 +63,7 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
   let lastKey = "";
 
   return {
-    refresh(sim, playerId, units, building, queue) {
+    refresh(sim, playerId, units, building, queue, garrisoned) {
       const p = sim.players[playerId]!;
       // production queue (redraws every call — progress moves without clicks)
       if (building && queue && queue.length > 0) {
@@ -80,7 +82,7 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
       } else {
         queueStrip.style.display = "none";
       }
-      const key = `${units.map((u) => u.eid).join(",")}|${building?.eid ?? -1}|${p.age}|${Math.trunc(p.foodMilli / 20000)}|${Math.trunc(p.woodMilli / 20000)}|${p.researchedTechs.length}|${p.researchQueue.length}`;
+      const key = `${garrisoned ?? 0}|${units.map((u) => u.eid).join(",")}|${building?.eid ?? -1}|${p.age}|${Math.trunc(p.foodMilli / 20000)}|${Math.trunc(p.woodMilli / 20000)}|${p.researchedTechs.length}|${p.researchQueue.length}`;
       // selection info refreshes every call; buttons only on change
       if (units.length > 0) {
         selTitle.textContent = units.length === 1 ? units[0]!.name : `${units.length} units`;
@@ -163,6 +165,9 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
             p.foodMilli >= t.cost.food * 1000 && p.woodMilli >= t.cost.wood * 1000 &&
             p.goldMilli >= t.cost.gold * 1000 && p.favorMilli >= t.cost.favor * 1000;
           addBtn(`🔬 ${t.name}`, `${t.name} — ${t.cost.food}f ${t.cost.wood}w ${t.cost.gold}g ${t.cost.favor}fv`, () => cb.onResearch(tid), afford);
+        }
+        if ((garrisoned ?? 0) > 0) {
+          addBtn(`Ungarrison (${garrisoned})`, "Release all sheltered units", () => cb.onUngarrison(building.eid), true);
         }
       }
     },

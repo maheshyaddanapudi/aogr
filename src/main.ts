@@ -76,9 +76,11 @@ function renderMenu(): void {
       <div class="menu-section menu-opts">
         <label>Opponent
           <select id="m-ai">
+            <option value="easiest">Easiest</option>
             <option value="easy">Easy</option>
             <option value="medium" selected>Medium</option>
             <option value="hard">Hard</option>
+            <option value="titan">Titan</option>
           </select>
         </label>
         <label>Map seed <input id="m-seed" type="number" value="${Math.trunc(Math.random() * 1_000_000)}" /></label>
@@ -144,7 +146,7 @@ function renderMenu(): void {
       seed: Number((menu.querySelector("#m-seed") as HTMLInputElement).value) >>> 0,
       pantheon: chosen,
       majorGod: chosenMajor,
-      aiDifficulty: (menu.querySelector("#m-ai") as HTMLSelectElement).value as "easy" | "medium" | "hard",
+      aiDifficulty: (menu.querySelector("#m-ai") as HTMLSelectElement).value as "easiest" | "easy" | "medium" | "hard" | "titan",
     });
   });
 

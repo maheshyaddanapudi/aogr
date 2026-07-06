@@ -8,7 +8,7 @@ import { hasComponent, query } from "bitecs";
 import type { Checksum } from "./checksum";
 import type { Command } from "./commands";
 import { AGE_INDEX, getTechStats, type TechStats } from "./techdata";
-import { getMinorPool } from "./pantheondata";
+import { getMinorPool, getMajorEffects } from "./pantheondata";
 import { getBuildingStatsByIndex } from "./buildingdata";
 import { canAfford, getPlayer, payCost } from "./economy";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
@@ -112,6 +112,11 @@ export function applyModifiers(sim: Sim, playerId: number, targetKeys: readonly 
   const p = sim.players[playerId];
   if (!p) return base;
   let v = base;
+  for (const e of getMajorEffects(p.pantheon, p.majorGod)) {
+    if (e.stat !== statPath || !targetKeys.includes(e.target)) continue;
+    if (e.op === "mul") v = Math.trunc((v * e.value1000) / 1000);
+    else if (e.op === "add") v += e.value1000 * (ADD_SCALE[statPath] ?? 1);
+  }
   for (const techId of p.researchedTechs) {
     for (const e of getTechStats(techId).effects) {
       if (e.stat !== statPath || !targetKeys.includes(e.target)) continue;

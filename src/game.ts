@@ -18,7 +18,7 @@ import { getPower, nextCastCostMilli } from "./sim/powers";
 import { saveGame } from "./platform/storage";
 import { spawnUnitEntity } from "./sim";
 import { getBuildingStatsByIndex } from "./sim/buildingdata";
-import { query } from "bitecs";
+import { hasComponent, query } from "bitecs";
 import { createEngine, createWorldScene } from "./render/scene";
 import { createUnitRenderer, type UnitAnimState } from "./render/units";
 import { createWorldObjectsRenderer } from "./render/buildings";
@@ -46,7 +46,7 @@ export interface GameConfig {
   seed: number;
   pantheon: string;
   majorGod: string;
-  aiDifficulty: "easy" | "medium" | "hard" | "off";
+  aiDifficulty: "easiest" | "easy" | "medium" | "hard" | "titan" | "off";
   loadSnapshot?: string;
 }
 
@@ -128,8 +128,8 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const fog = createFogRenderer(world.scene, sim.terrain.size, sim.terrain);
   const audio = createAudioSystem();
   const pathService = createPathService(sim);
-  const aiChoice = config?.aiDifficulty ?? ((params.get("ai") ?? "medium") as "easy" | "medium" | "hard" | "off");
-  const aiService = aiChoice === "off" || params.get("ai") === "off" ? null : createAiService(1, aiChoice as "easy" | "medium" | "hard", seed);
+  const aiChoice = config?.aiDifficulty ?? ((params.get("ai") ?? "medium") as "easiest" | "easy" | "medium" | "hard" | "titan" | "off");
+  const aiService = aiChoice === "off" || params.get("ai") === "off" ? null : createAiService(1, aiChoice as "easiest" | "easy" | "medium" | "hard" | "titan", seed);
   const hud = createHud(hudRoot);
   const agePanel = createAgePanel((tech, minorGod) => {
     queue.enqueue(sim.tick + 1, { type: "research", playerId: 0, tech, minorGod });
@@ -186,9 +186,15 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     const { Position, Velocity, Owner, UnitRef, MoveState, GatherTask, Building, ResourceNode } = sim.stores;
     unitView.length = 0;
     for (const eid of query(sim.world, [Position, UnitRef])) {
+      if (sim.garrisonOf.has(eid)) continue; // inside a building
       const phase = GatherTask.phase[eid] ?? 0;
+      const CombatState = sim.stores.CombatState;
+      const fighting =
+        hasComponent(sim.world, eid, CombatState) &&
+        CombatState.targetEid[eid]! >= 0 &&
+        MoveState.active[eid] !== 1;
       const anim: UnitAnimState =
-        phase === 2 || phase === 4 || phase === 5 ? "work" : MoveState.active[eid] === 1 ? "walk" : "idle";
+        fighting || phase === 2 || phase === 4 || phase === 5 || phase === 6 ? "work" : MoveState.active[eid] === 1 ? "walk" : "idle";
       const stats = sim.unitStats(eid);
       unitView.push({
         eid,
@@ -244,6 +250,8 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     isBuildingMesh: (m) => objects.isBuildingMesh(m),
     buildingOwner: (eid) => sim.stores.Owner.playerId[eid] ?? -1,
     buildingActive: (eid) => sim.stores.Building.active[eid] === 1,
+    garrisonCapacity: (eid) => getBuildingStatsByIndex(sim.stores.Building.typeIndex[eid]!).garrisonCapacity,
+    unitTypeOf: (eid) => (sim.stores.UnitRef.typeIndex[eid] !== undefined ? sim.unitStats(eid).id : null),
     farmFoodNode: (eid) => {
       const { Position, ResourceNode, Building } = sim.stores;
       const stats = getBuildingStatsByIndex(Building.typeIndex[eid]!);
@@ -297,6 +305,10 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     onStance: (stance) => {
       audio.uiClick();
       queue.enqueue(sim.tick + 1, { type: "stance", playerId: 0, eids: Array.from(selection.selected), stance });
+    },
+    onUngarrison: (buildingEid) => {
+      audio.uiClick();
+      queue.enqueue(sim.tick + 1, { type: "ungarrison", playerId: 0, buildingEid });
     },
     onDeselect: () => {
       audio.uiClick();
@@ -407,7 +419,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
           maxHp: Math.ceil(sim.unitStats(u.eid).hp100 / 100),
         }));
       const selB = selection.selectedBuilding();
-      commandCard.refresh(sim, 0, selUnits, selB !== null ? { eid: selB, buildingId: sim.buildingIdOf(selB) } : null, selB !== null ? sim.trainQueues.get(selB) ?? null : null);
+      commandCard.refresh(sim, 0, selUnits, selB !== null ? { eid: selB, buildingId: sim.buildingIdOf(selB) } : null, selB !== null ? sim.trainQueues.get(selB) ?? null : null, selB !== null ? (sim.garrisons.get(selB) ?? []).length : 0);
       refreshPowerBar();
       updateIdleBtn();
     }

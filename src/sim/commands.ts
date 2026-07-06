@@ -22,7 +22,10 @@ export type Command =
   | { type: "stance"; playerId: number; eids: number[]; stance: number }
   | { type: "repair"; playerId: number; eids: number[]; buildingEid: number }
   | { type: "trade_route"; playerId: number; eids: number[]; buildingEid: number }
-  | { type: "cancel_train"; playerId: number; buildingEid: number; index: number };
+  | { type: "cancel_train"; playerId: number; buildingEid: number; index: number }
+  | { type: "garrison"; playerId: number; eids: number[]; buildingEid: number }
+  | { type: "ungarrison"; playerId: number; buildingEid: number }
+  | { type: "patrol"; playerId: number; eids: number[]; x: number; y: number };
 
 interface Pending {
   tick: number;

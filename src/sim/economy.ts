@@ -21,10 +21,10 @@ export const CARRY_CAPACITY_MILLI = 10_000;
 const GATHER_REACH_FP = 1700;
 const PRAY_REACH_FP = 3000;
 
-export type ResourceKind = "food" | "wood" | "gold" | "game";
-const RES_INDEX: Record<ResourceKind, number> = { food: 0, wood: 1, gold: 2, game: 3 };
+export type ResourceKind = "food" | "wood" | "gold" | "game" | "relic";
+const RES_INDEX: Record<ResourceKind, number> = { food: 0, wood: 1, gold: 2, game: 3, relic: 4 };
 // index 3 (wild game) banks as food and drops off at food depots
-const RES_BY_INDEX: ResourceKind[] = ["food", "wood", "gold", "food"];
+const RES_BY_INDEX: ResourceKind[] = ["food", "wood", "gold", "food", "relic"];
 
 export interface PlayerState {
   foodMilli: number;
@@ -43,6 +43,8 @@ export interface PlayerState {
   researchQueue: ResearchEntry[];
   castCounts: Record<string, number>;
   powerReadyTick: Record<string, number>;
+  relicsStored: number;
+  tradeDriftPermille: number;
 }
 
 export interface TrainEntry {
@@ -69,6 +71,8 @@ export function createPlayers(count: number): PlayerState[] {
     researchQueue: [],
     castCounts: {},
     powerReadyTick: {},
+    relicsStored: 0,
+    tradeDriftPermille: 0,
   }));
 }
 
@@ -272,6 +276,12 @@ export function setupSkirmish(sim: Sim): void {
     place("game", 14, 12, 4, 400_000, 2);
     place("game", -14, -12, 3, 400_000, 3);
   }
+  // relics: contested ground between the bases
+  const mid = Math.trunc(sim.navGrid.size / 2);
+  for (const [rx, ry] of [[mid, mid - 20], [mid, mid + 20], [mid - 12, mid], [mid + 12, mid]] as const) {
+    const t = nearestPassableTile(sim, rx, ry);
+    spawnResourceNode(sim, "relic", t.x, t.y, 1);
+  }
 }
 
 /* ───────────────────────── command handlers ───────────────────────── */
@@ -281,6 +291,7 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
   switch (cmd.type) {
     case "gather": {
       if (!hasComponent(sim.world, cmd.nodeEid, ResourceNode)) return true;
+      if (ResourceNode.resType[cmd.nodeEid] === RES_INDEX.relic) return true;
       const sorted = [...cmd.eids].sort((a, b) => a - b);
       for (const eid of sorted) {
         if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, UnitRef)) continue;
@@ -373,7 +384,10 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
       const amount = Math.min(cmd.amountMilli, stockGet(p, sell));
       if (amount <= 0) return true;
       stockAdd(p, sell, -amount);
-      stockAdd(p, buy, Math.trunc((amount * (100 - spread)) / 100));
+      // supply pressure: heavy trading worsens the rate; it decays over time
+      const drift = Math.min(500, p.tradeDriftPermille);
+      stockAdd(p, buy, Math.trunc((Math.trunc((amount * (100 - spread)) / 100) * (1000 - drift)) / 1000));
+      p.tradeDriftPermille = Math.min(900, p.tradeDriftPermille + Math.max(10, Math.trunc(amount / 4000)));
       return true;
     }
     case "repair": {
@@ -467,6 +481,7 @@ export function economySystem(sim: Sim): void {
   const prayingByPlayer = new Map<number, number>();
 
   for (const eid of workers) {
+    if (sim.garrisonOf.has(eid)) continue; // sheltered — tasks pause inside
     const phase = GatherTask.phase[eid]!;
     if (phase === 0) continue;
     const px = Position.x[eid]!;
@@ -625,6 +640,40 @@ export function economySystem(sim: Sim): void {
     }
   }
 
+  // trade drift decays back toward par
+  if (sim.tick % 6 === 0) {
+    for (const p of sim.players) p.tradeDriftPermille = Math.max(0, p.tradeDriftPermille - 1);
+  }
+
+  // relics: heroes scoop them up in passing and bank them at temples
+  {
+    const heroes = Array.from(query(sim.world, [sim.stores.UnitRef]))
+      .filter((e) => sim.unitStats(e).unitClass === "hero" && !sim.garrisonOf.has(e))
+      .sort((a, b) => a - b);
+    for (const h of heroes) {
+      const held = sim.relicHolder.get(h) ?? 0;
+      if (held === 0) {
+        for (const n of Array.from(query(sim.world, [ResourceNode])).sort((a, b) => a - b)) {
+          if (ResourceNode.resType[n] !== RES_INDEX.relic || ResourceNode.amountMilli[n]! <= 0) continue;
+          if (dist(Position.x[h]!, Position.y[h]!, Position.x[n]!, Position.y[n]!) <= 1600) {
+            ResourceNode.amountMilli[n] = 0;
+            sim.relicHolder.set(h, 1);
+            break;
+          }
+        }
+      } else {
+        const temples = buildingsOf(sim, Owner.playerId[h]!, (s) => s.id === "temple" || s.id === "sky_temple");
+        for (const t of temples) {
+          if (dist(Position.x[h]!, Position.y[h]!, Position.x[t]!, Position.y[t]!) <= buildingReach(getBuildingStatsByIndex(Building.typeIndex[t]!).size)) {
+            getPlayer(sim, Owner.playerId[h]!).relicsStored += held;
+            sim.relicHolder.delete(h);
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // favor income — all four pantheon mechanics, data-calibrated
   favorSystem(sim, prayingByPlayer);
 
@@ -741,6 +790,8 @@ export function hashEconomy(sim: Sim, c: Checksum): void {
     c.addI32(p.woodMilli);
     c.addI32(p.goldMilli);
     c.addI32(p.favorMilli);
+    c.addI32(p.relicsStored);
+    c.addI32(p.tradeDriftPermille);
     c.addI32(p.favorMicroAccum);
     c.addI32(p.popCap);
     c.addI32(p.popUsed);

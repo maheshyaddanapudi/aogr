@@ -22,6 +22,7 @@ interface RawUnit {
   multipliers?: Record<string, number>;
   flying?: boolean;
   tradeGoldPerTile?: number;
+  specialCombat?: { splashRadius?: number; splashPercent?: number; regenPerSec?: number; lifestealPercent?: number };
   gatherRates?: {
     huntFoodPerSec?: number;
     forageFoodPerSec?: number;
@@ -63,6 +64,7 @@ export interface UnitStats {
   gatherMicroPerSec: [number, number, number, number] | null;
   /** caravans: gold (milli) earned per tile of one-way route distance */
   tradeGoldMilliPerTile: number;
+  special: { splashRadiusFp: number; splashPermille: number; regenPer15T100: number; lifestealPermille: number } | null;
 }
 
 const RADIUS_BY_CLASS: Record<string, number> = {
@@ -133,6 +135,14 @@ function load(): Map<string, UnitStats> {
           ]
         : null,
       tradeGoldMilliPerTile: Math.round((raw.tradeGoldPerTile ?? 0) * 1000),
+      special: raw.specialCombat
+        ? {
+            splashRadiusFp: Math.round((raw.specialCombat.splashRadius ?? 0) * 1000),
+            splashPermille: Math.round((raw.specialCombat.splashPercent ?? 0) * 10),
+            regenPer15T100: Math.round((raw.specialCombat.regenPerSec ?? 0) * 100),
+            lifestealPermille: Math.round((raw.specialCombat.lifestealPercent ?? 0) * 10),
+          }
+        : null,
     });
   }
   return cache;

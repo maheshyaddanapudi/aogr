@@ -16,7 +16,7 @@ import { getPower, nextCastCostMilli } from "../sim/powers";
 import { getUnitStats } from "../sim/unitdata";
 import { getBuildingStats } from "../sim/buildingdata";
 
-export type AiDifficulty = "easy" | "medium" | "hard";
+export type AiDifficulty = "easiest" | "easy" | "medium" | "hard" | "titan";
 
 interface Knobs {
   decisionIntervalTicks: number;

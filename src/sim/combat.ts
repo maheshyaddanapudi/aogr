@@ -11,7 +11,7 @@ import { isqrt } from "./fixed";
 import { getBuildingStatsByIndex } from "./buildingdata";
 import type { UnitStats } from "./unitdata";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
-import { type Sim } from "./sim";
+import { releaseGarrison, type Sim } from "./sim";
 // eslint-disable-next-line import/no-cycle -- runtime-safe
 import { applyModifiers, effectiveArmor } from "./research";
 // eslint-disable-next-line import/no-cycle -- runtime-safe
@@ -114,6 +114,7 @@ function reachFp(sim: Sim, attacker: number, target: number): number {
 
 export function targetAliveAndValid(sim: Sim, target: number): boolean {
   if (target < 0 || !entityExists(sim.world, target)) return false;
+  if (sim.garrisonOf.has(target)) return false; // sheltered inside a building
   const { Health } = sim.stores;
   return hasComponent(sim.world, target, Health) && Health.hp100[target]! > 0;
 }
@@ -129,7 +130,7 @@ function acquireTarget(sim: Sim, eid: number): number {
   let bestD = Number.MAX_SAFE_INTEGER;
   // nearest enemy unit first; buildings only if no unit found
   for (const other of query(sim.world, [UnitRef, Health])) {
-    if (Owner.playerId[other] === me || Health.hp100[other]! <= 0) continue;
+    if (Owner.playerId[other] === me || Health.hp100[other]! <= 0 || sim.garrisonOf.has(other)) continue;
     const dx = Position.x[other]! - px;
     const dy = Position.y[other]! - py;
     const d2 = dx * dx + dy * dy;
@@ -163,7 +164,7 @@ export function combatSystem(sim: Sim): void {
   const fighters = Array.from(query(sim.world, [CombatState])).sort((a, b) => a - b);
 
   for (const eid of fighters) {
-    if (Health.hp100[eid]! <= 0) continue;
+    if (Health.hp100[eid]! <= 0 || sim.garrisonOf.has(eid)) continue;
     if (CombatState.cooldown[eid]! > 0) CombatState.cooldown[eid] = CombatState.cooldown[eid]! - 1;
     if (CombatState.aggressive[eid] === 0) continue; // 1 aggressive, 2 hold-ground
 
@@ -186,6 +187,25 @@ export function combatSystem(sim: Sim): void {
         const dmg = computeDamage100(sim, eid, target);
         Health.hp100[target] = Health.hp100[target]! - dmg;
         creditCombatFavor(sim, sim.stores.Owner.playerId[eid]!, dmg);
+        const special = stats.special;
+        if (special) {
+          if (special.lifestealPermille > 0) {
+            Health.hp100[eid] = Math.min(stats.hp100, Health.hp100[eid]! + Math.trunc((dmg * special.lifestealPermille) / 1000));
+          }
+          if (special.splashRadiusFp > 0) {
+            const { Owner: Own, UnitRef: UR, Position: Pos } = sim.stores;
+            const me = Own.playerId[eid]!;
+            const splash = Math.trunc((dmg * special.splashPermille) / 1000);
+            for (const other of Array.from(query(sim.world, [UR, Health])).sort((a, b) => a - b)) {
+              if (other === target || Own.playerId[other] === me || Health.hp100[other]! <= 0 || sim.garrisonOf.has(other)) continue;
+              const sdx = Pos.x[other]! - Pos.x[target]!;
+              const sdy = Pos.y[other]! - Pos.y[target]!;
+              if (sdx * sdx + sdy * sdy <= special.splashRadiusFp * special.splashRadiusFp) {
+                Health.hp100[other] = Health.hp100[other]! - splash;
+              }
+            }
+          }
+        }
         sim.events.fired.push({
           from: eid,
           to: target,
@@ -215,7 +235,7 @@ export function combatSystem(sim: Sim): void {
       let best = -1;
       let bestD = Number.MAX_SAFE_INTEGER;
       for (const u of query(sim.world, [UnitRef, Health])) {
-        if (Owner.playerId[u] === me || Health.hp100[u]! <= 0) continue;
+        if (Owner.playerId[u] === me || Health.hp100[u]! <= 0 || sim.garrisonOf.has(u)) continue;
         const dx = Position.x[u]! - Position.x[b]!;
         const dy = Position.y[u]! - Position.y[b]!;
         const d2 = dx * dx + dy * dy;
@@ -224,17 +244,25 @@ export function combatSystem(sim: Sim): void {
       if (best < 0 || bestD > atk.rangeFp * atk.rangeFp) continue;
       const armor = sim.unitStats(best).armor;
       const reduce = atk.type === "pierce" ? armor.pierce : atk.type === "crush" ? armor.crush : armor.hack;
-      const dmg = Math.max(100, Math.trunc((atk.damage100 * (100 - reduce)) / 100));
+      // every garrisoned occupant adds arrows (+15% damage each)
+      const occupants = (sim.garrisons.get(b) ?? []).length;
+      const dmg = Math.max(100, Math.trunc((Math.trunc((atk.damage100 * (100 + 15 * occupants)) / 100) * (100 - reduce)) / 100));
       Health.hp100[best] = Health.hp100[best]! - dmg;
       sim.events.fired.push({ from: b, to: best, fromX: Position.x[b]!, fromY: Position.y[b]!, toX: Position.x[best]!, toY: Position.y[best]!, ranged: true });
       sim.events.hits.push({ x: Position.x[best]!, y: Position.y[best]! });
     }
   }
 
-  // hero heal aura: every second, heroes mend nearby wounded allies
+  // hero heal aura + myth regeneration: every second
   if (sim.tick % 15 === 0) {
     const { Position, Owner, UnitRef } = sim.stores;
     const all = Array.from(query(sim.world, [UnitRef, Health])).sort((a, b) => a - b);
+    for (const u of all) {
+      const sp = sim.unitStats(u).special;
+      if (sp && sp.regenPer15T100 > 0 && Health.hp100[u]! > 0) {
+        Health.hp100[u] = Math.min(sim.unitStats(u).hp100, Health.hp100[u]! + sp.regenPer15T100);
+      }
+    }
     for (const h of all) {
       if (Health.hp100[h]! <= 0 || sim.unitStats(h).unitClass !== "hero") continue;
       for (const u of all) {
@@ -256,6 +284,17 @@ export function combatSystem(sim: Sim): void {
   }
   dead.sort((a, b) => a - b);
   for (const eid of dead) {
+    // razed building: occupants step out before the walls come down
+    if (sim.garrisons.has(eid)) releaseGarrison(sim, eid);
+    // dead unit: drop out of any garrison bookkeeping + patrols + relics
+    const home = sim.garrisonOf.get(eid);
+    if (home !== undefined) {
+      sim.garrisonOf.delete(eid);
+      sim.garrisons.set(home, (sim.garrisons.get(home) ?? []).filter((m) => m !== eid));
+    }
+    sim.garrisonIntent.delete(eid);
+    sim.patrols.delete(eid);
+    sim.relicHolder.delete(eid);
     killEntity(sim, eid);
   }
 }

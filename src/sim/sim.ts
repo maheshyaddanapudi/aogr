@@ -3,7 +3,7 @@
  * bitECS world with per-sim component stores (so multiple sims — replays,
  * determinism tests, future lockstep verification — never share memory).
  */
-import { addComponent, addEntity, createWorld, hasComponent, query } from "bitecs";
+import { entityExists, addComponent, addEntity, createWorld, hasComponent, query } from "bitecs";
 import { Checksum } from "./checksum";
 import type { Command } from "./commands";
 import { fpFromInt, isqrt } from "./fixed";
@@ -148,6 +148,16 @@ export interface Sim {
   readonly flowFields: Map<number, FlowField>;
   readonly players: PlayerState[];
   readonly trainQueues: Map<number, TrainEntry[]>;
+  /** building eid → garrisoned unit eids (sorted ascending) */
+  readonly garrisons: Map<number, number[]>;
+  /** unit eid → building eid it is walking toward to garrison */
+  readonly garrisonIntent: Map<number, number>;
+  /** derived inverse of garrisons (unit eid → building eid); never serialized */
+  readonly garrisonOf: Map<number, number>;
+  /** unit eid → patrol legs (fp coords) + current leg */
+  readonly patrols: Map<number, { ax: number; ay: number; bx: number; by: number; leg: number }>;
+  /** hero eid → relics carried */
+  readonly relicHolder: Map<number, number>;
   readonly matchOptions: MatchOptions;
   /** transient per-tick outputs for the render layer; never hashed/serialized */
   events: SimEvents;
@@ -192,6 +202,11 @@ export function createSim(
     flowFields: new Map(),
     players: createPlayers(matchOptions.players),
     trainQueues: new Map(),
+    garrisons: new Map(),
+    garrisonIntent: new Map(),
+    garrisonOf: new Map(),
+    patrols: new Map(),
+    relicHolder: new Map(),
     matchOptions,
     events: emptyEvents(),
     activeEffects: [],
@@ -307,6 +322,7 @@ export function spawnUnitEntity(sim: Sim, playerId: number, unitId: string, x: n
 }
 
 function applyCommand(sim: Sim, cmd: Command): void {
+  if (handleGarrisonCommand(sim, cmd)) return;
   if (handleResearchCommand(sim, cmd)) return;
   if (handlePowerCommand(sim, cmd)) return;
   if (handleCombatCommand(sim, cmd)) return;
@@ -335,13 +351,29 @@ function applyCommand(sim: Sim, cmd: Command): void {
       const targetX = tile.x * 1000 + 500;
       const targetY = tile.y * 1000 + 500;
       const sorted = [...cmd.eids].sort((a, b) => a - b);
+      // formation: spread the group into a square grid around the target
+      const w = Math.ceil(Math.sqrt(sorted.length));
+      let slot = 0;
       for (const eid of sorted) {
         if (Owner.playerId[eid] !== cmd.playerId) continue;
         if (!hasComponent(sim.world, eid, UnitRef)) continue;
+        // grid slot for this unit (single units keep the exact target)
+        let ux = targetX;
+        let uy = targetY;
+        let ukey = key;
+        if (sorted.length > 1) {
+          const dx = (slot % w) - Math.trunc((w - 1) / 2);
+          const dy = Math.trunc(slot / w) - Math.trunc((w - 1) / 2);
+          const t = nearestPassableTile(sim, tile.x + dx, tile.y + dy);
+          ux = t.x * 1000 + 500;
+          uy = t.y * 1000 + 500;
+          ukey = tileKey(sim, t.x, t.y);
+        }
+        slot++;
         MoveState.active[eid] = 1;
-        MoveState.targetX[eid] = targetX;
-        MoveState.targetY[eid] = targetY;
-        MoveState.fieldKey[eid] = key;
+        MoveState.targetX[eid] = ux;
+        MoveState.targetY[eid] = uy;
+        MoveState.fieldKey[eid] = ukey;
         MoveState.stallTicks[eid] = 0;
       }
       return;
@@ -554,9 +586,120 @@ function unitMovementSystem(sim: Sim): void {
 }
 
 /** Advance exactly one tick. Commands must already be deterministically ordered. */
+function handleGarrisonCommand(sim: Sim, cmd: Command): boolean {
+  const { Owner, UnitRef, Building, Position, MoveState } = sim.stores;
+  if (cmd.type === "garrison") {
+    const beid = cmd.buildingEid;
+    if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
+    if (Building.active[beid] !== 1) return true;
+    const cap = getBuildingStatsByIndex(Building.typeIndex[beid]!).garrisonCapacity;
+    if (cap <= 0) return true;
+    for (const eid of [...cmd.eids].sort((a, b) => a - b)) {
+      if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, UnitRef)) continue;
+      if (sim.garrisonOf.has(eid)) continue;
+      sim.garrisonIntent.set(eid, beid);
+      setMoveTarget(sim, eid, Position.x[beid]!, Position.y[beid]!);
+    }
+    return true;
+  }
+  if (cmd.type === "ungarrison") {
+    const beid = cmd.buildingEid;
+    if (!hasComponent(sim.world, beid, Building) || Owner.playerId[beid] !== cmd.playerId) return true;
+    releaseGarrison(sim, beid);
+    return true;
+  }
+  if (cmd.type === "patrol") {
+    for (const eid of [...cmd.eids].sort((a, b) => a - b)) {
+      if (Owner.playerId[eid] !== cmd.playerId || !hasComponent(sim.world, eid, UnitRef)) continue;
+      if (sim.garrisonOf.has(eid)) continue;
+      sim.patrols.set(eid, { ax: Position.x[eid]!, ay: Position.y[eid]!, bx: cmd.x | 0, by: cmd.y | 0, leg: 1 });
+      setMoveTarget(sim, eid, cmd.x, cmd.y);
+    }
+    return true;
+  }
+  void MoveState;
+  return false;
+}
+
+export function releaseGarrison(sim: Sim, beid: number): void {
+  const { Position } = sim.stores;
+  const members = sim.garrisons.get(beid) ?? [];
+  const bx = Math.trunc(Position.x[beid]! / 1000);
+  const by = Math.trunc(Position.y[beid]! / 1000);
+  for (const eid of members) {
+    if (!entityExists(sim.world, eid)) continue;
+    const t = nearestPassableTile(sim, bx, by);
+    Position.x[eid] = t.x * 1000 + 500;
+    Position.y[eid] = t.y * 1000 + 500;
+    sim.garrisonOf.delete(eid);
+  }
+  sim.garrisons.delete(beid);
+}
+
+/** Walk-in absorption: intents become garrison membership on arrival. */
+function garrisonSystem(sim: Sim): void {
+  const { Position, Building, MoveState } = sim.stores;
+  const intents = Array.from(sim.garrisonIntent.keys()).sort((a, b) => a - b);
+  for (const eid of intents) {
+    const beid = sim.garrisonIntent.get(eid)!;
+    if (!entityExists(sim.world, eid) || !hasComponent(sim.world, beid, Building) || Building.active[beid] !== 1) {
+      sim.garrisonIntent.delete(eid);
+      continue;
+    }
+    const cap = getBuildingStatsByIndex(Building.typeIndex[beid]!).garrisonCapacity;
+    const members = sim.garrisons.get(beid) ?? [];
+    if (members.length >= cap) {
+      sim.garrisonIntent.delete(eid);
+      continue;
+    }
+    const size = getBuildingStatsByIndex(Building.typeIndex[beid]!).size;
+    const dx = Position.x[eid]! - Position.x[beid]!;
+    const dy = Position.y[eid]! - Position.y[beid]!;
+    if (dx * dx + dy * dy <= (size * 800 + 1200) ** 2) {
+      sim.garrisonIntent.delete(eid);
+      members.push(eid);
+      members.sort((a, b) => a - b);
+      sim.garrisons.set(beid, members);
+      sim.garrisonOf.set(eid, beid);
+      Position.x[eid] = Position.x[beid]!;
+      Position.y[eid] = Position.y[beid]!;
+      MoveState.active[eid] = 0;
+    }
+  }
+}
+
+/** Patrol: arrived units turn around and walk the other leg. */
+function patrolSystem(sim: Sim): void {
+  const { MoveState, CombatState } = sim.stores;
+  const ids = Array.from(sim.patrols.keys()).sort((a, b) => a - b);
+  for (const eid of ids) {
+    if (!entityExists(sim.world, eid)) {
+      sim.patrols.delete(eid);
+      continue;
+    }
+    // fighting pauses the patrol; it resumes when the target is gone
+    if (hasComponent(sim.world, eid, CombatState) && targetAliveAndValid(sim, CombatState.targetEid[eid]!)) continue;
+    if (MoveState.active[eid] === 1) continue;
+    const p = sim.patrols.get(eid)!;
+    p.leg = p.leg === 1 ? 0 : 1;
+    setMoveTarget(sim, eid, p.leg === 1 ? p.bx : p.ax, p.leg === 1 ? p.by : p.ay);
+  }
+}
+
 export function stepSim(sim: Sim, commands: readonly Command[]): void {
   sim.events = emptyEvents();
-  for (const cmd of commands) applyCommand(sim, cmd);
+  for (const cmd of commands) {
+    // a fresh order supersedes an existing patrol/garrison-walk
+    if (cmd.type !== "patrol" && "eids" in cmd) {
+      for (const eid of cmd.eids) {
+        sim.patrols.delete(eid);
+        sim.garrisonIntent.delete(eid);
+      }
+    }
+    applyCommand(sim, cmd);
+  }
+  garrisonSystem(sim);
+  patrolSystem(sim);
   combatSystem(sim);
   powerSystem(sim);
   researchSystem(sim);
@@ -596,6 +739,21 @@ export function simChecksum(sim: Sim): number {
     }
   }
   hashEconomy(sim, c);
+  {
+    // garrison/patrol/relic lanes — hash contents in ascending-eid iteration
+    // order WITHOUT hashing entity ids (charter rule)
+    const gKeys = Array.from(sim.garrisons.keys()).sort((a, b) => a - b);
+    c.addI32(gKeys.length);
+    for (const k of gKeys) c.addI32((sim.garrisons.get(k) ?? []).length);
+    c.addI32(sim.garrisonIntent.size);
+    const pKeys = Array.from(sim.patrols.keys()).sort((a, b) => a - b);
+    c.addI32(pKeys.length);
+    for (const k of pKeys) {
+      const p = sim.patrols.get(k)!;
+      c.addI32(p.ax); c.addI32(p.ay); c.addI32(p.bx); c.addI32(p.by); c.addI32(p.leg);
+    }
+    c.addI32(sim.relicHolder.size);
+  }
   hashCombat(sim, c);
   hashResearch(sim, c);
   hashPowers(sim, c);
@@ -641,6 +799,10 @@ interface SimSnapshot {
   matchOptions: MatchOptions;
   players: PlayerState[];
   trainQueues: Array<[number, TrainEntry[]]>;
+  garrisons?: Array<[number, number[]]>;
+  garrisonIntent?: Array<[number, number]>;
+  patrols?: Array<[number, { ax: number; ay: number; bx: number; by: number; leg: number }]>;
+  relicHolder?: Array<[number, number]>;
   activeEffects: ActiveEffect[];
   winner: number;
   wonderTicksLeft: number[];
@@ -668,6 +830,10 @@ export function serializeSim(sim: Sim): string {
     terrainConfig: sim.terrain.config,
     matchOptions: { ...sim.matchOptions, skirmish: false }, // content is in the snapshot
     players: sim.players.map((p) => ({ ...p })),
+    garrisons: Array.from(sim.garrisons.entries()),
+    garrisonIntent: Array.from(sim.garrisonIntent.entries()),
+    patrols: Array.from(sim.patrols.entries()).map(([k, v]) => [k, { ...v }]),
+    relicHolder: Array.from(sim.relicHolder.entries()),
     trainQueues: Array.from(sim.trainQueues.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([k, v]) => [k, v.map((e) => ({ ...e }))]),
@@ -742,7 +908,7 @@ export function deserializeSim(json: string): Sim {
   const remap = new Map<number, number>();
   for (const e of snapshot.entities) {
     if (e.node) {
-      const eid = spawnResourceNode(sim, (["food", "wood", "gold", "game"] as const)[e.node.resType]!, 0, 0, e.node.amountMilli);
+      const eid = spawnResourceNode(sim, (["food", "wood", "gold", "game", "relic"] as const)[e.node.resType]!, 0, 0, e.node.amountMilli);
       Position.x[eid] = e.x;
       Position.y[eid] = e.y;
       sim.stores.ResourceNode.resType[eid] = e.node.resType;
@@ -796,9 +962,22 @@ export function deserializeSim(json: string): Sim {
     GatherTask.carryMicro[eid] = e.gather.carryMicro;
   }
   sim.players.length = 0;
-  for (const p of snapshot.players) sim.players.push({ ...p, townCenterEid: r(p.townCenterEid) });
+  for (const p of snapshot.players) sim.players.push({ ...p, relicsStored: p.relicsStored ?? 0, tradeDriftPermille: p.tradeDriftPermille ?? 0, townCenterEid: r(p.townCenterEid) });
   sim.trainQueues.clear();
   for (const [k, v] of snapshot.trainQueues) sim.trainQueues.set(r(k), v.map((t) => ({ ...t })));
+  sim.garrisons.clear();
+  sim.garrisonOf.clear();
+  for (const [k, v] of snapshot.garrisons ?? []) {
+    const members = v.map(r).sort((a, b) => a - b);
+    sim.garrisons.set(r(k), members);
+    for (const m of members) sim.garrisonOf.set(m, r(k));
+  }
+  sim.garrisonIntent.clear();
+  for (const [k, v] of snapshot.garrisonIntent ?? []) sim.garrisonIntent.set(r(k), r(v));
+  sim.patrols.clear();
+  for (const [k, v] of snapshot.patrols ?? []) sim.patrols.set(r(k), { ...v });
+  sim.relicHolder.clear();
+  for (const [k, v] of snapshot.relicHolder ?? []) sim.relicHolder.set(r(k), v);
   sim.winner = snapshot.winner ?? -1;
   sim.wonderTicksLeft.length = 0;
   for (const w of snapshot.wonderTicksLeft ?? sim.players.map(() => 0)) sim.wonderTicksLeft.push(w);

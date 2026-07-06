@@ -28,6 +28,24 @@
       "usePowers": true,
       "prayerVillagers": 3,
       "mythTarget": 3
+    },
+    "easiest": {
+      "decisionIntervalTicks": 120,
+      "villagerTarget": 14,
+      "armyTarget": 8,
+      "waveSize": 12,
+      "usePowers": false,
+      "prayerVillagers": 1,
+      "mythTarget": 0
+    },
+    "titan": {
+      "decisionIntervalTicks": 13,
+      "villagerTarget": 32,
+      "armyTarget": 20,
+      "waveSize": 8,
+      "usePowers": true,
+      "prayerVillagers": 3,
+      "mythTarget": 3
     }
   }
 }

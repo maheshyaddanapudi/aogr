@@ -60,3 +60,29 @@ export function getMinor(pantheonId: string, minorId: string): RawMinor {
 export function getMinorPool(pantheonId: string, majorId: string, age: "classical" | "heroic" | "mythic"): string[] {
   return [...getMajor(pantheonId, majorId).minorPool[age]];
 }
+
+
+/** Major-god passive bonuses as tech-effect-shaped modifiers (cached). */
+export interface MajorEffect { target: string; stat: string; op: "add" | "mul"; value1000: number }
+const majorFxCache = new Map<string, MajorEffect[]>();
+export function getMajorEffects(pantheonId: string, majorId: string): MajorEffect[] {
+  const key = `${pantheonId}/${majorId}`;
+  let fx = majorFxCache.get(key);
+  if (fx) return fx;
+  fx = [];
+  try {
+    const major = getPantheon(pantheonId).majors.find((m) => m.id === majorId) as unknown as {
+      bonuses?: Array<{ appliesTo: string[]; stat: string; multiplier?: number; add?: number }>;
+    };
+    for (const b of major?.bonuses ?? []) {
+      for (const t of b.appliesTo) {
+        if (b.multiplier !== undefined) fx.push({ target: t, stat: b.stat, op: "mul", value1000: Math.round(b.multiplier * 1000) });
+        if (b.add !== undefined) fx.push({ target: t, stat: b.stat, op: "add", value1000: b.add });
+      }
+    }
+  } catch {
+    /* unknown pantheon/major: no bonuses */
+  }
+  majorFxCache.set(key, fx);
+  return fx;
+}

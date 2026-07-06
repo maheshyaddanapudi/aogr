@@ -27,6 +27,9 @@ export interface SelectionDeps {
   buildingActive?: (eid: number) => boolean;
   /** the harvestable food node sitting on a farm, if the building is one */
   farmFoodNode?: (eid: number) => number | null;
+  garrisonCapacity?: (eid: number) => number;
+  /** unit id lookup for double-click select-all-of-type */
+  unitTypeOf?: (eid: number) => string | null;
   groundHeightAt: (x: number, z: number) => number;
   /** placement support */
   canPlace?: (buildingId: string, tileX: number, tileY: number) => boolean;
@@ -183,6 +186,10 @@ export function setupSelection(deps: SelectionDeps): Selection {
           queue.enqueue(deps.currentTick() + 1, { type: "gather", playerId: deps.localPlayerId, eids: Array.from(selected), nodeEid: farmNode });
           return;
         }
+        if ((deps.garrisonCapacity?.(buildingHit) ?? 0) > 0) {
+          queue.enqueue(deps.currentTick() + 1, { type: "garrison", playerId: deps.localPlayerId, eids: Array.from(selected), buildingEid: buildingHit });
+          return;
+        }
       }
       if ((unitHit !== null && enemyUnit) || (buildingHit !== null && enemyBuilding)) {
         queue.enqueue(deps.currentTick() + 1, {
@@ -260,6 +267,10 @@ export function setupSelection(deps: SelectionDeps): Selection {
         if (farmNode !== null) {
           // own farm → put the crew to work in the field
           queue.enqueue(deps.currentTick() + 1, { type: "gather", playerId: deps.localPlayerId, eids: Array.from(selected), nodeEid: farmNode });
+          return;
+        }
+        if (ownBuilding && (deps.garrisonCapacity?.(beid!) ?? 0) > 0) {
+          queue.enqueue(deps.currentTick() + 1, { type: "garrison", playerId: deps.localPlayerId, eids: Array.from(selected), buildingEid: beid! });
           return;
         }
         if (ownBuilding) {
@@ -369,6 +380,22 @@ export function setupSelection(deps: SelectionDeps): Selection {
         selected.clear();
         for (const eid of g) selected.add(eid);
       }
+    }
+  });
+
+  canvas.addEventListener("dblclick", (e) => {
+    const eid = pickUnitNear(e.clientX, e.clientY, 14);
+    if (eid === null) return;
+    const typeId = deps.unitTypeOf?.(eid);
+    if (!typeId) return;
+    selected.clear();
+    selectedBuilding = null;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    for (const u of deps.unitPositions()) {
+      if (u.playerId !== deps.localPlayerId || deps.unitTypeOf?.(u.eid) !== typeId) continue;
+      const sp = screenPos(u.x, deps.groundHeightAt(u.x, u.z) + 0.5, u.z);
+      if (sp.x >= 0 && sp.x <= w && sp.y >= 0 && sp.y <= h) selected.add(u.eid);
     }
   });
 

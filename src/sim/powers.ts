@@ -219,6 +219,15 @@ function addFavorMicro(p: ReturnType<typeof getPlayer>, micro: number): void {
 const TICKS_PER_MIN = TICK_RATE * 60;
 
 export function favorSystem(sim: Sim, prayingByPlayer: Map<number, number>): void {
+  // relics stored in temples trickle favor (2/min each)
+  for (const pl of sim.players) {
+    if (pl.relicsStored > 0) {
+      pl.favorMicroAccum += pl.relicsStored * 2222;
+      const gain = Math.trunc(pl.favorMicroAccum / 1000);
+      pl.favorMicroAccum -= gain * 1000;
+      pl.favorMilli += gain;
+    }
+  }
   const { Owner, Building, UnitRef, Velocity, Position } = sim.stores;
   for (let pid = 0; pid < sim.players.length; pid++) {
     const p = sim.players[pid]!;
