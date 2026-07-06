@@ -78,6 +78,8 @@ const BITE = /^Attack$|^Attack_Headbutt$|^Attack_Kick$/;
 const UNIT_MODELS: Record<string, ModelCfg> = {
   villager: cfg("villager.glb", 1.05, CHOP),
   scout: cfg("horse_white.gltf", 1.35, BITE, { animal: true }),
+  fishing_boat: cfg("PROC_BOAT", 1.0, BITE),
+  war_galley: cfg("PROC_BOAT", 1.6, BITE),
   caravan: cfg("donkey.gltf", 1.4, BITE, { animal: true }),
   infantry_base: cfg("knight.glb", 1.15, MELEE, {
     loadout: /^(Knight_(Arm|Body|Head|Leg|Helmet|Cape).*|1H_Sword|Round_Shield)$/,
@@ -213,6 +215,28 @@ export async function createUnitRenderer(scene: Scene, shadows: CascadedShadowGe
 
   const loadPools = async (poolKey: string, c: ModelCfg, team: number, pantheon: string): Promise<void> => {
     const result: Pool[] = [];
+    if (c.file === "PROC_BOAT") {
+      // no CC0 ship model in the pack: simple hull + sail, team-tinted
+      const hull = MeshBuilder.CreateBox(`${poolKey}_hull`, { width: 0.7, depth: 1.8, height: 0.35 }, scene);
+      const hullMat = new StandardMaterial(`${poolKey}_hullMat`, scene);
+      hullMat.diffuseColor = new Color3(0.42, 0.28, 0.15);
+      hull.material = hullMat;
+      hull.position.y = 0.18;
+      const mast = MeshBuilder.CreateCylinder(`${poolKey}_mast`, { height: 1.2, diameter: 0.07 }, scene);
+      mast.material = hullMat;
+      mast.position.y = 0.9;
+      const sail = MeshBuilder.CreateBox(`${poolKey}_sail`, { width: 0.62, depth: 0.05, height: 0.7 }, scene);
+      sail.material = solidMats[team]!;
+      sail.position.y = 0.95;
+      const meshes = [hull, mast, sail];
+      for (const m of meshes) {
+        m.isVisible = false;
+        shadows.addShadowCaster(m);
+      }
+      for (let i = 0; i < c.anims.length; i++) result.push({ meshes, scaling: new Vector3(c.height, c.height, c.height) });
+      pools.set(poolKey, result);
+      return;
+    }
     for (const animRe of c.anims) {
       const r = await queuedImport(() => SceneLoader.ImportMeshAsync("", `${import.meta.env.BASE_URL}models/`, c.file, scene));
       const root = r.meshes[0]!;

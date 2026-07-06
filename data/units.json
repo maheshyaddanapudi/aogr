@@ -30,6 +30,15 @@
       "multipliers": {},
       "trainedAt": "market"
     },
+    "war_galley": {
+      "name": "War Galley", "class": "ship", "pantheon": "all", "age": "classical",
+      "hp": 180, "speed": 4.6, "los": 16, "pop": 3, "trainTime": 24,
+      "cost": { "food": 0, "wood": 120, "gold": 60, "favor": 0 },
+      "armor": { "hack": 15, "pierce": 20, "crush": 99 },
+      "attack": { "type": "pierce", "damage": 9, "range": 14, "cooldown": 1.6 },
+      "multipliers": { "ship": 1.5 },
+      "trainedAt": "dock"
+    },
     "fishing_boat": {
       "name": "Fishing Boat", "class": "ship", "pantheon": "all", "age": "archaic",
       "hp": 120, "speed": 5.0, "los": 14, "pop": 1, "trainTime": 16,
@@ -312,7 +321,7 @@
       "trainedAt": "temple"
     },
     "stonegaze_naga": {
-      "specialCombat": { "lifestealPercent": 20 },
+      "specialCombat": { "lifestealPercent": 20, "stunSeconds": 2.0 },
       "name": "Stonegaze Naga", "class": "myth", "pantheon": "storm_concord", "age": "heroic",
       "hp": 240, "speed": 4.2, "los": 16, "pop": 4, "trainTime": 20,
       "cost": { "food": 0, "wood": 0, "gold": 190, "favor": 15 },

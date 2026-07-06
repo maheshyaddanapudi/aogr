@@ -12,7 +12,7 @@ import { computeFlowField, flowDistAt, UNREACHABLE } from "./path/flowfield";
 import { getBuildingStats, getBuildingStatsByIndex, type BuildingStats } from "./buildingdata";
 import { getUnitStats } from "./unitdata";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
-import { nearestPassableTile, setMoveTarget, spawnUnitEntity, type Sim } from "./sim";
+import { isWaterTile, nearestPassableTile, setMoveTarget, spawnUnitEntity, type Sim } from "./sim";
 // eslint-disable-next-line import/no-cycle -- runtime-safe
 import { AGE_INDEX, effectiveGatherMicroPerTick, effectiveTrainTicks, type ResearchEntry } from "./research";
 
@@ -21,10 +21,10 @@ export const CARRY_CAPACITY_MILLI = 10_000;
 const GATHER_REACH_FP = 1700;
 const PRAY_REACH_FP = 3000;
 
-export type ResourceKind = "food" | "wood" | "gold" | "game" | "relic";
-const RES_INDEX: Record<ResourceKind, number> = { food: 0, wood: 1, gold: 2, game: 3, relic: 4 };
+export type ResourceKind = "food" | "wood" | "gold" | "game" | "relic" | "herd" | "fish";
+const RES_INDEX: Record<ResourceKind, number> = { food: 0, wood: 1, gold: 2, game: 3, relic: 4, herd: 5, fish: 6 };
 // index 3 (wild game) banks as food and drops off at food depots
-const RES_BY_INDEX: ResourceKind[] = ["food", "wood", "gold", "food", "relic"];
+const RES_BY_INDEX: ResourceKind[] = ["food", "wood", "gold", "food", "relic", "food", "food"];
 
 export interface PlayerState {
   foodMilli: number;
@@ -276,6 +276,30 @@ export function setupSkirmish(sim: Sim): void {
     place("game", 14, 12, 4, 400_000, 2);
     place("game", -14, -12, 3, 400_000, 3);
   }
+  // herdables: fattening animals near each base
+  for (let pid = 0; pid < sim.players.length; pid++) {
+    const start = starts[pid] ?? starts[0]!;
+    for (let i = 0; i < 3; i++) {
+      const t = nearestPassableTile(sim, start.x + 16 + i, start.y - 14);
+      spawnResourceNode(sim, "herd", t.x, t.y, 60_000);
+    }
+  }
+  // fish schools: open-water tiles (all neighbors wet)
+  {
+    let placed = 0;
+    const g = sim.navGrid.size;
+    for (let y = 8; y < g - 8 && placed < 10; y += 7) {
+      for (let x = 8; x < g - 8 && placed < 10; x += 7) {
+        let wet = true;
+        for (let dy = -1; dy <= 1 && wet; dy++) for (let dx = -1; dx <= 1; dx++) if (!isWaterTile(sim, x + dx, y + dy)) { wet = false; break; }
+        if (wet) {
+          spawnResourceNode(sim, "fish", x, y, 800_000);
+          placed++;
+        }
+      }
+    }
+  }
+
   // relics: contested ground between the bases
   const mid = Math.trunc(sim.navGrid.size / 2);
   for (const [rx, ry] of [[mid, mid - 20], [mid, mid + 20], [mid - 12, mid], [mid + 12, mid]] as const) {
@@ -313,6 +337,23 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
       if (stats.buildLimit > 0) {
         const existing = buildingsOf(sim, cmd.playerId, (s) => s.id === stats.id, false).length;
         if (existing >= stats.buildLimit) return true;
+      }
+      // town centers only rise on neutral settlement sites (AoM rule)
+      if (stats.id === "town_center" && cmd.x >= 0) {
+        const tx = Math.trunc(cmd.x / 1000);
+        const ty = Math.trunc(cmd.y / 1000);
+        const near = sim.settlements.some((st) => Math.abs(st.x - tx) <= 4 && Math.abs(st.y - ty) <= 4);
+        if (!near) return true;
+      }
+      // docks must touch the coast
+      if (stats.id === "dock" && cmd.x >= 0) {
+        const tx = Math.trunc(cmd.x / 1000);
+        const ty = Math.trunc(cmd.y / 1000);
+        let coastal = false;
+        for (let dy = -2; dy <= stats.size + 1 && !coastal; dy++) for (let dx = -2; dx <= stats.size + 1; dx++) {
+          if (isWaterTile(sim, tx + dx, ty + dy)) { coastal = true; break; }
+        }
+        if (!coastal) return true;
       }
       // a site without builders would never rise — ignore crewless orders
       const builders = [...cmd.eids]
@@ -637,6 +678,15 @@ export function economySystem(sim: Sim): void {
         GatherTask.phase[eid] = 7; // back to the market
       }
       setMoveTarget(sim, eid, Position.x[phase === 7 ? tcEid : market]!, Position.y[phase === 7 ? tcEid : market]!);
+    }
+  }
+
+  // herdables fatten toward their cap (120 food)
+  if (sim.tick % 15 === 0) {
+    for (const n of Array.from(query(sim.world, [ResourceNode])).sort((a, b) => a - b)) {
+      if (ResourceNode.resType[n] === 5 && ResourceNode.amountMilli[n]! > 0 && ResourceNode.amountMilli[n]! < 120_000) {
+        ResourceNode.amountMilli[n] = Math.min(120_000, ResourceNode.amountMilli[n]! + 400);
+      }
     }
   }
 

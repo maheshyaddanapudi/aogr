@@ -138,6 +138,9 @@ const RES_STAT: Record<number, string> = {
 /** Effective gather rate in micro-res/tick: modifiers apply to the per-second rate. */
 export function effectiveGatherMicroPerTick(sim: Sim, eid: number, resType: number): number {
   const stats = sim.unitStats(eid);
+  // herd(5) harvests at the hunt rate; fish(6) at the ship's slot-0 fish rate
+  if (resType === 5) resType = 3;
+  else if (resType === 6) resType = 0;
   const perSec = stats.gatherMicroPerSec?.[resType] ?? 0;
   if (perSec === 0) return 0;
   const playerId = sim.stores.Owner.playerId[eid]!;

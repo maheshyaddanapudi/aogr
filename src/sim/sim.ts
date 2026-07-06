@@ -158,6 +158,10 @@ export interface Sim {
   readonly patrols: Map<number, { ax: number; ay: number; bx: number; by: number; leg: number }>;
   /** hero eid → relics carried */
   readonly relicHolder: Map<number, number>;
+  /** unit eid → tick until which it is petrified */
+  readonly stunnedUntil: Map<number, number>;
+  /** neutral settlement sites (tile coords) — town centers may only rise here */
+  settlements: Array<{ x: number; y: number }>;
   readonly matchOptions: MatchOptions;
   /** transient per-tick outputs for the render layer; never hashed/serialized */
   events: SimEvents;
@@ -207,6 +211,8 @@ export function createSim(
     garrisonOf: new Map(),
     patrols: new Map(),
     relicHolder: new Map(),
+    stunnedUntil: new Map(),
+    settlements: [],
     matchOptions,
     events: emptyEvents(),
     activeEffects: [],
@@ -228,10 +234,57 @@ export function createSim(
     },
   };
   if (matchOptions.skirmish) {
+    sim.settlements = computeSettlements(sim);
     setupSkirmish(sim);
     recomputePop(sim);
   }
   return sim;
+}
+
+/** Water test straight off the sim-owned terrain heights (vertex grid). */
+export function isWaterTile(sim: Sim, tx: number, ty: number): boolean {
+  const verts = sim.terrain.size + 1;
+  if (tx < 0 || ty < 0 || tx >= sim.terrain.size || ty >= sim.terrain.size) return false;
+  return sim.terrain.heights[ty * verts + tx]! < sim.terrain.waterLevelFp;
+}
+
+export function nearestWaterTile(sim: Sim, tx: number, ty: number): { x: number; y: number } | null {
+  if (isWaterTile(sim, tx, ty)) return { x: tx, y: ty };
+  for (let r = 1; r < sim.navGrid.size; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (isWaterTile(sim, tx + dx, ty + dy)) return { x: tx + dx, y: ty + dy };
+      }
+    }
+  }
+  return null;
+}
+
+/** Deterministic settlement sites: nearest TC-sized buildable ground to the
+ * center + two flank crossroads (spiral search over the raw terrain grid). */
+export function computeSettlements(sim: Sim): Array<{ x: number; y: number }> {
+  const mid = Math.trunc(sim.navGrid.size / 2);
+  const spots = [{ x: mid, y: mid }, { x: mid - 30, y: mid + 30 }, { x: mid + 30, y: mid - 30 }];
+  const fits = (cx: number, cy: number): boolean => {
+    for (let y = cy - 3; y <= cy + 3; y++) {
+      for (let x = cx - 3; x <= cx + 3; x++) {
+        if (!isPassable(sim.navGrid, x, y)) return false;
+      }
+    }
+    return true;
+  };
+  return spots.map((p) => {
+    for (let r = 0; r < 60; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          if (fits(p.x + dx, p.y + dy)) return { x: p.x + dx, y: p.y + dy };
+        }
+      }
+    }
+    return nearestPassableTile(sim, p.x, p.y);
+  });
 }
 
 /** Point a unit's MoveState at a world position (commands & economy use this). */
@@ -352,7 +405,7 @@ function applyCommand(sim: Sim, cmd: Command): void {
       const targetY = tile.y * 1000 + 500;
       const sorted = [...cmd.eids].sort((a, b) => a - b);
       // formation: spread the group into a square grid around the target
-      const w = Math.ceil(Math.sqrt(sorted.length));
+      const w = (cmd as { formation?: number }).formation === 1 ? sorted.length : Math.ceil(Math.sqrt(sorted.length));
       let slot = 0;
       for (const eid of sorted) {
         if (Owner.playerId[eid] !== cmd.playerId) continue;
@@ -437,6 +490,54 @@ function unitMovementSystem(sim: Sim): void {
   for (const eid of units) {
     let vx = 0;
     let vy = 0;
+    if ((sim.stunnedUntil.get(eid) ?? 0) > sim.tick) {
+      Velocity.x[eid] = 0;
+      Velocity.y[eid] = 0;
+      continue;
+    }
+    // naval: direct steering, clamped to water — no land flow fields at sea
+    if (getUnitStatsByIndex(UnitRef.typeIndex[eid]!).naval) {
+      const st = getUnitStatsByIndex(UnitRef.typeIndex[eid]!);
+      let tX = -1;
+      let tY = -1;
+      if (MoveState.active[eid] === 1) {
+        tX = MoveState.targetX[eid]!;
+        tY = MoveState.targetY[eid]!;
+      } else if (hasComponent(sim.world, eid, CombatState) && targetAliveAndValid(sim, CombatState.targetEid[eid]!)) {
+        const tgt = CombatState.targetEid[eid]!;
+        const dxT = Position.x[tgt]! - Position.x[eid]!;
+        const dyT = Position.y[tgt]! - Position.y[eid]!;
+        if (isqrt(dxT * dxT + dyT * dyT) > st.attack!.rangeFp) {
+          tX = Position.x[tgt]!;
+          tY = Position.y[tgt]!;
+        }
+      }
+      if (tX >= 0) {
+        const dx = tX - Position.x[eid]!;
+        const dy = tY - Position.y[eid]!;
+        const d = isqrt(dx * dx + dy * dy);
+        if (d <= 400) {
+          MoveState.active[eid] = 0;
+        } else {
+          const nx = Position.x[eid]! + Math.trunc((dx * st.speedFpPerTick) / (d || 1));
+          const ny = Position.y[eid]! + Math.trunc((dy * st.speedFpPerTick) / (d || 1));
+          if (isWaterTile(sim, Math.trunc(nx / 1000), Math.trunc(ny / 1000))) {
+            Position.x[eid] = nx;
+            Position.y[eid] = ny;
+            Velocity.x[eid] = Math.trunc((dx * st.speedFpPerTick) / (d || 1));
+            Velocity.y[eid] = Math.trunc((dy * st.speedFpPerTick) / (d || 1));
+          } else {
+            MoveState.active[eid] = 0;
+            Velocity.x[eid] = 0;
+            Velocity.y[eid] = 0;
+          }
+        }
+      } else {
+        Velocity.x[eid] = 0;
+        Velocity.y[eid] = 0;
+      }
+      continue;
+    }
     // combat chase: aggressive units with a live out-of-reach target steer directly
     let chasing = false;
     if (hasComponent(sim.world, eid, CombatState) && CombatState.aggressive[eid] === 1) {
@@ -753,6 +854,9 @@ export function simChecksum(sim: Sim): number {
       c.addI32(p.ax); c.addI32(p.ay); c.addI32(p.bx); c.addI32(p.by); c.addI32(p.leg);
     }
     c.addI32(sim.relicHolder.size);
+    const stKeys = Array.from(sim.stunnedUntil.keys()).sort((a, b) => a - b);
+    c.addI32(stKeys.length);
+    for (const k of stKeys) c.addI32(sim.stunnedUntil.get(k)!);
   }
   hashCombat(sim, c);
   hashResearch(sim, c);
@@ -803,6 +907,7 @@ interface SimSnapshot {
   garrisonIntent?: Array<[number, number]>;
   patrols?: Array<[number, { ax: number; ay: number; bx: number; by: number; leg: number }]>;
   relicHolder?: Array<[number, number]>;
+  stunnedUntil?: Array<[number, number]>;
   activeEffects: ActiveEffect[];
   winner: number;
   wonderTicksLeft: number[];
@@ -834,6 +939,7 @@ export function serializeSim(sim: Sim): string {
     garrisonIntent: Array.from(sim.garrisonIntent.entries()),
     patrols: Array.from(sim.patrols.entries()).map(([k, v]) => [k, { ...v }]),
     relicHolder: Array.from(sim.relicHolder.entries()),
+    stunnedUntil: Array.from(sim.stunnedUntil.entries()),
     trainQueues: Array.from(sim.trainQueues.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([k, v]) => [k, v.map((e) => ({ ...e }))]),
@@ -978,6 +1084,9 @@ export function deserializeSim(json: string): Sim {
   for (const [k, v] of snapshot.patrols ?? []) sim.patrols.set(r(k), { ...v });
   sim.relicHolder.clear();
   for (const [k, v] of snapshot.relicHolder ?? []) sim.relicHolder.set(r(k), v);
+  sim.stunnedUntil.clear();
+  for (const [k, v] of snapshot.stunnedUntil ?? []) sim.stunnedUntil.set(r(k), v);
+  sim.settlements = computeSettlements(sim);
   sim.winner = snapshot.winner ?? -1;
   sim.wonderTicksLeft.length = 0;
   for (const w of snapshot.wonderTicksLeft ?? sim.players.map(() => 0)) sim.wonderTicksLeft.push(w);

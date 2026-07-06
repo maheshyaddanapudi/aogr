@@ -8,7 +8,7 @@ export type Command =
   | { type: "noop"; playerId: number }
   | { type: "debug_spawn"; playerId: number; x: number; y: number }
   | { type: "spawn_unit"; playerId: number; unit: string; x: number; y: number }
-  | { type: "move"; playerId: number; eids: number[]; x: number; y: number }
+  | { type: "move"; playerId: number; eids: number[]; x: number; y: number; formation?: number }
   | { type: "gather"; playerId: number; eids: number[]; nodeEid: number }
   | { type: "build"; playerId: number; eids: number[]; building: string; x: number; y: number }
   | { type: "train"; playerId: number; buildingEid: number; unit: string }

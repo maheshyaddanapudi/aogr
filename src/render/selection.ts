@@ -30,6 +30,7 @@ export interface SelectionDeps {
   garrisonCapacity?: (eid: number) => number;
   /** unit id lookup for double-click select-all-of-type */
   unitTypeOf?: (eid: number) => string | null;
+  formation?: () => number;
   groundHeightAt: (x: number, z: number) => number;
   /** placement support */
   canPlace?: (buildingId: string, tileX: number, tileY: number) => boolean;
@@ -211,6 +212,7 @@ export function setupSelection(deps: SelectionDeps): Selection {
           eids: Array.from(selected),
           x,
           y,
+          formation: deps.formation?.() ?? 0,
         });
       }
     }
@@ -294,7 +296,7 @@ export function setupSelection(deps: SelectionDeps): Selection {
           const x = Math.round(ground.pickedPoint.x * FP_ONE);
           const y = Math.round(ground.pickedPoint.z * FP_ONE);
           deps.onMoveOrder?.(Math.trunc(ground.pickedPoint.x), Math.trunc(ground.pickedPoint.z));
-          queue.enqueue(deps.currentTick() + 1, { type: "move", playerId: deps.localPlayerId, eids: Array.from(selected), x, y });
+          queue.enqueue(deps.currentTick() + 1, { type: "move", playerId: deps.localPlayerId, eids: Array.from(selected), x, y, formation: deps.formation?.() ?? 0 });
         }
         return;
       }

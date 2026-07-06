@@ -165,6 +165,7 @@ export function combatSystem(sim: Sim): void {
 
   for (const eid of fighters) {
     if (Health.hp100[eid]! <= 0 || sim.garrisonOf.has(eid)) continue;
+    if ((sim.stunnedUntil.get(eid) ?? 0) > sim.tick) continue; // petrified
     if (CombatState.cooldown[eid]! > 0) CombatState.cooldown[eid] = CombatState.cooldown[eid]! - 1;
     if (CombatState.aggressive[eid] === 0) continue; // 1 aggressive, 2 hold-ground
 
@@ -189,6 +190,9 @@ export function combatSystem(sim: Sim): void {
         creditCombatFavor(sim, sim.stores.Owner.playerId[eid]!, dmg);
         const special = stats.special;
         if (special) {
+          if (special.stunTicks > 0 && Math.trunc(sim.tick / stats.attack!.cooldownTicks) % 4 === 0) {
+            sim.stunnedUntil.set(target, sim.tick + special.stunTicks);
+          }
           if (special.lifestealPermille > 0) {
             Health.hp100[eid] = Math.min(stats.hp100, Health.hp100[eid]! + Math.trunc((dmg * special.lifestealPermille) / 1000));
           }
@@ -253,6 +257,11 @@ export function combatSystem(sim: Sim): void {
     }
   }
 
+  if (sim.tick % 15 === 0) {
+    for (const [k, until] of Array.from(sim.stunnedUntil.entries()).sort((a, b) => a[0] - b[0])) {
+      if (until <= sim.tick) sim.stunnedUntil.delete(k);
+    }
+  }
   // hero heal aura + myth regeneration: every second
   if (sim.tick % 15 === 0) {
     const { Position, Owner, UnitRef } = sim.stores;

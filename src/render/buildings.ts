@@ -43,6 +43,7 @@ const NODE_MODEL: Record<number, string> = {
   2: "nature/rock_single_A", // gold outcrop
   3: "stag", // wild game herds (hunted for food)
   4: "nature/rock_single_D", // relics — heroes carry them to temples
+  5: "bull", // herdables fattening near the base
 };
 
 interface PuffFx {
@@ -398,11 +399,27 @@ export async function createWorldObjectsRenderer(
     for (const n of nodes) {
       let v = nodeVisuals.get(n.eid);
       if (!v && !n.depleted && onFarm(n.x, n.z)) continue;
+      if (!v && !n.depleted && n.resType === 6) {
+        // fish school: shimmering disc on the water
+        v = new TransformNode(`node${n.eid}`, scene);
+        const disc = MeshBuilder.CreateCylinder(`fish${n.eid}`, { diameter: 1.5, height: 0.06 }, scene);
+        if (!soilMat) { /* mats init in makeFarmField; fish needs its own */ }
+        const fm = new StandardMaterial(`fishMat${n.eid}`, scene);
+        fm.emissiveColor = new Color3(0.35, 0.55, 0.65);
+        fm.alpha = 0.75;
+        disc.material = fm;
+        disc.parent = v;
+        v.position.set(n.x, groundHeightAt(n.x, n.z) + 0.55, n.z);
+        for (const m of v.getChildMeshes()) nodeMeshToEid.set(m, n.eid);
+        nodeVisuals.set(n.eid, v);
+        continue;
+      }
+      if (!v && !n.depleted && !NODE_MODEL[n.resType]) continue;
       if (!v && !n.depleted) {
         v = cloneProto(NODE_MODEL[n.resType]!, `node${n.eid}`);
         const bounds = v.getHierarchyBoundingVectors();
         const h = Math.max(bounds.max.y - bounds.min.y, 0.001);
-        const target = n.resType === 2 ? 0.9 : n.resType === 3 ? 1.3 : n.resType === 4 ? 0.7 : 2.2;
+        const target = n.resType === 2 ? 0.9 : n.resType === 3 ? 1.3 : n.resType === 4 ? 0.7 : n.resType === 5 ? 1.1 : 2.2;
         v.scaling.setAll(target / h);
         v.position.set(n.x, groundHeightAt(n.x, n.z), n.z);
         // deterministic-ish variety from eid (render-side, floats fine)

@@ -123,6 +123,22 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       seed ^ 0x5ca77e2,
     );
   }
+  // settlement sites: bronze rings on the ground where town centers may rise
+  {
+    const { MeshBuilder } = await import("@babylonjs/core/Meshes/meshBuilder");
+    const { StandardMaterial } = await import("@babylonjs/core/Materials/standardMaterial");
+    const { Color3 } = await import("@babylonjs/core/Maths/math.color");
+    const rm = new StandardMaterial("settleMat", world.scene);
+    rm.emissiveColor = new Color3(0.75, 0.6, 0.25);
+    rm.disableLighting = true;
+    rm.alpha = 0.7;
+    for (const st of sim.settlements) {
+      const ring = MeshBuilder.CreateTorus(`settlement_${st.x}_${st.y}`, { diameter: 7, thickness: 0.18, tessellation: 40 }, world.scene);
+      ring.material = rm;
+      ring.isPickable = false;
+      ring.position.set(st.x, world.groundHeightAt(st.x, st.y) + 0.15, st.y);
+    }
+  }
   const combatFx = await createCombatFx(world.scene);
   const powerFx = createPowerFx(world.scene);
   const fog = createFogRenderer(world.scene, sim.terrain.size, sim.terrain);
@@ -237,6 +253,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     }
   };
 
+  let formationPref = 0;
   const selection = setupSelection({
     scene: world.scene,
     canvas,
@@ -251,6 +268,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     buildingOwner: (eid) => sim.stores.Owner.playerId[eid] ?? -1,
     buildingActive: (eid) => sim.stores.Building.active[eid] === 1,
     garrisonCapacity: (eid) => getBuildingStatsByIndex(sim.stores.Building.typeIndex[eid]!).garrisonCapacity,
+    formation: () => formationPref,
     unitTypeOf: (eid) => (sim.stores.UnitRef.typeIndex[eid] !== undefined ? sim.unitStats(eid).id : null),
     farmFoodNode: (eid) => {
       const { Position, ResourceNode, Building } = sim.stores;
@@ -305,6 +323,10 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     onStance: (stance) => {
       audio.uiClick();
       queue.enqueue(sim.tick + 1, { type: "stance", playerId: 0, eids: Array.from(selection.selected), stance });
+    },
+    onFormation: (f) => {
+      audio.uiClick();
+      formationPref = f;
     },
     onUngarrison: (buildingEid) => {
       audio.uiClick();

@@ -16,6 +16,7 @@ export interface CardCallbacks {
   onResearch: (techId: string) => void;
   onCancelTrain: (buildingEid: number, index: number) => void;
   onStance: (stance: number) => void;
+  onFormation: (formation: number) => void;
   onUngarrison: (buildingEid: number) => void;
   onDeselect: () => void;
 }
@@ -31,7 +32,7 @@ export interface CommandCard {
   ) => void;
 }
 
-const VILLAGER_BUILDS = ["house", "farm", "granary", "storehouse", "temple", "barracks", "archery_range", "stable", "armory", "market", "tower", "wall", "gate", "fortress", "wonder"];
+const VILLAGER_BUILDS = ["house", "farm", "granary", "storehouse", "temple", "barracks", "archery_range", "stable", "armory", "market", "dock", "tower", "wall", "gate", "fortress", "town_center", "wonder"];
 /** each pantheon's own favor building joins the build menu */
 const FAVOR_BUILDS: Record<string, string> = { auryan_dawn: "sun_altar", storm_concord: "sky_temple" };
 const STANCES = [
@@ -134,6 +135,8 @@ export function createCommandCard(root: HTMLElement, cb: CardCallbacks): Command
       } else if (units.length > 0) {
         // military selection: stance controls
         for (const s of STANCES) addBtn(s.label, s.hint, () => cb.onStance(s.v), true);
+        addBtn("Box Formation", "Group moves arrange in a compact square", () => cb.onFormation(0), true);
+        addBtn("Line Formation", "Group moves string out in a battle line", () => cb.onFormation(1), true);
       } else if (building) {
         const stats = getBuildingStats(building.buildingId);
         const trains: string[] = [];

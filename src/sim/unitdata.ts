@@ -22,7 +22,7 @@ interface RawUnit {
   multipliers?: Record<string, number>;
   flying?: boolean;
   tradeGoldPerTile?: number;
-  specialCombat?: { splashRadius?: number; splashPercent?: number; regenPerSec?: number; lifestealPercent?: number };
+  specialCombat?: { splashRadius?: number; splashPercent?: number; regenPerSec?: number; lifestealPercent?: number; stunSeconds?: number };
   gatherRates?: {
     huntFoodPerSec?: number;
     forageFoodPerSec?: number;
@@ -64,7 +64,8 @@ export interface UnitStats {
   gatherMicroPerSec: [number, number, number, number] | null;
   /** caravans: gold (milli) earned per tile of one-way route distance */
   tradeGoldMilliPerTile: number;
-  special: { splashRadiusFp: number; splashPermille: number; regenPer15T100: number; lifestealPermille: number } | null;
+  special: { splashRadiusFp: number; splashPermille: number; regenPer15T100: number; lifestealPermille: number; stunTicks: number } | null;
+  naval: boolean;
 }
 
 const RADIUS_BY_CLASS: Record<string, number> = {
@@ -120,7 +121,7 @@ function load(): Map<string, UnitStats> {
       flying: raw.flying ?? false,
       gatherMicroPerTick: raw.gatherRates
         ? [
-            Math.trunc(((raw.gatherRates.forageFoodPerSec ?? 0) * 1_000_000) / TICK_RATE),
+            Math.trunc((((raw.class === "ship" ? raw.gatherRates.fishFoodPerSec : raw.gatherRates.forageFoodPerSec) ?? 0) * 1_000_000) / TICK_RATE),
             Math.trunc(((raw.gatherRates.woodPerSec ?? 0) * 1_000_000) / TICK_RATE),
             Math.trunc(((raw.gatherRates.goldPerSec ?? 0) * 1_000_000) / TICK_RATE),
             Math.trunc(((raw.gatherRates.huntFoodPerSec ?? 0) * 1_000_000) / TICK_RATE),
@@ -128,19 +129,21 @@ function load(): Map<string, UnitStats> {
         : null,
       gatherMicroPerSec: raw.gatherRates
         ? [
-            Math.round((raw.gatherRates.forageFoodPerSec ?? 0) * 1_000_000),
+            Math.round(((raw.class === "ship" ? raw.gatherRates.fishFoodPerSec : raw.gatherRates.forageFoodPerSec) ?? 0) * 1_000_000),
             Math.round((raw.gatherRates.woodPerSec ?? 0) * 1_000_000),
             Math.round((raw.gatherRates.goldPerSec ?? 0) * 1_000_000),
             Math.round((raw.gatherRates.huntFoodPerSec ?? 0) * 1_000_000),
           ]
         : null,
       tradeGoldMilliPerTile: Math.round((raw.tradeGoldPerTile ?? 0) * 1000),
+      naval: raw.class === "ship",
       special: raw.specialCombat
         ? {
             splashRadiusFp: Math.round((raw.specialCombat.splashRadius ?? 0) * 1000),
             splashPermille: Math.round((raw.specialCombat.splashPercent ?? 0) * 10),
             regenPer15T100: Math.round((raw.specialCombat.regenPerSec ?? 0) * 100),
             lifestealPermille: Math.round((raw.specialCombat.lifestealPercent ?? 0) * 10),
+            stunTicks: Math.round((raw.specialCombat.stunSeconds ?? 0) * TICK_RATE),
           }
         : null,
     });
