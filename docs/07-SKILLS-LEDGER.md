@@ -46,6 +46,8 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 
 | 2026-07-06 | Session 2 / Gap-fix pass | deterministic-sim-testing | (vendored) | authored in-repo | Applied to 10 new mechanics in one TDD batch (building fire, stances, repair, caravans, hunting, rally auto-task, heal aura, cancel-refund, walls/gates); tick-phase cooldown pattern avoided a snapshot format bump | All 10 landed red→green; zero determinism regressions across 123 tests | tests/sim/gaps.test.ts, src/sim/* |
 
+| 2026-07-06 | Session 2 / Rounds 4–5 | deterministic-sim-testing | (vendored) | authored in-repo | 18 more TDD mechanics (transports→FFA); Map-based sim state pattern (garrisons/patrols/relics/stuns/herds) reused 8×; balance gate built on the AI-match harness | Zero determinism regressions across 153 tests; double-boot bug root-caused via duplicated DOM, not sim divergence | tests/sim/gaps4-5, tests/balance, src/sim/* |
+
 ## SESSION 1 FINAL ROLLUP (Phases 0–10 complete)
 
 **Skills used:** frontend-design (4 uses), deterministic-sim-testing (authored Phase 2; used at every gate after), babylon-integration-pitfalls (authored Phase 1; used + updated through Phase 9), docx + deep-research (pre-repo provenance).

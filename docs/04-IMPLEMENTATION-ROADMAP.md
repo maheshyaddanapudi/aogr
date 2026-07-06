@@ -153,3 +153,15 @@ Closed every "unreachable" finding from the AoM capability audit except garrison
 Verified: 123/123 tests (10 new TDD tests in tests/sim/gaps.test.ts), sim purity clean, full end-to-end
 playthrough re-run with all systems live — conquest victory at game-minute 27 vs the easy AI (defensive
 fire makes sieges realistically slower than the pre-fix 16-minute win).
+
+
+## Rounds 4–5 (finish-it-entirely pass)
+
+- [x] Naval complete: fishing, war galleys, transport barges + amphibious ops (drowning on sink), coastal docks, AI navies
+- [x] Campaign "The Reforging": 6 missions, story interludes, 4 objective types, sequential unlock, saved progress
+- [x] Mythic-tongue procedural voice lines (per-pantheon dialects) + wind/birds/shore ambience + death animations
+- [x] 3-player FFA, herd wander/capture, menders, attack-move, patrol UI, gate toggles, battle order, chain-bolt/consume/stun myth actives, replays, stats graph, 3 map types, 5 difficulties, live in-game settings, richer major passives, tier display names
+- [x] Automated balance gate (tests/balance): hard dominates easiest, real combat, all pantheons viable
+- [x] CRITICAL: removed game.ts module-level auto-boot that ran a hidden second sim + render loop behind every menu match
+
+Verified: 153/153 tests, purity clean, headless smoke of every new control path.
