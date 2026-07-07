@@ -70,7 +70,7 @@
       "majorGod": "oyandi",
       "seed": 55255,
       "mapType": "island",
-      "aiDifficulty": "medium",
+      "aiDifficulty": "easy",
       "opponents": 1,
       "objective": {
         "type": "wonder"
@@ -85,7 +85,7 @@
       "majorGod": "shangor",
       "seed": 66366,
       "mapType": "island",
-      "aiDifficulty": "hard",
+      "aiDifficulty": "medium",
       "opponents": 2,
       "objective": {
         "type": "conquest"
