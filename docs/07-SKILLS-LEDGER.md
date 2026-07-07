@@ -49,6 +49,7 @@ are logged too. Vendored copies live in `.claude/skills/<name>/` with an ORIGIN.
 | 2026-07-06 | Session 2 / Rounds 4–5 | deterministic-sim-testing | (vendored) | authored in-repo | 18 more TDD mechanics (transports→FFA); Map-based sim state pattern (garrisons/patrols/relics/stuns/herds) reused 8×; balance gate built on the AI-match harness | Zero determinism regressions across 153 tests; double-boot bug root-caused via duplicated DOM, not sim divergence | tests/sim/gaps4-5, tests/balance, src/sim/* |
 
 | 2026-07-07 | Session 2 / Play-matrix | deterministic-sim-testing | (vendored) | authored in-repo | "Play before declaring done" section applied at full scale: 10-match human-side matrix with invariant probes; caught the never-booted map types + phantom naval patch | 4 shipped bugs found by playing that 156 unit tests missed; probe design lesson: judge liveness mid-game, never from end-state | scripts/play-matrix.mjs, tests/sim/gaps6.test.ts |
+| 2026-07-07 | Session 2 / Round-8 fix round | deterministic-sim-testing | (vendored) | authored in-repo | it.fails→it probe-flip pattern closed F1–F4/F10; discriminator + instrumented-trace method root-caused F5 (terrain-pocket start) and F8 (test-driver site spam); replay checksum E2E; headless FX-aging artifact documented | 169 tests green, 0 expected-fail; two 'sim bugs' correctly reattributed to data (dock trains) and driver (campaign macro) | tests/probes/*, tests/sim/gaps7.test.ts, scripts/verify-replay.mjs |
 
 ## SESSION 1 FINAL ROLLUP (Phases 0–10 complete)
 

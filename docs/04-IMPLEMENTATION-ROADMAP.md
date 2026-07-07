@@ -227,3 +227,34 @@ Clean under stress: kitchen-sink save/load lockstep, no dangling town-center ref
 out-of-bounds power casts harmless, ungarrison placement, player wonder victory,
 archipelago start resourcing across 6 seeds, rush/boom/turtle matches with zero
 invariant violations, heap flat across all soaks.
+
+## Fix round (round 8): all round-7 findings closed
+
+Every F1–F14 finding fixed (or root-caused to the test driver) plus F15, found
+while triaging: the balance gate's 90s/180s wall-clock timeouts fired under
+background CPU load — raised to 300s/600s (assertions are tick-based).
+
+| # | Resolution | Verified by |
+|---|-----------|-------------|
+| F1 | Gather phases validate herd ownership every tick; retarget + rally skip foreign herds | P3 enforcing |
+| F2 | Move targets split by domain (naval→water, land→ground); naval axis-slide coast steering | P4 enforcing |
+| F3 | Pop gate re-checked at training COMPLETION; finished units hold in queue until room | P6 enforcing |
+| F4 | Gate close nudges occupants to open ground (same nudge as construction) | P7 enforcing |
+| F5 | Root cause: TC placed in a 19-tile terrain pocket — starts now require a ≥150-tile connected region (bounded flood-fill) | gaps7 F5 test |
+| F6 | AI naval invasions: BFS land-reachability → train barge → board → sail → unload → attack-move | gaps7 invasion test + browser (medium AI sank a passive player min 15) |
+| F7 | Root cause was DATA: dock trains listed only fishing_boat — war-galley/transport orders silently dropped for everyone | dock trains fixed; naval cells re-run (macro still times out on archipelago economy — driver skill, all orders now accepted) |
+| F8 | Root cause was the CAMPAIGN TEST DRIVER: it re-issued a new house site every pulse (10 sites, one builder ping-ponging, popCap frozen 25) — matrix macro's under-construction guard added to the campaign macro; mission plumbing itself verified sound. Also fixed: campaign macro omitted the mandatory minor-god pick on heroic/mythic age-ups | instrumented M1 trace; full campaign playthrough |
+| F9 | New data knob firstWaveMin (25/12/9/6/5) + softer easy/medium economy | browser: easy WIN@18, medium WIN@14, hard legitimate LOSS |
+| F10 | Re-verified post-fixes: titan (and hard) WIN by conquest at min ~10 — the probe's 35-min Mythic wait was the match ending first; P11 rewritten to enforce win-or-Mythic | P11 enforcing |
+| F11 | Root cause split: live-loop FX disposal was already correct; headless __step never aged FX (visuals accumulated forever — the soak's growth was largely this measurement artifact). __step now ages combatFx/powerFx by simulated time | soak re-run |
+| F12 | Saves carry {aogrSave, mission, sim} envelope; mid-mission saves resume as the mission (legacy raw snapshots still load) | code + suite |
+| F13 | Corpse sink wall-time-driven; corpse pool capped at 120 | soak re-run |
+| F14 | scripts/verify-replay.mjs: record 4 game-min vs medium AI headlessly, feed the file through the real menu path, final checksums equal (4260508905, 46 command batches) | ✔ lockstep verified |
+| F15 | Balance-gate timeouts 300s/600s | suite stable |
+
+Also fixed while verifying: ship deaths crashed the GLB death-pose loader
+(PROC_BOAT), transport_barge had no hull model (rendered as the caravan donkey),
+depleted-then-regrown nodes (herds/fish) stayed invisible.
+
+Suite after the round: **169 passed, 0 expected-fail** — every discovery probe now
+enforces its fix.

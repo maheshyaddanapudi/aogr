@@ -72,8 +72,15 @@ for (let mi = start; mi < missions.length; mi++) {
       }
       const food = P.foodMilli / 1000, wood = P.woodMilli / 1000, gold = P.goldMilli / 1000;
       if (my("villager").length < 14 && food >= 60 && P.popUsed < P.popCap) window.__cmd({ type: "train", playerId: 0, buildingEid: tc.eid, unit: "villager" });
+      // ONE construction site at a time: keep a crew on it until it stands —
+      // re-issuing builds each pulse starves the builder (round-7 F8 root cause)
+      const sites = view.buildings.filter((b) => b.playerId === 0 && !b.active);
       const builder = my("villager")[0];
-      if (builder) {
+      if (sites.length > 0) {
+        const G2 = S.stores.GatherTask;
+        const crewed = my("villager").some((u) => G2.phase[u.eid] === 4);
+        if (!crewed && builder) window.__cmd({ type: "work_on", playerId: 0, eids: [builder.eid], buildingEid: sites[0].eid });
+      } else if (builder) {
         if (P.popCap - P.popUsed <= 3 && wood >= 35) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "house", x: -1, y: -1 });
         else if (myB("temple", false).length === 0 && wood >= 110) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "temple", x: -1, y: -1 });
         else if (P.age >= 1 && myB("barracks", false).length === 0 && wood >= 160) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "barracks", x: -1, y: -1 });
@@ -88,16 +95,27 @@ for (let mi = start; mi < missions.length; mi++) {
         window.__cmd({ type: "research", playerId: 0, tech: "age_classical", minorGod: window.__firstMinor[P.pantheon] });
       }
       if (obj === "wonder") {
-        if (P.age === 1 && food >= 850 && gold >= 550 && myB("armory").length > 0 && !P.researchQueue.some((r) => r.techId.startsWith("age_"))) window.__cmd({ type: "research", playerId: 0, tech: "age_heroic" });
-        if (P.age === 2 && food >= 1050 && gold >= 1050 && myB("market").length > 0 && !P.researchQueue.some((r) => r.techId.startsWith("age_"))) window.__cmd({ type: "research", playerId: 0, tech: "age_mythic" });
+        // age-ups REQUIRE a minor-god pick — omitting it is silently rejected
+        if (P.age === 1 && food >= 850 && gold >= 550 && myB("armory").length > 0 && !P.researchQueue.some((r) => r.techId.startsWith("age_"))) window.__cmd({ type: "research", playerId: 0, tech: "age_heroic", minorGod: window.__minorPools[P.pantheon].heroic });
+        if (P.age === 2 && food >= 1050 && gold >= 1050 && myB("market").length > 0 && !P.researchQueue.some((r) => r.techId.startsWith("age_"))) window.__cmd({ type: "research", playerId: 0, tech: "age_mythic", minorGod: window.__minorPools[P.pantheon].mythic });
       }
       // relic mission: hero duty
       if (obj === "relics") {
+        // heroes cost FAVOR — generate it per pantheon mechanic first
+        if (P.favorMilli < 6000) {
+          if (P.pantheon === "auryan_dawn" && sites.length === 0 && myB("sun_altar", false).length === 0 && wood >= 110 && gold >= 60 && builder) {
+            window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "sun_altar", x: -1, y: -1 });
+          } else if (P.pantheon === "storm_concord" && myB("temple").length > 0) {
+            const pv = my("villager").slice(0, 2).map((u) => u.eid);
+            if (pv.length > 0) window.__cmd({ type: "pray", playerId: 0, eids: pv });
+          }
+        }
         const heroes = my().filter((u) => window.__sim.unitStats(u.eid).unitClass === "hero");
-        if (heroes.length === 0 && !window.__camp.heroTrained && P.age >= 1 && myB("temple").length > 0 && food >= 200) {
+        const temple = myB("temple")[0];
+        // retry until a hero actually EXISTS — the order is silently rejected while favor is short
+        if (heroes.length === 0 && P.age >= 1 && temple && food >= 200 && P.favorMilli >= 4000 && (S.trainQueues.get(temple.eid)?.length ?? 0) === 0) {
           const heroId = { auryan_dawn: "radiant_champion", verdant_deep: "tide_seer", ashen_forge: "forgeborn", storm_concord: "sky_herald" }[P.pantheon];
-          window.__cmd({ type: "train", playerId: 0, buildingEid: myB("temple")[0].eid, unit: heroId });
-          window.__camp.heroTrained = true;
+          window.__cmd({ type: "train", playerId: 0, buildingEid: temple.eid, unit: heroId });
         }
         for (const h of heroes) {
           if (S.relicHolder.get(h.eid)) {
@@ -129,8 +147,15 @@ for (let mi = start; mi < missions.length; mi++) {
   // real first minors come from the data — inject them
   const pantheonsData = JSON.parse(readFileSync(new URL("../data/pantheons.json", import.meta.url), "utf8")).pantheons;
   const fm = {};
-  for (const [pid, pan] of Object.entries(pantheonsData)) fm[pid] = pan.majors?.[0]?.minorPool?.classical?.[0];
-  await page.evaluate(([f, water]) => { window.__firstMinor = f; window.__isWaterMission = water; }, [fm, ms.mapType !== "inland"]);
+  const pools = {};
+  for (const [pid, pan] of Object.entries(pantheonsData)) {
+    fm[pid] = pan.majors?.[0]?.minorPool?.classical?.[0];
+    pools[pid] = {
+      heroic: pan.majors?.[0]?.minorPool?.heroic?.[0],
+      mythic: pan.majors?.[0]?.minorPool?.mythic?.[0],
+    };
+  }
+  await page.evaluate(([f, water, mp]) => { window.__firstMinor = f; window.__isWaterMission = water; window.__minorPools = mp; }, [fm, ms.mapType !== "inland", pools]);
   void FIRST_MINOR;
 
   const objType = ms.objective.type === "conquest" && ms.mapType === "archipelago" ? "naval" : ms.objective.type;
@@ -149,6 +174,8 @@ for (let mi = start; mi < missions.length; mi++) {
     if (st.winner === 0) { result = "WIN"; break; }
     if (st.winner > 0) { result = "LOSS"; break; }
   }
+  // the objective checker runs on a 500ms interval — give it a beat to write progress
+  if (result === "WIN") await page.waitForFunction((want) => Number(localStorage.getItem("aogr-campaign") ?? 0) >= want, mi + 1, { timeout: 5000 }).catch(() => {});
   const progressAfter = await page.evaluate(() => Number(localStorage.getItem("aogr-campaign") ?? 0));
   if (result === "WIN" && progressAfter < mi + 1) findings.push(`M${mi + 1}: WIN did not advance campaign progress (${progressAfter})`);
   if (errs.length) findings.push(`M${mi + 1}: pageerrors: ${errs.slice(0, 2).join(" | ")}`);
