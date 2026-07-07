@@ -13,6 +13,10 @@ import { writeFileSync, readFileSync, existsSync } from "node:fs";
 
 // minor god → god power id, straight from the data files
 const pantheons = JSON.parse(readFileSync(new URL("../data/pantheons.json", import.meta.url), "utf8")).pantheons;
+const FIRST_MINOR = {}; // pantheon → first classical minor of the default major
+for (const [pid, pan] of Object.entries(pantheons)) {
+  FIRST_MINOR[pid] = pan.majors?.[0]?.minorPool?.classical?.[0];
+}
 const MINOR_POWER = {};
 for (const pan of Object.values(pantheons)) {
   for (const tier of Object.values(pan.minors ?? {})) {
@@ -102,7 +106,7 @@ window.__macro = (isWaterMap) => {
   // dock has no auto-site (-1 goes near TC which may be inland) — handled by sim findBuildSite + coastal rule; if it failed 3 times, note it
   // age up
   if (p.age === 0 && food >= 420 && myB("temple").length > 0 && !p.researchQueue.some((r) => r.techId === "age_classical")) {
-    window.__cmd({ type: "research", playerId: 0, tech: "age_classical" });
+    window.__cmd({ type: "research", playerId: 0, tech: "age_classical", minorGod: window.__firstMinor[p.pantheon] });
     window.__log.push("min " + Math.trunc(S().tick / 900) + ": CLASSICAL research");
   }
   // mender once
@@ -202,6 +206,7 @@ window.__macro = (isWaterMap) => {
 const results = [];
 const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 for (const cell of cells) {
+  try {
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
   const pageErrors = [];
   page.on("pageerror", (e) => pageErrors.push(e.message.slice(0, 160)));
@@ -210,15 +215,16 @@ for (const cell of cells) {
   await page.goto(url, { waitUntil: "networkidle" });
   await page.waitForFunction(() => window.__sim !== undefined, null, { timeout: 240000 });
   await page.evaluate(MACRO);
-  await page.evaluate((minorPowerMap) => {
+  await page.evaluate(([minorPowerMap, firstMinor]) => {
     window.__minorPowerMap = minorPowerMap;
+    window.__firstMinor = firstMinor;
     window.__isWater = (tx, ty) => {
       const t = window.__sim.terrain;
       const verts = t.size + 1;
       if (tx < 0 || ty < 0 || tx >= t.size || ty >= t.size) return false;
       return t.heights[ty * verts + tx] < t.waterLevelFp;
     };
-  }, MINOR_POWER);
+  }, [MINOR_POWER, FIRST_MINOR]);
   const isWaterMap = cell.map !== "inland";
   let lastTick = -1;
   let hung = false;
@@ -264,6 +270,11 @@ for (const cell of cells) {
   });
   console.log(`■ cell ${cell.i} ${cell.mode}/${cell.ai}/${cell.map}: ${result} @min ${Math.trunc(fin.tick / 900)} | anomalies: ${fin.anomalies.length ? fin.anomalies.join(" ;; ") : "none"}`);
   await page.context().close();
+  } catch (err) {
+    results.push({ cell: cell.i, mode: cell.mode, ai: cell.ai, map: cell.map, pantheon: cell.pantheon, seed: cell.seed,
+      result: "CRASH", gameMin: 0, anomalies: ["runner: " + String(err).slice(0, 200)] });
+    console.log(`■ cell ${cell.i} ${cell.mode}/${cell.ai}/${cell.map}: CRASH — ${String(err).slice(0, 160)}`);
+  }
 }
 await browser.close();
 

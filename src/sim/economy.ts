@@ -12,7 +12,7 @@ import { computeFlowField, flowDistAt, UNREACHABLE } from "./path/flowfield";
 import { getBuildingStats, getBuildingStatsByIndex, type BuildingStats } from "./buildingdata";
 import { getUnitStats } from "./unitdata";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
-import { isWaterTile, nearestPassableTile, setMoveTarget, spawnUnitEntity, type Sim } from "./sim";
+import { isWaterTile, nearestPassableTile, nearestWaterTile, setMoveTarget, spawnUnitEntity, type Sim } from "./sim";
 // eslint-disable-next-line import/no-cycle -- runtime-safe
 import { AGE_INDEX, effectiveGatherMicroPerTick, effectiveTrainTicks, type ResearchEntry } from "./research";
 
@@ -174,6 +174,28 @@ function footprintClear(sim: Sim, tileX: number, tileY: number, size: number): b
     }
   }
   return true;
+}
+
+/** Coastal variant: nearest clear footprint that touches water (docks). */
+export function findCoastalSite(sim: Sim, nearX: number, nearY: number, size: number): { x: number; y: number } | null {
+  for (let r = 2; r < 60; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = nearX + dx;
+        const y = nearY + dy;
+        if (!footprintClear(sim, x, y, size)) continue;
+        let coastal = false;
+        for (let yy = -2; yy <= size + 1 && !coastal; yy++) {
+          for (let xx = -2; xx <= size + 1; xx++) {
+            if (isWaterTile(sim, x + xx, y + yy)) { coastal = true; break; }
+          }
+        }
+        if (coastal) return { x, y };
+      }
+    }
+  }
+  return null;
 }
 
 /** Deterministic spiral search for a clear building site near a tile,
@@ -370,7 +392,7 @@ export function handleEconomyCommand(sim: Sim, cmd: Command): boolean {
         const tc = p.townCenterEid;
         const nx = tc >= 0 ? Math.trunc(Position.x[tc]! / 1000) : 100;
         const ny = tc >= 0 ? Math.trunc(Position.y[tc]! / 1000) : 100;
-        site = findBuildSite(sim, nx, ny, stats.size);
+        site = stats.id === "dock" ? findCoastalSite(sim, nx, ny, stats.size) : findBuildSite(sim, nx, ny, stats.size);
       } else {
         const tx = Math.trunc(cmd.x / 1000);
         const ty = Math.trunc(cmd.y / 1000);
@@ -773,7 +795,24 @@ export function economySystem(sim: Sim): void {
       const bx = Math.trunc(Position.x[beid]! / 1000);
       const by = Math.trunc(Position.y[beid]! / 1000);
       const size = getBuildingStatsByIndex(Building.typeIndex[beid]!).size;
-      const t = nearestPassableTile(sim, bx, by + Math.trunc(size / 2) + 1);
+      const naval = getUnitStats(head.unitId).naval;
+      let t: { x: number; y: number };
+      if (naval) {
+        const w = nearestWaterTile(sim, bx, by);
+        if (!w || Math.max(Math.abs(w.x - bx), Math.abs(w.y - by)) > 6) {
+          // landlocked dock: refund rather than beach a ship on grass
+          const cost = getUnitStats(head.unitId).cost;
+          const pl = getPlayer(sim, Owner.playerId[beid]!);
+          pl.foodMilli += cost.food * 1000;
+          pl.woodMilli += cost.wood * 1000;
+          pl.goldMilli += cost.gold * 1000;
+          pl.favorMilli += cost.favor * 1000;
+          continue;
+        }
+        t = w;
+      } else {
+        t = nearestPassableTile(sim, bx, by + Math.trunc(size / 2) + 1);
+      }
       const eid = spawnUnitEntity(sim, Owner.playerId[beid]!, head.unitId, t.x * 1000 + 500, t.y * 1000 + 500);
       if (Building.rallyX[beid] !== 0 || Building.rallyY[beid] !== 0) {
         setMoveTarget(sim, eid, Building.rallyX[beid]!, Building.rallyY[beid]!);

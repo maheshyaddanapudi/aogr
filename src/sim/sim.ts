@@ -197,10 +197,12 @@ const DEFAULT_MATCH: MatchOptions = { players: 2, skirmish: false };
 
 export function createSim(
   seed: number,
-  terrainConfig: TerrainConfig = DEFAULT_TERRAIN_CONFIG,
+  terrainConfig?: Partial<TerrainConfig>,
   matchOptions: MatchOptions = DEFAULT_MATCH,
 ): Sim {
-  const terrain = generateTerrain(new Prng((seed ^ TERRAIN_SEED_SALT) >>> 0), terrainConfig);
+  // partial configs (e.g. a map type overriding only the water level) merge
+  // over the defaults — a bare { waterLevelFp } once crashed terrain gen
+  const terrain = generateTerrain(new Prng((seed ^ TERRAIN_SEED_SALT) >>> 0), { ...DEFAULT_TERRAIN_CONFIG, ...terrainConfig });
   const stores = createStores();
   const sim: Sim = {
     world: createWorld(),

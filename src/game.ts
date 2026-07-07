@@ -93,7 +93,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const playerCount = 1 + Math.max(1, Math.min(2, config?.opponents ?? Number(params.get("opp") ?? 1)));
   const sim = config?.loadSnapshot
     ? deserializeSim(config.loadSnapshot)
-    : createSim(seed, terrainCfg as never, { players: playerCount, skirmish: true });
+    : createSim(seed, terrainCfg, { players: playerCount, skirmish: true });
   const wantPantheon = config?.pantheon ?? params.get("pantheon") ?? undefined;
   if (!config?.loadSnapshot && wantPantheon) {
     getPlayer(sim, 0).pantheon = wantPantheon;
