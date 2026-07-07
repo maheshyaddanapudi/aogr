@@ -94,10 +94,10 @@ for (let mi = start; mi < missions.length; mi++) {
       if (P.age === 0 && food >= 420 && myB("temple").length > 0 && !P.researchQueue.some((r) => r.techId === "age_classical")) {
         window.__cmd({ type: "research", playerId: 0, tech: "age_classical", minorGod: window.__firstMinor[P.pantheon] });
       }
-      // an average player upgrades their line: armory techs when affordable
-      if (P.age >= 1 && myB("armory").length > 0 && P.researchQueue.length === 0) {
+      // armory techs from SURPLUS only — never at the cost of the army queue
+      if (P.age >= 1 && myB("armory").length > 0 && P.researchQueue.length === 0 && food >= 450 && gold >= 350) {
         for (const tech of ["bronze_weapons", "bronze_mail"]) {
-          if (!P.researchedTechs.includes(tech) && food >= 160 && gold >= 110) {
+          if (!P.researchedTechs.includes(tech)) {
             window.__cmd({ type: "research", playerId: 0, tech });
             break;
           }
