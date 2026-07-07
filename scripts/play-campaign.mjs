@@ -83,11 +83,11 @@ for (let mi = start; mi < missions.length; mi++) {
       } else if (builder) {
         if (P.popCap - P.popUsed <= 3 && wood >= 35) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "house", x: -1, y: -1 });
         else if (myB("temple", false).length === 0 && wood >= 110) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "temple", x: -1, y: -1 });
-        else if (P.age >= 1 && myB("barracks", false).length === 0 && wood >= 160) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "barracks", x: -1, y: -1 });
+        else if (P.age >= 1 && myB("barracks", false).length < (obj === "wonder" ? 2 : 1) && wood >= 160) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "barracks", x: -1, y: -1 });
         else if (P.age >= 1 && myB("armory", false).length === 0 && myB("barracks").length > 0 && wood >= 160) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "armory", x: -1, y: -1 });
         else if (myB("farm", false).length < 3 && wood >= 70 && my("villager").length >= 8) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "farm", x: -1, y: -1 });
         else if (obj === "wonder" && P.age >= 2 && myB("market", false).length === 0 && wood >= 160) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "market", x: -1, y: -1 });
-        else if (obj === "wonder" && P.age >= 3 && myB("wonder", false).length === 0 && food >= 1050 && wood >= 1050 && gold >= 1050) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "wonder", x: -1, y: -1 });
+        else if (obj === "wonder" && P.age >= 3 && myB("wonder", false).length === 0 && food >= 1050 && wood >= 1050 && gold >= 1050 && my().filter((u) => ["infantry", "archer", "cavalry"].includes(S.unitStats(u.eid).unitClass)).length >= 14) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "wonder", x: -1, y: -1 });
         else if ((obj === "conquest" || obj === "naval") && window.__isWaterMission && myB("dock", false).length === 0 && wood >= 140) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "dock", x: -1, y: -1 });
       }
       const FIRST = { ashen_forge: "vulkar", verdant_deep: "thalassa", auryan_dawn: "aurel", storm_concord: "zephyrion" };
@@ -128,8 +128,11 @@ for (let mi = start; mi < missions.length; mi++) {
         }
       }
       // military + defense/attack
-      const bar = myB("barracks")[0];
-      if (bar && P.age >= 1 && food >= 60 && gold >= 50 && P.popUsed < P.popCap) window.__cmd({ type: "train", playerId: 0, buildingEid: bar.eid, unit: "infantry_base" });
+      for (const bar of myB("barracks")) {
+        if (P.age >= 1 && food >= 60 && gold >= 50 && P.popUsed < P.popCap && (S.trainQueues.get(bar.eid)?.length ?? 0) < 2) {
+          window.__cmd({ type: "train", playerId: 0, buildingEid: bar.eid, unit: "infantry_base" });
+        }
+      }
       const army = my().filter((u) => ["infantry", "archer", "cavalry"].includes(window.__sim.unitStats(u.eid).unitClass)).map((u) => u.eid);
       // water missions: a small picket of galleys meets seaborne raiders
       if (window.__isWaterMission) {
