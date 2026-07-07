@@ -237,6 +237,7 @@ for (const cell of cells) {
       pop: window.__sim.players[0].popUsed,
       age: window.__sim.players[0].age,
       anomalies: window.__anomalies.length,
+      aiB: window.__sim.players.map((_, i) => window.__view().buildings.filter((b) => b.playerId === i).length),
     }));
     if (st.tick === lastTick) { hung = true; break; }
     lastTick = st.tick;
@@ -244,6 +245,13 @@ for (const cell of cells) {
     if (min % 5 === 0 && min > 0 && !statusLines.includes(min)) {
       statusLines.push(min);
       console.log(`  [${cell.mode}/${cell.ai}] min ${min}: pop ${st.pop}, age ${st.age}, anomalies ${st.anomalies}`);
+    }
+    // liveness snapshot at ~min 6: every AI must have started building by then
+    if (st.tick >= 6 * 900 && !cell._livenessChecked) {
+      cell._livenessChecked = true;
+      for (let i = 1; i < st.aiB.length; i++) {
+        if (st.aiB[i] <= 1) await page.evaluate((n) => window.__anomalies.push(n), `AI p${i} (${cell.ai}) inactive at min 6`);
+      }
     }
     if (st.winner >= 0) break;
     if (Date.now() - start > 8 * 60 * 1000) break; // wall-clock guard per match
@@ -253,10 +261,7 @@ for (const cell of cells) {
     anomalies: window.__anomalies, m: window.__m,
     aiB: window.__sim.players.map((_, i) => window.__view().buildings.filter((b) => b.playerId === i).length),
   }));
-  // AI liveness verdict (buildings beyond the starting TC by end of match)
-  for (let i = 1; i < fin.aiB.length; i++) {
-    if (fin.aiB[i] <= 1 && fin.tick > 6 * 900) fin.anomalies.push(`AI p${i} (${cell.ai}) never built anything`);
-  }
+  // (liveness is judged at min 6 during play — end-state counts conflate defeat with inactivity)
   if (hung) fin.anomalies.push("SIM HANG: tick stopped advancing");
   if (pageErrors.length) fin.anomalies.push(...pageErrors.map((e) => "pageerror: " + e));
   if (fin.winner < 0 && fin.tick >= MAX_GAME_MIN * 900 - 75 && !fin.m.aiEverAttacked) {
