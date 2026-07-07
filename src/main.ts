@@ -4,6 +4,13 @@
  * code-split requirement). ?skipmenu preserves the direct-boot behavior that
  * all headless gate captures rely on.
  */
+// self-hosted fonts (no CDN dependency — offline-safe, matrix-noise-free)
+import "@fontsource/cinzel/latin-500.css";
+import "@fontsource/cinzel/latin-600.css";
+import "@fontsource/cinzel/latin-700.css";
+import "@fontsource/alegreya-sans/latin-400.css";
+import "@fontsource/alegreya-sans/latin-500.css";
+import "@fontsource/alegreya-sans/latin-700.css";
 import "./ui/hud.css";
 import { listPantheonIds, getPantheon } from "./sim/pantheondata";
 import { loadGame, loadSettings, saveSettings } from "./platform/storage";
