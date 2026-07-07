@@ -621,10 +621,17 @@ export function economySystem(sim: Sim): void {
         continue;
       }
       const d = dist(px, py, Position.x[node]!, Position.y[node]!);
-      if (d <= GATHER_REACH_FP) {
+      // congestion forgiveness (campaign-M4 autopsy): crowd-stop and blocked-
+      // avoidance can park a walker just OUTSIDE strict reach — near enough is
+      // work, otherwise a long hard stall means the approach is futile: retask
+      const settled = MoveState.active[eid] !== 1;
+      const jammed = MoveState.stallTicks[eid]! > 30;
+      if (d <= GATHER_REACH_FP || ((settled || jammed) && d <= GATHER_REACH_FP * 2)) {
         GatherTask.phase[eid] = 2;
         MoveState.active[eid] = 0;
-      } else if (MoveState.active[eid] !== 1) {
+      } else if (jammed && MoveState.stallTicks[eid]! > 90) {
+        retargetNode(sim, eid, node);
+      } else if (settled) {
         setMoveTarget(sim, eid, Position.x[node]!, Position.y[node]!); // stalled short: re-approach
       }
     } else if (phase === 2) {
@@ -934,10 +941,11 @@ function goDropoff(sim: Sim, eid: number): void {
   void Building;
 }
 
-function retargetNode(sim: Sim, eid: number): void {
+function retargetNode(sim: Sim, eid: number, excludeEid = -1): void {
   const { Position, GatherTask, MoveState, Owner } = sim.stores;
   const kind = RES_BY_INDEX[GatherTask.carriedType[eid]!]!;
   let nodes = findResourceNodes(sim, kind);
+  if (excludeEid >= 0) nodes = nodes.filter((n) => n !== excludeEid);
   if (kind === "herd") {
     nodes = nodes.filter((n) => {
       const o = sim.herdOwner.get(n);

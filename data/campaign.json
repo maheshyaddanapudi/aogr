@@ -55,7 +55,7 @@
       "majorGod": "indravan",
       "seed": 44144,
       "mapType": "archipelago",
-      "aiDifficulty": "medium",
+      "aiDifficulty": "easy",
       "opponents": 1,
       "objective": {
         "type": "conquest"

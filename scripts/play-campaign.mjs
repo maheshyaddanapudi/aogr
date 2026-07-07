@@ -131,9 +131,23 @@ for (let mi = start; mi < missions.length; mi++) {
       const bar = myB("barracks")[0];
       if (bar && P.age >= 1 && food >= 60 && gold >= 50 && P.popUsed < P.popCap) window.__cmd({ type: "train", playerId: 0, buildingEid: bar.eid, unit: "infantry_base" });
       const army = my().filter((u) => ["infantry", "archer", "cavalry"].includes(window.__sim.unitStats(u.eid).unitClass)).map((u) => u.eid);
+      // water missions: a small picket of galleys meets seaborne raiders
+      if (window.__isWaterMission) {
+        const dock = myB("dock")[0];
+        if (dock && wood >= 130 && gold >= 70 && my("war_galley").length < 2 && P.age >= 1) {
+          window.__cmd({ type: "train", playerId: 0, buildingEid: dock.eid, unit: "war_galley" });
+        }
+      }
       const intruders = view.units.filter((u) => u.playerId !== 0 && Math.hypot(u.x - tc.x, u.z - tc.z) < 20);
       if (intruders.length > 0 && army.length > 0) {
         window.__cmd({ type: "attack_move", playerId: 0, eids: army, x: Math.round(intruders[0].x * 1000), y: Math.round(intruders[0].z * 1000) });
+        if (!window.__camp.garrisoned) {
+          const vs = my("villager").slice(0, 3).map((u) => u.eid);
+          if (vs.length > 0) { window.__cmd({ type: "garrison", playerId: 0, eids: vs, buildingEid: tc.eid }); window.__camp.garrisoned = true; }
+        }
+      } else if (window.__camp.garrisoned && intruders.length === 0) {
+        window.__cmd({ type: "ungarrison", playerId: 0, buildingEid: tc.eid });
+        window.__camp.garrisoned = false;
       } else if ((obj === "conquest" || obj === "naval") && army.length >= 12) {
         const foes = view.buildings.filter((b) => b.playerId !== 0 && b.buildingId === "town_center");
         if (foes.length > 0) {

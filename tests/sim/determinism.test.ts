@@ -35,6 +35,18 @@ describe("PHASE 0 GATE — determinism checksum", () => {
   it("same seed + same ordered command list ⇒ identical checksum after 10,000 ticks", () => {
     const a = run(42, 10_000, spawnScript());
     const b = run(42, 10_000, spawnScript());
+    // forensic aid for the rare full-suite-only flake: on mismatch, name the
+    // diverging state lanes before failing (assertion itself is unchanged)
+    if (simChecksum(a) !== simChecksum(b)) {
+      const sa = JSON.parse(serializeSim(a)) as Record<string, unknown>;
+      const sb = JSON.parse(serializeSim(b)) as Record<string, unknown>;
+      const lanes = Object.keys(sa).filter((k) => JSON.stringify(sa[k]) !== JSON.stringify(sb[k]));
+      console.error(`DETERMINISM DIVERGENCE — lanes: ${lanes.join(", ")}`);
+      for (const k of lanes.slice(0, 3)) {
+        console.error(`  ${k} A: ${JSON.stringify(sa[k])?.slice(0, 400)}`);
+        console.error(`  ${k} B: ${JSON.stringify(sb[k])?.slice(0, 400)}`);
+      }
+    }
     expect(simChecksum(a)).toBe(simChecksum(b));
   });
 
