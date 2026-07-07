@@ -12,7 +12,7 @@ import type { Sim } from "../sim/sim";
 import { getPlayer, findResourceNodes } from "../sim/economy";
 import { getTechStats } from "../sim/techdata";
 import { getMinorPool, getMinor, getPantheon } from "../sim/pantheondata";
-import { isWaterTile } from "../sim/sim";
+import { isWaterTile, nearestWaterTile } from "../sim/sim";
 import { getPower, nextCastCostMilli } from "../sim/powers";
 import { getUnitStats } from "../sim/unitdata";
 import { getBuildingStats } from "../sim/buildingdata";
@@ -27,6 +27,8 @@ interface Knobs {
   usePowers: boolean;
   prayerVillagers: number;
   mythTarget: number;
+  /** no attack wave (land or naval) before this game-minute — the classic difficulty lever */
+  firstWaveMin: number;
 }
 
 const KNOBS = (aiJson as { difficulties: Record<string, Knobs> }).difficulties;
@@ -38,6 +40,12 @@ export interface AiState {
   /** tick of the last launched attack wave */
   lastWaveTick: number;
   attacking: boolean;
+  /** naval invasion machine: 0 idle · 1 boarding · 2 sailing */
+  invasionPhase: 0 | 1 | 2;
+  invasionShip: number;
+  invasionSince: number;
+  /** cached land-path answer to the current enemy TC (BFS is not free) */
+  reachCache: { target: number; ok: boolean; tick: number } | null;
 }
 
 export function createAiState(playerId: number, difficulty: AiDifficulty, _seed: number): AiState {
@@ -47,7 +55,66 @@ export function createAiState(playerId: number, difficulty: AiDifficulty, _seed:
     decisionIntervalTicks: KNOBS[difficulty]!.decisionIntervalTicks,
     lastWaveTick: -100000,
     attacking: false,
+    invasionPhase: 0,
+    invasionShip: -1,
+    invasionSince: 0,
+    reachCache: null,
   };
+}
+
+/** BFS over the nav grid: is there a land path between two entities' tiles?
+ * Cached per enemy TC for 5 game-minutes — island topology barely changes. */
+function landReachable(sim: Sim, ai: AiState, fromEid: number, toEid: number): boolean {
+  if (ai.reachCache && ai.reachCache.target === toEid && sim.tick - ai.reachCache.tick < 15 * 300) {
+    return ai.reachCache.ok;
+  }
+  const { Position } = sim.stores;
+  const g = sim.navGrid;
+  const sx = Math.trunc(Position.x[fromEid]! / 1000);
+  const sy = Math.trunc(Position.y[fromEid]! / 1000);
+  const gx = Math.trunc(Position.x[toEid]! / 1000);
+  const gy = Math.trunc(Position.y[toEid]! / 1000);
+  const seen = new Uint8Array(g.size * g.size);
+  // the TC's own footprint is blocked — seed the BFS from the walkable ring around it
+  let qx: number[] = [];
+  let qy: number[] = [];
+  for (let dy = -4; dy <= 4; dy++) {
+    for (let dx = -4; dx <= 4; dx++) {
+      const x = sx + dx;
+      const y = sy + dy;
+      if (x < 0 || y < 0 || x >= g.size || y >= g.size) continue;
+      const k = y * g.size + x;
+      if (!g.passable[k] || seen[k]) continue;
+      seen[k] = 1;
+      qx.push(x);
+      qy.push(y);
+    }
+  }
+  let ok = false;
+  while (qx.length > 0 && !ok) {
+    const nqx: number[] = [];
+    const nqy: number[] = [];
+    for (let i = 0; i < qx.length; i++) {
+      const x = qx[i]!;
+      const y = qy[i]!;
+      // TC footprints are unwalkable — arriving beside the goal counts
+      if (Math.abs(x - gx) <= 4 && Math.abs(y - gy) <= 4) { ok = true; break; }
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= g.size || ny >= g.size) continue;
+        const k = ny * g.size + nx;
+        if (seen[k] || !g.passable[k]) continue;
+        seen[k] = 1;
+        nqx.push(nx);
+        nqy.push(ny);
+      }
+    }
+    qx = nqx;
+    qy = nqy;
+  }
+  ai.reachCache = { target: toEid, ok, tick: sim.tick };
+  return ok;
 }
 
 const AGE_TECHS = ["age_classical", "age_heroic", "age_mythic"] as const;
@@ -289,12 +356,71 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
   }
 
   // ── attackManager: launch waves at the enemy base ──
+  // land path ⇒ march; no land path (archipelago/island) ⇒ ferry the wave across
   const enemyTc = sim.players.map((pp, i) => ({ pp, i })).find(({ pp, i }) => i !== pid && pp.townCenterEid >= 0);
-  if (enemyTc && military.length >= knobs.waveSize && sim.tick - ai.lastWaveTick > 15 * 60) {
+  const warTime = sim.tick >= (knobs.firstWaveMin ?? 0) * 900;
+  if (enemyTc && warTime) {
     const target = enemyTc.pp.townCenterEid;
-    cmds.push({ type: "move", playerId: pid, eids: military, x: Position.x[target]!, y: Position.y[target]! });
-    ai.lastWaveTick = sim.tick;
-    ai.attacking = true;
+    if (landReachable(sim, ai, tc, target)) {
+      if (military.length >= knobs.waveSize && sim.tick - ai.lastWaveTick > 15 * 60) {
+        cmds.push({ type: "move", playerId: pid, eids: military, x: Position.x[target]!, y: Position.y[target]! });
+        ai.lastWaveTick = sim.tick;
+        ai.attacking = true;
+      }
+    } else {
+      const barges = myUnits.filter((e) => sim.unitStats(e).id === "transport_barge");
+      const dock = active("dock")[0];
+      if (ai.invasionPhase !== 0 && (ai.invasionShip < 0 || !myUnits.includes(ai.invasionShip))) {
+        ai.invasionPhase = 0; // the barge sank — start over
+        ai.invasionShip = -1;
+      }
+      if (ai.invasionPhase === 0) {
+        if (barges.length === 0) {
+          if (dock !== undefined && p.woodMilli >= 100_000 && (sim.trainQueues.get(dock)?.length ?? 0) === 0) {
+            cmds.push({ type: "train", playerId: pid, buildingEid: dock, unit: "transport_barge" });
+          }
+        } else if (military.length >= Math.min(knobs.waveSize, 6) && sim.tick - ai.lastWaveTick > 15 * 60) {
+          const ship = barges[0]!;
+          const wave = military.filter((e) => !sim.garrisonOf.has(e)).slice(0, 6);
+          if (wave.length > 0) {
+            cmds.push({ type: "garrison", playerId: pid, eids: wave, buildingEid: ship });
+            ai.invasionPhase = 1;
+            ai.invasionShip = ship;
+            ai.invasionSince = sim.tick;
+          }
+        }
+      } else if (ai.invasionPhase === 1) {
+        const aboard = sim.garrisons.get(ai.invasionShip)?.length ?? 0;
+        const full = aboard >= Math.min(6, military.length + aboard);
+        const waited = sim.tick - ai.invasionSince > 15 * 90;
+        if (full || (waited && aboard > 0)) {
+          const shore = nearestWaterTile(sim, Math.trunc(Position.x[target]! / 1000), Math.trunc(Position.y[target]! / 1000));
+          if (shore) {
+            cmds.push({ type: "move", playerId: pid, eids: [ai.invasionShip], x: shore.x * 1000 + 500, y: shore.y * 1000 + 500 });
+            ai.invasionPhase = 2;
+            ai.invasionSince = sim.tick;
+          }
+        } else if (waited) {
+          ai.invasionPhase = 0; // nobody made it aboard — re-plan
+          ai.invasionShip = -1;
+        }
+      } else {
+        const dx = Position.x[ai.invasionShip]! - Position.x[target]!;
+        const dy = Position.y[ai.invasionShip]! - Position.y[target]!;
+        const troops = [...(sim.garrisons.get(ai.invasionShip) ?? [])];
+        if (dx * dx + dy * dy < 10_000 * 10_000 && troops.length > 0) {
+          cmds.push({ type: "ungarrison", playerId: pid, buildingEid: ai.invasionShip });
+          cmds.push({ type: "attack_move", playerId: pid, eids: troops, x: Position.x[target]!, y: Position.y[target]! });
+          ai.lastWaveTick = sim.tick;
+          ai.attacking = true;
+          ai.invasionPhase = 0;
+          ai.invasionShip = -1;
+        } else if (troops.length === 0 || sim.tick - ai.invasionSince > 15 * 240) {
+          ai.invasionPhase = 0; // lost the cargo or the way — re-plan
+          ai.invasionShip = -1;
+        }
+      }
+    }
   }
 
   // ── god powers: drop on the enemy base when affordable ──

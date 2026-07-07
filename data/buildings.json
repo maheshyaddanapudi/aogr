@@ -283,7 +283,9 @@
         "crush": 5
       },
       "trains": [
-        "fishing_boat"
+        "fishing_boat",
+        "war_galley",
+        "transport_barge"
       ],
       "dropoff": [
         "food"

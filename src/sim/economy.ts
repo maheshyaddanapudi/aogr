@@ -265,6 +265,54 @@ function nearestEid(sim: Sim, fromX: number, fromY: number, eids: number[]): num
 
 /* ───────────────────────── worldgen ───────────────────────── */
 
+/** Bounded flood-fill: how many connected passable tiles surround (x,y)?
+ * Stops counting at `cap` — placement only needs "big enough", not exact. */
+function openRegionSize(sim: Sim, x: number, y: number, cap: number): number {
+  const g = sim.navGrid;
+  if (!isPassable(g, x, y)) return 0;
+  const seen = new Set<number>([y * g.size + x]);
+  const qx = [x];
+  const qy = [y];
+  let head = 0;
+  while (head < qx.length && seen.size < cap) {
+    const cx = qx[head]!;
+    const cy = qy[head]!;
+    head++;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= g.size || ny >= g.size) continue;
+      const k = ny * g.size + nx;
+      if (seen.has(k) || !g.passable[k]) continue;
+      seen.add(k);
+      qx.push(nx);
+      qy.push(ny);
+    }
+  }
+  return seen.size;
+}
+
+/** A start needs ROOM: the first TC-buildable site whose walkable region can
+ * actually hold a town (≥150 tiles). Terrain pockets trap the whole player —
+ * villagers can't leave, nothing can be built (round-7 finding F5). */
+const START_REGION_MIN = 150;
+function findViableStart(sim: Sim, sx: number, sy: number, tcSize: number): { x: number; y: number } | null {
+  for (let r = 0; r < 50; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = sx + dx;
+        const y = sy + dy;
+        if (!isPassable(sim.navGrid, x, y)) continue;
+        if (openRegionSize(sim, x, y, START_REGION_MIN) < START_REGION_MIN) continue;
+        const site = findBuildSite(sim, x, y, tcSize);
+        if (site) return site;
+      }
+    }
+  }
+  return null;
+}
+
 export function setupSkirmish(sim: Sim): void {
   const starts = [
     { x: 48, y: 100 },
@@ -275,7 +323,7 @@ export function setupSkirmish(sim: Sim): void {
     const start = starts[pid] ?? starts[0]!;
     const tcSize = getBuildingStats("town_center").size;
     const near = nearestPassableTile(sim, start.x, start.y);
-    const site = findBuildSite(sim, near.x, near.y, tcSize) ?? { x: near.x, y: near.y };
+    const site = findViableStart(sim, near.x, near.y, tcSize) ?? findBuildSite(sim, near.x, near.y, tcSize) ?? { x: near.x, y: near.y };
     const tc = spawnBuilding(sim, pid, "town_center", site.x, site.y, true);
     getPlayer(sim, pid).townCenterEid = tc;
     // villagers + scout around the TC

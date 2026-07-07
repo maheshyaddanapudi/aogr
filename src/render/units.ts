@@ -80,6 +80,7 @@ const UNIT_MODELS: Record<string, ModelCfg> = {
   scout: cfg("horse_white.gltf", 1.35, BITE, { animal: true }),
   fishing_boat: cfg("PROC_BOAT", 1.0, BITE),
   war_galley: cfg("PROC_BOAT", 1.6, BITE),
+  transport_barge: cfg("PROC_BOAT", 1.4, BITE),
   caravan: cfg("donkey.gltf", 1.4, BITE, { animal: true }),
   infantry_base: cfg("knight.glb", 1.15, MELEE, {
     loadout: /^(Knight_(Arm|Body|Head|Leg|Helmet|Cape).*|1H_Sword|Round_Shield)$/,
@@ -127,7 +128,7 @@ const CLASS_MODELS: Record<string, ModelCfg> = {
   siege: cfg("barbarian.glb", 1.6, TWOHAND),
   hero: UNIT_MODELS.forgeborn!,
   myth: UNIT_MODELS.coral_golem!,
-  ship: UNIT_MODELS.caravan!,
+  ship: UNIT_MODELS.fishing_boat!, // any future hull renders as a boat, not a swimming donkey
 };
 
 export function resolveModelCfg(unitId: string, unitClass: string): { key: string; cfg: ModelCfg } {
@@ -355,11 +356,16 @@ export async function createUnitRenderer(scene: Scene, shadows: CascadedShadowGe
     }
   };
 
-  const corpses: Array<{ node: TransformNode; born: number }> = [];
+  const CORPSE_CAP = 120; // battles can kill faster than corpses fade — bound the pool
+  const corpses: Array<{ node: TransformNode; born: number; groundY: number }> = [];
   const spawnCorpse: UnitRenderer["spawnCorpse"] = (unitId, unitClass, pantheon, team, x, z, groundY) => {
     const { key, cfg: c } = resolveModelCfg(unitId, unitClass);
     const pool = pools.get(`${key}_${team % TEAM_COLORS.length}_${c.mythTint ? pantheon : "x"}`);
     if (!pool || pool === "loading") return;
+    if (corpses.length >= CORPSE_CAP) {
+      corpses[0]!.node.dispose();
+      corpses.shift();
+    }
     const node = new TransformNode(`corpse${corpses.length}`, scene);
     for (const m of pool[0]!.meshes) {
       const inst = m.createInstance(`c${corpses.length}_${m.name}`);
@@ -370,9 +376,9 @@ export async function createUnitRenderer(scene: Scene, shadows: CascadedShadowGe
     }
     node.position.set(x, groundY, z);
     node.rotation.z = Math.PI / 2; // fallen
-    corpses.push({ node, born: performance.now() });
+    corpses.push({ node, born: performance.now(), groundY });
   };
-  // corpses sink and vanish over ~1.6s (driven from update())
+  // corpses sink and vanish over ~1.6s of WALL TIME (frame rate independent)
   const updateCorpses = () => {
     const now = performance.now();
     for (let i = corpses.length - 1; i >= 0; i--) {
@@ -382,7 +388,7 @@ export async function createUnitRenderer(scene: Scene, shadows: CascadedShadowGe
         corpses.splice(i, 1);
         continue;
       }
-      corpses[i]!.node.position.y -= 0.006;
+      corpses[i]!.node.position.y = corpses[i]!.groundY - age * 0.45;
     }
   };
 

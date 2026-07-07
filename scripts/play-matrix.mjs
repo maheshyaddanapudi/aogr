@@ -191,16 +191,16 @@ window.__macro = (isWaterMap, strat) => {
     if (myB("dock").length > 0 && wood >= 130 && gold >= 70 && myUnits("war_galley").length < 2) {
       window.__cmd({ type: "train", playerId: 0, buildingEid: myB("dock")[0].eid, unit: "war_galley" });
     }
-    if (myB("dock").length > 0 && wood >= 110 && myUnits("transport_barge").length < 1 && army.length >= 4) {
+    if (myB("dock").length > 0 && wood >= 110 && myUnits("transport_barge").length < 1 && army.length >= 3) {
       window.__cmd({ type: "train", playerId: 0, buildingEid: myB("dock")[0].eid, unit: "transport_barge" });
     }
     const barge = myUnits("transport_barge")[0];
     const foes = window.__view().buildings.filter((b) => b.playerId !== 0 && b.buildingId === "town_center");
     if (barge && foes.length > 0) {
       const loaded = (S().garrisons.get(barge.eid) ?? []).length;
-      if (loaded < 4 && army.length >= 4) {
+      if (loaded < 3 && army.length >= 1) {
         window.__cmd({ type: "garrison", playerId: 0, eids: army.slice(0, 5), buildingEid: barge.eid });
-      } else if (loaded >= 4) {
+      } else if (loaded >= 3) {
         window.__cmd({ type: "move", playerId: 0, eids: [barge.eid], x: Math.round(foes[0].x * 1000), y: Math.round((foes[0].z + 4) * 1000) });
         const bd = Math.hypot(barge.x - foes[0].x, barge.z - foes[0].z);
         if (bd < 12) {

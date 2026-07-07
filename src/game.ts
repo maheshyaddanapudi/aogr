@@ -875,14 +875,29 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   (window as unknown as Record<string, unknown>).__step = (n: number) => {
     for (let i = 0; i < n; i++) {
       for (const svc of aiServices) svc.decideSyncNow(sim, queue);
-      stepSim(sim, queue.drain(sim.tick));
+      if (replayFeed) for (const rc of replayFeed.get(sim.tick) ?? []) queue.enqueue(sim.tick, rc as never);
+      const drained = queue.drain(sim.tick);
+      if (drained.length > 0) replayLog.push({ t: sim.tick, cmds: drained });
+      stepSim(sim, drained);
       if (i >= n - 3) combatFx.collect(sim.events, world.groundHeightAt); // only recent FX
       powerFx.collect(sim.events, world.groundHeightAt);
       audio.collect(sim.events);
       collectNotifications();
     }
+    // age transient FX by the simulated time — headless runs otherwise
+    // accumulate never-expiring death visuals and power meshes (soak artifact)
+    combatFx.update((n * 1000) / 15);
+    powerFx.update((n * 1000) / 15);
     checksum = simChecksum(sim);
   };
+  // replay + lockstep hooks (verify-replay E2E, harmless in production)
+  (window as unknown as Record<string, unknown>).__replay = () => ({
+    seed,
+    pantheon: getPlayer(sim, 0).pantheon,
+    majorGod: getPlayer(sim, 0).majorGod,
+    commands: replayLog,
+  });
+  (window as unknown as Record<string, unknown>).__checksum = () => simChecksum(sim);
 }
 
 // boot() is invoked exclusively by main.ts (menu or direct-boot params) —

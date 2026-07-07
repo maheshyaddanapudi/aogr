@@ -427,8 +427,8 @@ export async function createWorldObjectsRenderer(
         for (const m of v.getChildMeshes()) nodeMeshToEid.set(m, n.eid);
         nodeVisuals.set(n.eid, v);
       }
-      if (v && n.depleted) {
-        v.setEnabled(false);
+      if (v) {
+        v.setEnabled(!n.depleted); // herds refatten and fish schools respawn — re-show them
       }
     }
   };

@@ -159,6 +159,7 @@ export async function createCombatFx(scene: Scene): Promise<CombatFx> {
     for (const d of events.deaths) {
       if (!d.unitClass) continue;
       const { cfg } = resolveModelCfg((d as { unitId?: string }).unitId ?? "", d.unitClass);
+      if (cfg.file === "PROC_BOAT") continue; // procedural hull — no GLB death pose to load
       const pool = deathPools.get(cfg.file);
       if (!pool || pool === "loading") {
         if (!pool) {

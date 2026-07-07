@@ -3,22 +3,24 @@
   "version": 1,
   "difficulties": {
     "easy": {
-      "decisionIntervalTicks": 60,
+      "decisionIntervalTicks": 75,
       "villagerTarget": 14,
-      "armyTarget": 8,
-      "waveSize": 8,
+      "armyTarget": 6,
+      "waveSize": 6,
       "usePowers": false,
       "prayerVillagers": 1,
-      "mythTarget": 0
+      "mythTarget": 0,
+      "firstWaveMin": 12
     },
     "medium": {
-      "decisionIntervalTicks": 38,
-      "villagerTarget": 22,
-      "armyTarget": 14,
+      "decisionIntervalTicks": 50,
+      "villagerTarget": 16,
+      "armyTarget": 10,
       "waveSize": 10,
       "usePowers": true,
       "prayerVillagers": 2,
-      "mythTarget": 1
+      "mythTarget": 1,
+      "firstWaveMin": 9
     },
     "hard": {
       "decisionIntervalTicks": 23,
@@ -27,7 +29,8 @@
       "waveSize": 10,
       "usePowers": true,
       "prayerVillagers": 3,
-      "mythTarget": 3
+      "mythTarget": 3,
+      "firstWaveMin": 6
     },
     "easiest": {
       "decisionIntervalTicks": 120,
@@ -36,7 +39,8 @@
       "waveSize": 12,
       "usePowers": false,
       "prayerVillagers": 1,
-      "mythTarget": 0
+      "mythTarget": 0,
+      "firstWaveMin": 25
     },
     "titan": {
       "decisionIntervalTicks": 13,
@@ -45,7 +49,8 @@
       "waveSize": 8,
       "usePowers": true,
       "prayerVillagers": 3,
-      "mythTarget": 3
+      "mythTarget": 3,
+      "firstWaveMin": 5
     }
   }
 }
