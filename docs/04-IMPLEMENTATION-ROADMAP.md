@@ -165,3 +165,36 @@ fire makes sieges realistically slower than the pre-fix 16-minute win).
 - [x] CRITICAL: removed game.ts module-level auto-boot that ran a hidden second sim + render loop behind every menu match
 
 Verified: 153/153 tests, purity clean, headless smoke of every new control path.
+
+
+## Manual play-matrix (round 6): 10 full matches, human-side vs live AI
+
+| Cell | Mode | Difficulty | Map | Pantheon | Result | Game min |
+|------|------|-----------|-----|----------|--------|----------|
+| 0 | 1v1 | easiest | island | ashen_forge | **WIN** | 16 |
+| 1 | 1v1 | easy | inland | verdant_deep | loss | 16 |
+| 2 | 1v1 | medium | island | auryan_dawn | loss | 20 |
+| 3 | 1v1 | hard | archipelago | storm_concord | loss | 10 |
+| 4 | 1v1 | titan | island | ashen_forge | loss | 11 |
+| 5 | FFA | easiest | inland | storm_concord | **WIN** | 28 |
+| 6 | FFA | easy | island | auryan_dawn | loss | 33 |
+| 7 | FFA | medium | island | verdant_deep | loss | 23 |
+| 8 | FFA | hard | inland | ashen_forge | loss | 15 |
+| 9 | FFA | titan | island | storm_concord | loss | 19 |
+
+Scripted-average-player baseline: beats easiest in both modes, loses upward — the
+difficulty gradient is monotone (harder AIs end the game faster). Zero invariant
+violations across all 10 matches (resources finite/non-negative, ships afloat,
+garrison maps consistent, herds leashed, no hangs); all AIs verified active by
+minute 6 in every match.
+
+**Bugs captured by playing (all fixed, TDD):**
+- Inland/Archipelago map types crashed boot — partial terrain config missing octaves
+  (the map-type menu options had never actually been played off-island)
+- Auto-sited docks could be founded inland; ships then spawned on grass
+- The round-5 "ships launch onto water" patch had silently targeted the wrong file
+- Google Fonts CDN dependency (now self-hosted via fontsource)
+- Matrix-runner corrections: age-up requires a minor-god pick; AI liveness judged
+  mid-game, not from post-defeat rubble
+
+Runner: `scripts/play-matrix.mjs` (committed, reusable for future regressions).
