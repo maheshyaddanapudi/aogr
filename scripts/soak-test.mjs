@@ -5,7 +5,7 @@ const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=sw
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
 const errs = [];
 page.on("pageerror", (e) => errs.push(e.message.slice(0, 140)));
-await page.goto("http://localhost:4173/aogr/?paused&seed=4242&ai=medium&pantheon=verdant_deep", { waitUntil: "networkidle" });
+await page.goto("http://localhost:4173/aogr/?paused&seed=4242&ai=off&pantheon=verdant_deep", { waitUntil: "networkidle" });
 await page.waitForFunction(() => window.__sim !== undefined, null, { timeout: 240000 });
 // a passive-ish but alive player: eco + defense, never wins → long war
 await page.evaluate(() => {
@@ -43,10 +43,29 @@ const pantheons = await import("node:fs").then((fs) => JSON.parse(fs.readFileSyn
 const fm = {};
 for (const [pid, pan] of Object.entries(pantheons)) fm[pid] = pan.majors?.[0]?.minorPool?.classical?.[0];
 await page.evaluate((f) => { window.__fm = f; }, fm);
+// standing defenders so the synthetic raids churn combat without ending the match
+await page.evaluate(() => {
+  const tc = window.__view().buildings.find((b) => b.playerId === 0 && b.buildingId === "town_center");
+  const eids = [];
+  for (let i = 0; i < 10; i++) eids.push(window.__spawn(0, "infantry_base", tc.x - 4 + (i % 5) * 2, tc.z + 5));
+  window.__cmd({ type: "stance", playerId: 0, eids, stance: 2 });
+  window.__step(2);
+});
 const samples = [];
 for (let min = 0; min < 90; min++) {
   const t0 = Date.now();
-  await page.evaluate(() => { window.__soak(); window.__step(900); for (let i = 0; i < 2; i++) window.__forceFrame(); });
+  await page.evaluate((m) => {
+    window.__soak();
+    // synthetic raid every minute: combat + deaths + corpses + FX churn
+    const tc = window.__view().buildings.find((b) => b.playerId === 0 && b.buildingId === "town_center");
+    if (tc && m > 2) {
+      const eids = [];
+      for (let i = 0; i < 2; i++) eids.push(window.__spawn(1, i % 2 ? "archer_base" : "infantry_base", tc.x + 8 + i, tc.z + 6));
+      window.__cmd({ type: "attack", playerId: 1, eids, targetEid: -1 });
+    }
+    window.__step(900);
+    for (let i = 0; i < 2; i++) window.__forceFrame();
+  }, min);
   const s = await page.evaluate(() => ({
     tick: window.__sim.tick, winner: window.__sim.winner,
     heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1,
@@ -60,7 +79,7 @@ for (let min = 0; min < 90; min++) {
   samples.push(s);
   if (min % 10 === 0) console.log(`min ${min + 1}: heap ${s.heapMB}MB meshes ${s.meshes} tnodes ${s.tnodes} mats ${s.mats} units ${s.units} wall ${s.wallMs}ms winner ${s.winner}`);
   if (s.winner >= 0) { console.log(`match ended at min ${min + 1}, winner ${s.winner} — continuing sampling post-game 5 min`); }
-  if (s.winner >= 0 && min > 5) break;
+  if (s.winner >= 0) { console.log("unexpected early end"); break; }
 }
 const a = samples[Math.min(9, samples.length - 1)], z = samples[samples.length - 1];
 console.log(`\nDRIFT min10→end: heap ${a.heapMB}→${z.heapMB}MB, meshes ${a.meshes}→${z.meshes}, tnodes ${a.tnodes}→${z.tnodes}, mats ${a.mats}→${z.mats}, wall ${a.wallMs}→${z.wallMs}ms`);

@@ -53,14 +53,17 @@ for (let mi = start; mi < missions.length; mi++) {
       const myB = (id, act = true) => view.buildings.filter((b) => b.playerId === 0 && (!id || b.buildingId === id) && (!act || b.active));
       const G = S.stores.GatherTask;
       const idle = my("villager").filter((u) => G.phase[u.eid] === 0).map((u) => u.eid);
+      window.__rot = window.__rot ?? 0;
+      const ROT = [[0, 3, 5], [1], [1], [0, 3, 5], [2], [1]];
       const tc = myB("town_center")[0];
       if (!tc) return;
       // eco basics
       for (const eid of idle) {
         const u = view.units.find((x) => x.eid === eid);
+        const types = ROT[window.__rot++ % ROT.length];
         let best = null, bd = 1e18;
         for (const n of view.nodes) {
-          if (n.depleted || ![0, 1, 2, 3, 5].includes(n.resType)) continue;
+          if (n.depleted || !types.includes(n.resType)) continue;
           if (n.resType === 5) { const o = S.herdOwner.get(n.eid); if (o !== undefined && o !== 0) continue; }
           const d = (n.x - u.x) ** 2 + (n.z - u.z) ** 2;
           if (d < bd) { bd = d; best = n; }
