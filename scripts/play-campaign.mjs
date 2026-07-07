@@ -94,6 +94,15 @@ for (let mi = start; mi < missions.length; mi++) {
       if (P.age === 0 && food >= 420 && myB("temple").length > 0 && !P.researchQueue.some((r) => r.techId === "age_classical")) {
         window.__cmd({ type: "research", playerId: 0, tech: "age_classical", minorGod: window.__firstMinor[P.pantheon] });
       }
+      // an average player upgrades their line: armory techs when affordable
+      if (P.age >= 1 && myB("armory").length > 0 && P.researchQueue.length === 0) {
+        for (const tech of ["bronze_weapons", "bronze_mail"]) {
+          if (!P.researchedTechs.includes(tech) && food >= 160 && gold >= 110) {
+            window.__cmd({ type: "research", playerId: 0, tech });
+            break;
+          }
+        }
+      }
       if (obj === "wonder") {
         // age-ups REQUIRE a minor-god pick — omitting it is silently rejected
         if (P.age === 1 && food >= 850 && gold >= 550 && myB("armory").length > 0 && !P.researchQueue.some((r) => r.techId.startsWith("age_"))) window.__cmd({ type: "research", playerId: 0, tech: "age_heroic", minorGod: window.__minorPools[P.pantheon].heroic });

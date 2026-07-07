@@ -610,6 +610,9 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     notifyArmed = true;
   };
 
+  // mission objective probe — assigned in the campaign block below, called from
+  // the tick paths (wall-clock intervals get throttled in background tabs)
+  let missionCheck: (() => void) | null = null;
   // ?paused: gate-capture mode — sim/render driven only via __step/__forceFrame
   const loopCtl = params.has("paused") ? null : startLoop({
     onTick: () => {
@@ -628,6 +631,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       }
       audio.collect(sim.events);
       collectNotifications();
+      if (sim.tick % 450 === 0) missionCheck?.(); // tick-driven: browser timer throttling must not eat a mission win
       if (sim.tick % 15 === 0) checksum = simChecksum(sim);
     },
     onFrame: (alpha, dtMs) => {
@@ -719,7 +723,8 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
         if (sim.winner < 0) sim.winner = 0; // triggers the victory overlay
       }
     };
-    setInterval(checkObjective, 500);
+    missionCheck = checkObjective;
+    setInterval(checkObjective, 500); // belt-and-braces for a paused-but-visible game
   }
 
   // victory / defeat overlay
@@ -888,6 +893,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     // accumulate never-expiring death visuals and power meshes (soak artifact)
     combatFx.update((n * 1000) / 15);
     powerFx.update((n * 1000) / 15);
+    missionCheck?.();
     checksum = simChecksum(sim);
   };
   // replay + lockstep hooks (verify-replay E2E, harmless in production)
