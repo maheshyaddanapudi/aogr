@@ -86,15 +86,18 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   // spawns battle lines — must never run in a real menu-started match.
   const demo = params.has("demo") && !config?.loadSnapshot;
 
+  // direct-boot affordances: ?opp / ?map / ?pantheon / ?major mirror the menu
+  const mapType = config?.mapType ?? (params.get("map") as GameConfig["mapType"] | null) ?? "island";
   const terrainCfg =
-    config?.mapType === "inland" ? { waterLevelFp: -3000 } : config?.mapType === "archipelago" ? { waterLevelFp: 200 } : undefined;
-  const playerCount = 1 + Math.max(1, Math.min(2, config?.opponents ?? 1));
+    mapType === "inland" ? { waterLevelFp: -3000 } : mapType === "archipelago" ? { waterLevelFp: 200 } : undefined;
+  const playerCount = 1 + Math.max(1, Math.min(2, config?.opponents ?? Number(params.get("opp") ?? 1)));
   const sim = config?.loadSnapshot
     ? deserializeSim(config.loadSnapshot)
     : createSim(seed, terrainCfg as never, { players: playerCount, skirmish: true });
-  if (!config?.loadSnapshot && config?.pantheon) {
-    getPlayer(sim, 0).pantheon = config.pantheon;
-    getPlayer(sim, 0).majorGod = config.majorGod ?? getPantheon(config.pantheon).majors[0]!.id;
+  const wantPantheon = config?.pantheon ?? params.get("pantheon") ?? undefined;
+  if (!config?.loadSnapshot && wantPantheon) {
+    getPlayer(sim, 0).pantheon = wantPantheon;
+    getPlayer(sim, 0).majorGod = config?.majorGod ?? params.get("major") ?? getPantheon(wantPantheon).majors[0]!.id;
   }
   const queue = new CommandQueue();
 
@@ -172,7 +175,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const powerFx = createPowerFx(world.scene);
   const fog = createFogRenderer(world.scene, sim.terrain.size, sim.terrain);
   const audio = createAudioSystem();
-  const ambience = createAmbience(config?.mapType !== "inland");
+  const ambience = createAmbience(mapType !== "inland");
   window.addEventListener("pointerdown", function startAmb() {
     window.removeEventListener("pointerdown", startAmb);
     ambience.start();
