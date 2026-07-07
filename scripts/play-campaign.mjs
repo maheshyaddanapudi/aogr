@@ -136,6 +136,15 @@ for (let mi = start; mi < missions.length; mi++) {
           }
         }
       }
+      // god powers: hurl the first unlocked power at the enemy base (avg player does this)
+      if (P.minorGods.length > 0 && P.favorMilli > 60000 && (window.__camp.casts ?? 0) < 4) {
+        const foesTc = view.buildings.filter((b) => b.playerId !== 0 && b.buildingId === "town_center");
+        const power = window.__minorPowerMap?.[P.minorGods[0]];
+        if (power && foesTc.length > 0) {
+          window.__cmd({ type: "cast_power", playerId: 0, power, x: Math.round(foesTc[0].x * 1000), y: Math.round(foesTc[0].z * 1000) });
+          window.__camp.casts = (window.__camp.casts ?? 0) + 1;
+        }
+      }
       // military + defense/attack
       for (const bar of myB("barracks")) {
         if (P.age >= 1 && food >= 60 && gold >= 50 && P.popUsed < P.popCap && (S.trainQueues.get(bar.eid)?.length ?? 0) < 2) {
@@ -174,14 +183,18 @@ for (let mi = start; mi < missions.length; mi++) {
   const pantheonsData = JSON.parse(readFileSync(new URL("../data/pantheons.json", import.meta.url), "utf8")).pantheons;
   const fm = {};
   const pools = {};
+  const minorPower = {};
   for (const [pid, pan] of Object.entries(pantheonsData)) {
     fm[pid] = pan.majors?.[0]?.minorPool?.classical?.[0];
     pools[pid] = {
       heroic: pan.majors?.[0]?.minorPool?.heroic?.[0],
       mythic: pan.majors?.[0]?.minorPool?.mythic?.[0],
     };
+    for (const tier of Object.values(pan.minors ?? {})) {
+      for (const m of Array.isArray(tier) ? tier : []) minorPower[m.id] = m.grants?.power;
+    }
   }
-  await page.evaluate(([f, water, mp]) => { window.__firstMinor = f; window.__isWaterMission = water; window.__minorPools = mp; }, [fm, ms.mapType !== "inland", pools]);
+  await page.evaluate(([f, water, mp, pw]) => { window.__firstMinor = f; window.__isWaterMission = water; window.__minorPools = mp; window.__minorPowerMap = pw; }, [fm, ms.mapType !== "inland", pools, minorPower]);
   void FIRST_MINOR;
 
   const objType = ms.objective.type === "conquest" && ms.mapType === "archipelago" ? "naval" : ms.objective.type;
