@@ -63,6 +63,20 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const hudRoot = document.getElementById("hud-root")!;
 
   const params = new URLSearchParams(location.search);
+  // saved-game envelope: mission context rides along with the sim snapshot so a
+  // mid-mission save resumes as that mission, not as a plain skirmish
+  let snapshotJson = config?.loadSnapshot;
+  if (snapshotJson) {
+    try {
+      const env = JSON.parse(snapshotJson) as { aogrSave?: number; mission?: number; sim?: string };
+      if (env && typeof env === "object" && env.aogrSave === 1 && typeof env.sim === "string") {
+        if (config && env.mission !== undefined) config.mission = env.mission;
+        snapshotJson = env.sim;
+      }
+    } catch {
+      /* legacy raw snapshot — load as-is */
+    }
+  }
   const missions = (campaignJson as { missions: Array<Record<string, unknown>> }).missions;
   const mission = config?.mission !== undefined ? (missions[config.mission] as {
     id: string; title: string; pantheon: string; majorGod: string; seed: number;
@@ -91,8 +105,8 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   const terrainCfg =
     mapType === "inland" ? { waterLevelFp: -3000 } : mapType === "archipelago" ? { waterLevelFp: 200 } : undefined;
   const playerCount = 1 + Math.max(1, Math.min(2, config?.opponents ?? Number(params.get("opp") ?? 1)));
-  const sim = config?.loadSnapshot
-    ? deserializeSim(config.loadSnapshot)
+  const sim = snapshotJson
+    ? deserializeSim(snapshotJson)
     : createSim(seed, terrainCfg, { players: playerCount, skirmish: true });
   const wantPantheon = config?.pantheon ?? params.get("pantheon") ?? undefined;
   if (!config?.loadSnapshot && wantPantheon) {
@@ -762,8 +776,9 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   saveBtn.className = "age-up-btn save-btn";
   saveBtn.textContent = "Save";
   saveBtn.title = "Save the match (resume from the main menu)";
+  const saveEnvelope = (): string => JSON.stringify({ aogrSave: 1, mission: config?.mission, sim: serializeSim(sim) });
   saveBtn.addEventListener("click", () => {
-    void saveGame(serializeSim(sim)).then(() => {
+    void saveGame(saveEnvelope()).then(() => {
       saveBtn.textContent = "Saved ✓";
       setTimeout(() => (saveBtn.textContent = "Save"), 1500);
     });
@@ -835,7 +850,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   menuBtn.textContent = "Menu";
   menuBtn.title = "Save and return to the main menu";
   menuBtn.addEventListener("click", () => {
-    void saveGame(serializeSim(sim)).finally(() => location.assign(location.pathname));
+    void saveGame(saveEnvelope()).finally(() => location.assign(location.pathname));
   });
   document.querySelector(".age-wrap")?.appendChild(menuBtn);
   // Debug handles for headless gate probes (harmless in production).

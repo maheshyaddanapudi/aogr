@@ -54,23 +54,27 @@ describe("DISCOVERY", () => {
     }
   });
 
-  it.fails("KNOWN BUG P3: a herd that defects mid-gather should stop feeding the old owner", () => {
+  it("FIXED P3: a herd that defects mid-gather should stop feeding the old owner", () => {
     const sim = createSim(779, undefined, SKIRMISH);
     const { ResourceNode, UnitRef, Owner, GatherTask, Position } = sim.stores;
     const herd = Array.from(query(sim.world, [ResourceNode])).filter((e) => ResourceNode.resType[e] === 5)[0]!;
     const vill = Array.from(query(sim.world, [UnitRef, GatherTask])).filter((e) => Owner.playerId[e] === 0)[0]!;
     stepSim(sim, [{ type: "gather", playerId: 0, eids: [vill], nodeEid: herd }]);
     run(sim, 15 * 8); // walk + start gathering
-    // enemy shepherd claims it
+    // enemy shepherd claims it; the old gatherer walks off so proximity can't re-claim
+    // (herdables convert to the NEAREST unit — standing beside it would win it back)
     spawnUnitEntity(sim, 1, "villager", Position.x[herd]! + 600, Position.y[herd]!);
+    run(sim, 15 * 2);
+    stepSim(sim, [{ type: "move", playerId: 0, eids: [vill], x: Position.x[herd]! - 12_000, y: Position.y[herd]! }]);
     run(sim, 15 * 4);
     expect(sim.herdOwner.get(herd), "herd defected").toBe(1);
+    expect(GatherTask.phase[vill], "old owner's villager dropped the herd task").toBe(0);
     const foodBefore = getPlayer(sim, 0).foodMilli;
     run(sim, 15 * 20);
     expect(getPlayer(sim, 0).foodMilli, "old owner no longer milks the defected herd").toBe(foodBefore);
   });
 
-  it.fails("KNOWN BUG P4: a boat ordered to OPEN WATER should go there — not to the nearest beach", () => {
+  it("FIXED P4: a boat ordered to OPEN WATER should go there — not to the nearest beach", () => {
     const sim = createSim(1101, undefined, SKIRMISH);
     const { Position } = sim.stores;
     const w = nearestWaterTile(sim, 100, 100)!;

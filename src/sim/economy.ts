@@ -556,6 +556,16 @@ export function economySystem(sim: Sim): void {
     const py = Position.y[eid]!;
     const node = GatherTask.nodeEid[eid]!;
 
+    // a herd that defected to another player stops feeding the old owner
+    if ((phase === 1 || phase === 2) && ResourceNode.resType[node] === RES_INDEX.herd) {
+      const herdOwner = sim.herdOwner.get(node);
+      if (herdOwner !== undefined && herdOwner !== Owner.playerId[eid]) {
+        GatherTask.phase[eid] = 0;
+        MoveState.active[eid] = 0;
+        continue;
+      }
+    }
+
     if (phase === 1) {
       // walking to node
       if (ResourceNode.amountMilli[node]! <= 0) {
@@ -790,6 +800,10 @@ export function economySystem(sim: Sim): void {
     }
     head.ticksLeft--;
     if (head.ticksLeft <= 0) {
+      // population gate at COMPLETION too: room may have filled while training —
+      // hold the finished unit in the queue until space frees up (AoM behavior)
+      const holder = getPlayer(sim, Owner.playerId[beid]!);
+      if (holder.popUsed + getUnitStats(head.unitId).pop > Math.min(holder.popCap, POP_CAP_ABSOLUTE)) continue;
       q.shift();
       if (q.length === 0) sim.trainQueues.delete(beid);
       const bx = Math.trunc(Position.x[beid]! / 1000);
@@ -814,6 +828,7 @@ export function economySystem(sim: Sim): void {
         t = nearestPassableTile(sim, bx, by + Math.trunc(size / 2) + 1);
       }
       const eid = spawnUnitEntity(sim, Owner.playerId[beid]!, head.unitId, t.x * 1000 + 500, t.y * 1000 + 500);
+      holder.popUsed += getUnitStats(head.unitId).pop; // keep the gate honest within this tick (recomputed later)
       if (Building.rallyX[beid] !== 0 || Building.rallyY[beid] !== 0) {
         setMoveTarget(sim, eid, Building.rallyX[beid]!, Building.rallyY[beid]!);
         // rally on a resource: gatherers go straight to work
@@ -821,6 +836,10 @@ export function economySystem(sim: Sim): void {
           let node = -1;
           for (const n of Array.from(query(sim.world, [ResourceNode])).sort((a, b) => a - b)) {
             if (ResourceNode.amountMilli[n]! <= 0) continue;
+            if (ResourceNode.resType[n] === RES_INDEX.herd) {
+              const o = sim.herdOwner.get(n);
+              if (o !== undefined && o !== Owner.playerId[beid]) continue;
+            }
             const dx = Position.x[n]! - Building.rallyX[beid]!;
             const dy = Position.y[n]! - Building.rallyY[beid]!;
             if (dx * dx + dy * dy <= 2000 * 2000) { node = n; break; }
@@ -868,9 +887,15 @@ function goDropoff(sim: Sim, eid: number): void {
 }
 
 function retargetNode(sim: Sim, eid: number): void {
-  const { Position, GatherTask, MoveState } = sim.stores;
+  const { Position, GatherTask, MoveState, Owner } = sim.stores;
   const kind = RES_BY_INDEX[GatherTask.carriedType[eid]!]!;
-  const nodes = findResourceNodes(sim, kind);
+  let nodes = findResourceNodes(sim, kind);
+  if (kind === "herd") {
+    nodes = nodes.filter((n) => {
+      const o = sim.herdOwner.get(n);
+      return o === undefined || o === Owner.playerId[eid];
+    });
+  }
   if (nodes.length === 0) {
     GatherTask.phase[eid] = 0;
     MoveState.active[eid] = 0;

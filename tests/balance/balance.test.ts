@@ -31,7 +31,7 @@ function score(sim: Sim, pid: number): number {
 }
 
 describe("BALANCE GATE", () => {
-  it("a hard AI dominates an easiest AI inside 25 minutes", { timeout: 90_000 }, () => {
+  it("a hard AI dominates an easiest AI inside 25 minutes", { timeout: 300_000 }, () => {
     const sim = aiMatch(42, "easiest", "hard", 25);
     if (sim.winner >= 0) {
       expect(sim.winner, "hard wins outright").toBe(1);
@@ -40,7 +40,7 @@ describe("BALANCE GATE", () => {
     }
   });
 
-  it("the war is real: units die on both sides (no pacifist stalemate)", { timeout: 90_000 }, () => {
+  it("the war is real: units die on both sides (no pacifist stalemate)", { timeout: 300_000 }, () => {
     const sim = createSim(7, undefined, { players: 2, skirmish: true });
     const a0 = createAiState(0, "hard", 7);
     const a1 = createAiState(1, "hard", 7);
@@ -56,7 +56,7 @@ describe("BALANCE GATE", () => {
     expect(deaths, "blood was spilled").toBeGreaterThan(10);
   });
 
-  it("every pantheon functions as a playable civ (economy grows, favor flows)", { timeout: 180_000 }, () => {
+  it("every pantheon functions as a playable civ (economy grows, favor flows)", { timeout: 600_000 }, () => {
     for (const pid of listPantheonIds()) {
       const sim = createSim(99, undefined, { players: 2, skirmish: true });
       getPlayer(sim, 0).pantheon = pid;

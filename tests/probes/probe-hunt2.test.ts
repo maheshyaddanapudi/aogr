@@ -22,7 +22,7 @@ describe("DISCOVERY 2", () => {
     expect(won, "wonder countdown crowns the builder").toBe(true);
   });
 
-  it.fails("KNOWN BUG P6: queued training must respect the population cap at completion", () => {
+  it("FIXED P6: queued training must respect the population cap at completion", () => {
     const sim = createSim(882, undefined, SKIRMISH);
     const p = getPlayer(sim, 0);
     p.foodMilli = 5_000_000;
@@ -41,7 +41,7 @@ describe("DISCOVERY 2", () => {
     expect(getPlayer(sim, 0).popUsed, "population never exceeds the cap").toBeLessThanOrEqual(getPlayer(sim, 0).popCap);
   });
 
-  it.fails("KNOWN BUG P7: closing a gate with a unit standing on it must not trap the unit in a wall", () => {
+  it("FIXED P7: closing a gate with a unit standing on it must not trap the unit in a wall", () => {
     const sim = createSim(883, undefined, SKIRMISH);
     const g = sim.navGrid;
     let gx = 0, gy = 0;

@@ -298,10 +298,15 @@ export function computeSettlements(sim: Sim): Array<{ x: number; y: number }> {
   });
 }
 
-/** Point a unit's MoveState at a world position (commands & economy use this). */
+/** Point a unit's MoveState at a world position (commands & economy use this).
+ * Naval units snap the target to water, land units to passable ground — a boat
+ * ordered to open water must not divert to the nearest beach (and vice versa). */
 export function setMoveTarget(sim: Sim, eid: number, xFp: number, yFp: number): void {
-  const { MoveState } = sim.stores;
-  const tile = nearestPassableTile(sim, Math.trunc(xFp / 1000), Math.trunc(yFp / 1000));
+  const { MoveState, UnitRef } = sim.stores;
+  const tx = Math.trunc(xFp / 1000);
+  const ty = Math.trunc(yFp / 1000);
+  const naval = hasComponent(sim.world, eid, UnitRef) && getUnitStatsByIndex(UnitRef.typeIndex[eid]!).naval;
+  const tile = naval ? (nearestWaterTile(sim, tx, ty) ?? { x: tx, y: ty }) : nearestPassableTile(sim, tx, ty);
   MoveState.active[eid] = 1;
   MoveState.targetX[eid] = tile.x * 1000 + 500;
   MoveState.targetY[eid] = tile.y * 1000 + 500;
@@ -406,14 +411,12 @@ function applyCommand(sim: Sim, cmd: Command): void {
     }
     case "move": {
       const { MoveState, Owner, UnitRef } = sim.stores;
-      const tile = nearestPassableTile(
-        sim,
-        Math.trunc(cmd.x / fpFromInt(1)),
-        Math.trunc(cmd.y / fpFromInt(1)),
-      );
-      const key = tileKey(sim, tile.x, tile.y);
-      const targetX = tile.x * 1000 + 500;
-      const targetY = tile.y * 1000 + 500;
+      const rawTx = Math.trunc(cmd.x / fpFromInt(1));
+      const rawTy = Math.trunc(cmd.y / fpFromInt(1));
+      // land units snap to passable ground, boats snap to water — a mixed
+      // selection splits so ships never divert to the nearest beach (and back)
+      const landTile = nearestPassableTile(sim, rawTx, rawTy);
+      const waterTile = nearestWaterTile(sim, rawTx, rawTy);
       let sorted = [...cmd.eids].sort((a, b) => a - b);
       const formation = (cmd as { formation?: number }).formation ?? 0;
       // battle order: melee take the leading rows (slots fill toward the target)
@@ -426,15 +429,19 @@ function applyCommand(sim: Sim, cmd: Command): void {
       for (const eid of sorted) {
         if (Owner.playerId[eid] !== cmd.playerId) continue;
         if (!hasComponent(sim.world, eid, UnitRef)) continue;
+        const naval = getUnitStatsByIndex(UnitRef.typeIndex[eid]!).naval;
+        const tile = naval ? (waterTile ?? landTile) : landTile;
         // grid slot for this unit (single units keep the exact target)
-        let ux = targetX;
-        let uy = targetY;
-        let ukey = key;
+        let ux = tile.x * 1000 + 500;
+        let uy = tile.y * 1000 + 500;
+        let ukey = tileKey(sim, tile.x, tile.y);
         if (sorted.length > 1) {
           const dx = (slot % w) - Math.trunc((w - 1) / 2);
           let dy = Math.trunc(slot / w) - Math.trunc((w - 1) / 2);
           if ((cmd as { formation?: number }).formation === 2) dy = -dy; // front rows face the approach
-          const t = nearestPassableTile(sim, tile.x + dx, tile.y + dy);
+          const t = naval
+            ? (nearestWaterTile(sim, tile.x + dx, tile.y + dy) ?? tile)
+            : nearestPassableTile(sim, tile.x + dx, tile.y + dy);
           ux = t.x * 1000 + 500;
           uy = t.y * 1000 + 500;
           ukey = tileKey(sim, t.x, t.y);
@@ -536,13 +543,25 @@ function unitMovementSystem(sim: Sim): void {
         if (d <= 400) {
           MoveState.active[eid] = 0;
         } else {
-          const nx = Position.x[eid]! + Math.trunc((dx * st.speedFpPerTick) / (d || 1));
-          const ny = Position.y[eid]! + Math.trunc((dy * st.speedFpPerTick) / (d || 1));
+          const stepX = Math.trunc((dx * st.speedFpPerTick) / (d || 1));
+          const stepY = Math.trunc((dy * st.speedFpPerTick) / (d || 1));
+          const nx = Position.x[eid]! + stepX;
+          const ny = Position.y[eid]! + stepY;
+          // straight line first; if the bow touches land, slide along one axis
+          // (hug the coast around promontories instead of giving up)
           if (isWaterTile(sim, Math.trunc(nx / 1000), Math.trunc(ny / 1000))) {
             Position.x[eid] = nx;
             Position.y[eid] = ny;
-            Velocity.x[eid] = Math.trunc((dx * st.speedFpPerTick) / (d || 1));
-            Velocity.y[eid] = Math.trunc((dy * st.speedFpPerTick) / (d || 1));
+            Velocity.x[eid] = stepX;
+            Velocity.y[eid] = stepY;
+          } else if (stepX !== 0 && isWaterTile(sim, Math.trunc(nx / 1000), Math.trunc(Position.y[eid]! / 1000))) {
+            Position.x[eid] = nx;
+            Velocity.x[eid] = stepX;
+            Velocity.y[eid] = 0;
+          } else if (stepY !== 0 && isWaterTile(sim, Math.trunc(Position.x[eid]! / 1000), Math.trunc(ny / 1000))) {
+            Position.y[eid] = ny;
+            Velocity.x[eid] = 0;
+            Velocity.y[eid] = stepY;
           } else {
             MoveState.active[eid] = 0;
             Velocity.x[eid] = 0;
@@ -754,6 +773,19 @@ function handleGarrisonCommand(sim: Sim, cmd: Command): boolean {
       }
     }
     sim.flowFields.clear();
+    if (open) {
+      // closing: anyone standing in the passage is pushed to open ground, not walled in
+      const units = Array.from(query(sim.world, [Position, UnitRef])).sort((a, b) => a - b);
+      for (const eid of units) {
+        const utx = Math.trunc(Position.x[eid]! / 1000);
+        const uty = Math.trunc(Position.y[eid]! / 1000);
+        if (utx >= tx && utx < tx + stats.size && uty >= ty && uty < ty + stats.size) {
+          const t = nearestPassableTile(sim, utx, uty);
+          Position.x[eid] = t.x * 1000 + 500;
+          Position.y[eid] = t.y * 1000 + 500;
+        }
+      }
+    }
     return true;
   }
   if (cmd.type === "patrol") {
