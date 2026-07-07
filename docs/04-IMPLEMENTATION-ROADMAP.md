@@ -198,3 +198,32 @@ minute 6 in every match.
   mid-game, not from post-defeat rubble
 
 Runner: `scripts/play-matrix.mjs` (committed, reusable for future regressions).
+
+
+## Discovery round (round 7): strategy sweep + campaign + soak + 11 probes
+
+18 additional played matches (8 strategy-diverse + campaign attempts + soaks) and
+three probe batches. Confirmed findings cataloged below — documented as it.fails
+tests in tests/probes/ where sim-reproducible; FIXES PENDING (list-first round).
+
+| # | Finding | Class | Evidence |
+|---|---------|-------|----------|
+| F1 | Defected herds keep feeding their old owner (ownership checked only at order time) | sim bug | probe P3 (it.fails) |
+| F2 | Boats ordered to open water sail to the nearest beach (move targets snap to land) | sim bug | probe P4 (it.fails) |
+| F3 | Population cap overflows via queued training (cap checked at queue, not completion) | sim bug | probe P6 (it.fails) |
+| F4 | Closing a gate traps units standing on it inside an impassable tile | sim bug | probe P7 (it.fails) |
+| F5 | One archipelago seed produced a fully inactive AI (starts look resourced — suspect reachability) | worldgen/AI | matrix cell 17 |
+| F6 | The AI never crosses water — no transport usage; split-island maps are human-invasion-only | AI gap | cells 16/17 |
+| F7 | Scripted naval invasion stalled in real-match conditions (barge flow never launched) | needs trace | cell 16 |
+| F8 | Campaign missions hard-stall the economy ~min 10; identical params via direct boot WIN @15 | campaign bug | M1 ×2 vs cell 18 |
+| F9 | Difficulty curve steep: only *easiest* beatable by an average scripted player, all strategies | balance | 18 matches |
+| F10 | Titan AI never reaches Mythic even unopposed (hard does in 22 min) — synthesized knobs regress development | AI/data bug | probe P11 (it.fails) |
+| F11 | Material count grows unbounded under sustained combat (+~2.5/min); wall-time degraded 40× in headless soak | render leak | soak v3 |
+| F12 | Saving mid-campaign-mission drops the mission — Continue resumes as objective-less skirmish | design gap | code-read |
+| F13 | Corpse visuals accumulate when frame rate is very low (cleanup is frame-driven) | render edge | soak v3 |
+| F14 | Browser replay round-trip (record → download → watch) never verified end-to-end | untested path | — |
+
+Clean under stress: kitchen-sink save/load lockstep, no dangling town-center refs,
+out-of-bounds power casts harmless, ungarrison placement, player wonder victory,
+archipelago start resourcing across 6 seeds, rush/boom/turtle matches with zero
+invariant violations, heap flat across all soaks.

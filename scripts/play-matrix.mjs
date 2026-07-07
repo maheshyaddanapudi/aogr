@@ -45,6 +45,8 @@ const CELLS = [
   { mode: "1v1", ai: "medium", opp: 1, map: "inland", pantheon: "ashen_forge", seed: 3666, strategy: "turtle" },
   { mode: "1v1", ai: "easy", opp: 1, map: "archipelago", pantheon: "storm_concord", seed: 3777, strategy: "naval" },
   { mode: "1v1", ai: "medium", opp: 1, map: "archipelago", pantheon: "verdant_deep", seed: 3888, strategy: "naval" },
+  // cell 18: campaign M1 conditions via direct boot (mission-stall discriminator)
+  { mode: "1v1", ai: "easiest", opp: 1, map: "island", pantheon: "ashen_forge", seed: 11711 },
 ];
 
 const MAX_GAME_MIN = 40;
