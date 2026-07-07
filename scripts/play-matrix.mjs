@@ -36,6 +36,15 @@ const CELLS = [
   { mode: "FFA", ai: "medium", opp: 2, map: "island", pantheon: "verdant_deep", seed: 2303 },
   { mode: "FFA", ai: "hard", opp: 2, map: "inland", pantheon: "ashen_forge", seed: 2404 },
   { mode: "FFA", ai: "titan", opp: 2, map: "island", pantheon: "storm_concord", seed: 2505 },
+  // strategy sweep (cells 10-17): same game, four very different players
+  { mode: "1v1", ai: "medium", opp: 1, map: "island", pantheon: "ashen_forge", seed: 3111, strategy: "rush" },
+  { mode: "1v1", ai: "easy", opp: 1, map: "inland", pantheon: "storm_concord", seed: 3222, strategy: "rush" },
+  { mode: "1v1", ai: "medium", opp: 1, map: "island", pantheon: "verdant_deep", seed: 3333, strategy: "boom" },
+  { mode: "1v1", ai: "easy", opp: 1, map: "island", pantheon: "auryan_dawn", seed: 3444, strategy: "boom" },
+  { mode: "1v1", ai: "easy", opp: 1, map: "island", pantheon: "auryan_dawn", seed: 3555, strategy: "turtle" },
+  { mode: "1v1", ai: "medium", opp: 1, map: "inland", pantheon: "ashen_forge", seed: 3666, strategy: "turtle" },
+  { mode: "1v1", ai: "easy", opp: 1, map: "archipelago", pantheon: "storm_concord", seed: 3777, strategy: "naval" },
+  { mode: "1v1", ai: "medium", opp: 1, map: "archipelago", pantheon: "verdant_deep", seed: 3888, strategy: "naval" },
 ];
 
 const MAX_GAME_MIN = 40;
@@ -70,7 +79,8 @@ const tc = () => window.__view().buildings.find((b) => b.playerId === 0 && b.bui
 let rot = 0;
 const ROT = [[0, 3, 5], [1], [0, 3, 5], [2], [1], [0, 3, 5]]; // food-ish, wood, gold rotation
 let buildCd = 0;
-window.__macro = (isWaterMap) => {
+window.__macro = (isWaterMap, strat) => {
+  strat = strat || "standard";
   const t = tc();
   if (!t) return;
   const p = P(0);
@@ -84,8 +94,9 @@ window.__macro = (isWaterMap) => {
       if (n.resType === 3 || n.resType === 5) window.__m.hunted = true;
     }
   }
-  // train villagers to 15
-  if (myUnits("villager").length < 15 && food >= 60 && p.popUsed < p.popCap) {
+  // villager target varies by playstyle
+  const villTarget = strat === "boom" ? 25 : strat === "rush" ? 9 : 15;
+  if (myUnits("villager").length < villTarget && food >= 60 && p.popUsed < p.popCap) {
     window.__cmd({ type: "train", playerId: 0, buildingEid: t.eid, unit: "villager" });
   }
   if (buildCd > 0) buildCd--;
@@ -96,7 +107,10 @@ window.__macro = (isWaterMap) => {
     if (myB("temple", false).length === 0 && wood >= 110) want.push("temple");
     if (p.age >= 1 && myB("barracks", false).length === 0 && wood >= 160) want.push("barracks");
     if (p.age >= 1 && myB("barracks").length > 0 && myB("armory", false).length === 0 && wood >= 160) want.push("armory");
-    if (myB("farm", false).length < 2 && wood >= 70 && myUnits("villager").length >= 8) want.push("farm");
+    if (myB("farm", false).length < (strat === "boom" ? 4 : 2) && wood >= 70 && myUnits("villager").length >= 8) want.push("farm");
+    if (strat === "turtle" && p.age >= 1 && myB("tower", false).length < 3 && wood >= 120 && gold >= 90) want.push("tower");
+    if (strat === "boom" && p.age >= 2 && myB("town_center", false).length < 2 && wood >= 450 && gold >= 250) want.push("town_center");
+    if (strat === "turtle" && p.age >= 3 && myB("wonder", false).length === 0 && food >= 1050 && wood >= 1050 && gold >= 1050) want.push("wonder");
     if (isWaterMap && p.age >= 0 && myB("dock", false).length === 0 && wood >= 140 && myUnits("villager").length >= 6) want.push("dock");
     if (want.length > 0) {
       window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: want[0], x: -1, y: -1 });
@@ -108,6 +122,16 @@ window.__macro = (isWaterMap) => {
   if (p.age === 0 && food >= 420 && myB("temple").length > 0 && !p.researchQueue.some((r) => r.techId === "age_classical")) {
     window.__cmd({ type: "research", playerId: 0, tech: "age_classical", minorGod: window.__firstMinor[p.pantheon] });
     window.__log.push("min " + Math.trunc(S().tick / 900) + ": CLASSICAL research");
+  }
+  if ((strat === "boom" || strat === "turtle") && p.age === 1 && food >= 850 && gold >= 550 && myB("armory").length > 0 && !p.researchQueue.some((r) => r.techId.startsWith("age_"))) {
+    window.__cmd({ type: "research", playerId: 0, tech: "age_heroic" });
+  }
+  if (strat === "turtle" && p.age === 2 && food >= 1050 && gold >= 1050 && myB("market", false).length > 0 && !p.researchQueue.some((r) => r.techId.startsWith("age_"))) {
+    window.__cmd({ type: "research", playerId: 0, tech: "age_mythic" });
+  }
+  if (strat === "turtle" && p.age >= 2 && myB("market", false).length === 0 && wood >= 160) {
+    const b2 = myUnits("villager")[1];
+    if (b2) window.__cmd({ type: "build", playerId: 0, eids: [b2.eid], building: "market", x: -1, y: -1 });
   }
   // mender once
   if (!window.__m.mender && p.age >= 1 && myB("temple").length > 0 && food >= 70 && gold >= 45) {
@@ -160,7 +184,38 @@ window.__macro = (isWaterMap) => {
   } else if (window.__m.garrisoned && (S().garrisons.get(t.eid) ?? []).length > 0) {
     window.__cmd({ type: "ungarrison", playerId: 0, buildingEid: t.eid });
     window.__m.garrisoned = false;
-  } else if (army.length >= 12) {
+  } else if (strat === "naval" && isWaterMap) {
+    // naval doctrine: galleys + a loaded barge, land on the enemy shore
+    if (myB("dock").length > 0 && wood >= 130 && gold >= 70 && myUnits("war_galley").length < 2) {
+      window.__cmd({ type: "train", playerId: 0, buildingEid: myB("dock")[0].eid, unit: "war_galley" });
+    }
+    if (myB("dock").length > 0 && wood >= 110 && myUnits("transport_barge").length < 1 && army.length >= 4) {
+      window.__cmd({ type: "train", playerId: 0, buildingEid: myB("dock")[0].eid, unit: "transport_barge" });
+    }
+    const barge = myUnits("transport_barge")[0];
+    const foes = window.__view().buildings.filter((b) => b.playerId !== 0 && b.buildingId === "town_center");
+    if (barge && foes.length > 0) {
+      const loaded = (S().garrisons.get(barge.eid) ?? []).length;
+      if (loaded < 4 && army.length >= 4) {
+        window.__cmd({ type: "garrison", playerId: 0, eids: army.slice(0, 5), buildingEid: barge.eid });
+      } else if (loaded >= 4) {
+        window.__cmd({ type: "move", playerId: 0, eids: [barge.eid], x: Math.round(foes[0].x * 1000), y: Math.round((foes[0].z + 4) * 1000) });
+        const bd = Math.hypot(barge.x - foes[0].x, barge.z - foes[0].z);
+        if (bd < 12) {
+          window.__cmd({ type: "ungarrison", playerId: 0, buildingEid: barge.eid });
+          window.__m.attackMoves++;
+        }
+      }
+      // escorts shadow the barge
+      const gals = myUnits("war_galley").map((u) => u.eid);
+      if (gals.length > 0) window.__cmd({ type: "move", playerId: 0, eids: gals, x: Math.round(barge.x * 1000), y: Math.round(barge.z * 1000) });
+      // landed troops assault
+      const ashore = army.filter((e) => !S().garrisonOf.has(e));
+      if (ashore.length >= 3 && window.__m.attackMoves > 0) {
+        window.__cmd({ type: "attack_move", playerId: 0, eids: ashore, x: Math.round(foes[0].x * 1000), y: Math.round(foes[0].z * 1000) });
+      }
+    }
+  } else if (army.length >= (strat === "rush" ? 6 : strat === "boom" ? 16 : strat === "turtle" ? 9999 : 12)) {
     // assault the WEAKEST enemy throne, battle order, attack-move
     const foes = window.__view().buildings.filter((b) => b.playerId !== 0 && b.buildingId === "town_center");
     if (foes.length > 0) {
@@ -231,7 +286,7 @@ for (const cell of cells) {
   const start = Date.now();
   let statusLines = [];
   for (let pulse = 0; pulse < (MAX_GAME_MIN * 900) / 75; pulse++) {
-    await page.evaluate((w) => { window.__macro(w); window.__step(75); }, isWaterMap);
+    await page.evaluate(([w, st]) => { window.__macro(w, st); window.__step(75); }, [isWaterMap, cell.strategy ?? "standard"]);
     const st = await page.evaluate(() => ({
       tick: window.__sim.tick, winner: window.__sim.winner,
       pop: window.__sim.players[0].popUsed,
@@ -273,12 +328,12 @@ for (const cell of cells) {
     result, gameMin: Math.trunc(fin.tick / 900), anomalies: fin.anomalies,
     exercised: { raided: fin.m.raided, garrisoned: fin.m.garrisoned || fin.m.raided, hunted: fin.m.hunted, dock: fin.m.dockBuilt, attackMoves: fin.m.attackMoves },
   });
-  console.log(`■ cell ${cell.i} ${cell.mode}/${cell.ai}/${cell.map}: ${result} @min ${Math.trunc(fin.tick / 900)} | anomalies: ${fin.anomalies.length ? fin.anomalies.join(" ;; ") : "none"}`);
+  console.log(`■ cell ${cell.i} ${cell.mode}/${cell.ai}/${cell.map}${cell.strategy ? "/" + cell.strategy : ""}: ${result} @min ${Math.trunc(fin.tick / 900)} | anomalies: ${fin.anomalies.length ? fin.anomalies.join(" ;; ") : "none"}`);
   await page.context().close();
   } catch (err) {
     results.push({ cell: cell.i, mode: cell.mode, ai: cell.ai, map: cell.map, pantheon: cell.pantheon, seed: cell.seed,
       result: "CRASH", gameMin: 0, anomalies: ["runner: " + String(err).slice(0, 200)] });
-    console.log(`■ cell ${cell.i} ${cell.mode}/${cell.ai}/${cell.map}: CRASH — ${String(err).slice(0, 160)}`);
+    console.log(`■ cell ${cell.i} ${cell.mode}/${cell.ai}/${cell.map}${cell.strategy ? "/" + cell.strategy : ""}: CRASH — ${String(err).slice(0, 160)}`);
   }
 }
 await browser.close();
