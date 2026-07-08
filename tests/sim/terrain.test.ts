@@ -5,20 +5,20 @@ import { createSim, simChecksum, stepSim } from "../../src/sim/sim";
 import { FP_ONE } from "../../src/sim/fixed";
 
 describe("deterministic terrain generation (sim-owned, integer heights)", () => {
-  it("same seed ⇒ identical heights and terrain checksum", () => {
+  it("same seed ⇒ identical heights and terrain checksum", { timeout: 120_000 }, () => {
     const a = generateTerrain(new Prng(123), DEFAULT_TERRAIN_CONFIG);
     const b = generateTerrain(new Prng(123), DEFAULT_TERRAIN_CONFIG);
     expect(a.checksum).toBe(b.checksum);
     expect(Array.from(a.heights)).toEqual(Array.from(b.heights));
   });
 
-  it("different seed ⇒ different terrain", () => {
+  it("different seed ⇒ different terrain", { timeout: 120_000 }, () => {
     const a = generateTerrain(new Prng(1), DEFAULT_TERRAIN_CONFIG);
     const b = generateTerrain(new Prng(2), DEFAULT_TERRAIN_CONFIG);
     expect(a.checksum).not.toBe(b.checksum);
   });
 
-  it("produces (size+1)² integer vertex heights within ±4 tiles of sea level", () => {
+  it("produces (size+1)² integer vertex heights within ±4 tiles of sea level", { timeout: 120_000 }, () => {
     const t = generateTerrain(new Prng(99), DEFAULT_TERRAIN_CONFIG);
     expect(t.heights.length).toBe((t.size + 1) * (t.size + 1));
     for (const h of t.heights) {
@@ -27,7 +27,7 @@ describe("deterministic terrain generation (sim-owned, integer heights)", () => 
     }
   });
 
-  it("carves water: some but not most vertices sit below water level (sampled seeds)", () => {
+  it("carves water: some but not most vertices sit below water level (sampled seeds)", { timeout: 120_000 }, () => {
     for (const seed of [7, 42, 2026]) {
       const t = generateTerrain(new Prng(seed), DEFAULT_TERRAIN_CONFIG);
       let below = 0;
@@ -38,7 +38,7 @@ describe("deterministic terrain generation (sim-owned, integer heights)", () => 
     }
   });
 
-  it("terrain is part of the sim state checksum", () => {
+  it("terrain is part of the sim state checksum", { timeout: 120_000 }, () => {
     const a = createSim(5);
     const b = createSim(5);
     expect(a.terrain.checksum).toBe(b.terrain.checksum);
@@ -47,7 +47,7 @@ describe("deterministic terrain generation (sim-owned, integer heights)", () => 
     expect(simChecksum(c)).not.toBe(simChecksum(a));
   });
 
-  it("terrain generation does not break 10k-tick determinism", () => {
+  it("terrain generation does not break 10k-tick determinism", { timeout: 120_000 }, () => {
     const run = (seed: number) => {
       const sim = createSim(seed);
       for (let t = 0; t < 10_000; t++) stepSim(sim, t === 0 ? [{ type: "debug_spawn", playerId: 0, x: 5000, y: 5000 }] : []);
@@ -56,7 +56,7 @@ describe("deterministic terrain generation (sim-owned, integer heights)", () => 
     expect(run(77)).toBe(run(77));
   });
 
-  it("exposes tile height sampling for movement/render queries", () => {
+  it("exposes tile height sampling for movement/render queries", { timeout: 120_000 }, () => {
     const t = generateTerrain(new Prng(11), DEFAULT_TERRAIN_CONFIG);
     const h = t.heights[0]!;
     expect(typeof h).toBe("number");

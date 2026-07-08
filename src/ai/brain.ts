@@ -304,26 +304,30 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
     buildIfMissing("barracks", 10);
     buildIfMissing("armory", 12);
     if (p.age >= 2) buildIfMissing("market", 14);
-    // static defense scales with ambition: medium keeps 1 tower, hard/titan 2
+    // static defense scales with ambition: medium keeps 1 tower, hard/titan 2 —
+    // but the age ladder ALWAYS eats first (reserve the next age-up's cost)
+    const nextAgeCost = p.age < 3 ? getTechStats(AGE_TECHS[p.age]!).cost : null;
+    const surplusAfterAge = (foodNeed: number, goldNeed: number): boolean =>
+      p.foodMilli >= foodNeed + (nextAgeCost ? nextAgeCost.food * 1000 : 0) &&
+      p.goldMilli >= goldNeed + (nextAgeCost ? nextAgeCost.gold * 1000 : 0);
     const towerTarget = Math.min(2, Math.trunc(knobs.armyTarget / 10));
     if (towerTarget > 0 && anyOf("tower").length < towerTarget && underConstruction("tower") === 0 &&
-        p.woodMilli >= 250_000 && p.goldMilli >= 180_000) {
+        p.woodMilli >= 250_000 && surplusAfterAge(0, 180_000)) {
       const builder = idleVillagers[0] ?? villagers[0];
       if (builder !== undefined) cmds.push({ type: "build", playerId: pid, eids: [builder], building: "tower", x: -1, y: -1 });
     }
-  }
-  // armory line upgrades from surplus (never starving the troop queue)
-  if (p.age >= 1 && active("armory").length > 0 && p.researchQueue.length === 0 &&
-      p.foodMilli >= 450_000 && p.goldMilli >= 350_000) {
-    const line = p.age >= 2 ? ["bronze_weapons", "bronze_mail", "iron_weapons", "iron_mail"] : ["bronze_weapons", "bronze_mail"];
-    const next = line.find((t) => !p.researchedTechs.includes(t));
-    if (next) cmds.push({ type: "research", playerId: pid, tech: next });
+    // armory line upgrades from what's left AFTER the age reserve
+    if (active("armory").length > 0 && p.researchQueue.length === 0 && surplusAfterAge(450_000, 350_000)) {
+      const line = p.age >= 2 ? ["bronze_weapons", "bronze_mail", "iron_weapons", "iron_mail"] : ["bronze_weapons", "bronze_mail"];
+      const next = line.find((t) => !p.researchedTechs.includes(t));
+      if (next) cmds.push({ type: "research", playerId: pid, tech: next });
+    }
   }
   // a hero on relic duty: train one, walk it from relic to relic, bank at the temple
   {
     const heroes = myUnits.filter((e) => sim.unitStats(e).unitClass === "hero");
     const temple = active("temple")[0];
-    if (heroes.length === 0 && p.age >= 1 && temple !== undefined &&
+    if (heroes.length === 0 && p.age >= 1 && villagers.length >= 12 && temple !== undefined &&
         canAffordMilli(p, getUnitStats(HERO_OF[p.pantheon] ?? "sky_herald").cost) &&
         (sim.trainQueues.get(temple)?.length ?? 0) === 0) {
       cmds.push({ type: "train", playerId: pid, buildingEid: temple, unit: HERO_OF[p.pantheon] ?? "sky_herald" });

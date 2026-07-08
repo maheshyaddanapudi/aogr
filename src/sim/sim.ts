@@ -144,8 +144,12 @@ export interface Sim {
   readonly seed: number;
   readonly terrain: Terrain;
   readonly navGrid: NavGrid;
+  /** water-tile grid for naval pathing (derived from terrain, never mutated) */
+  readonly waterGrid: NavGrid;
   /** Flow fields cached by target tile key; derived data, never serialized. */
   readonly flowFields: Map<number, FlowField>;
+  /** naval flow fields over the water grid; derived, never serialized */
+  readonly waterFlowFields: Map<number, FlowField>;
   readonly players: PlayerState[];
   readonly trainQueues: Map<number, TrainEntry[]>;
   /** building eid → garrisoned unit eids (sorted ascending) */
@@ -211,7 +215,9 @@ export function createSim(
     seed: seed >>> 0,
     terrain,
     navGrid: buildNavGrid(terrain),
+    waterGrid: buildWaterGrid(terrain),
     flowFields: new Map(),
+    waterFlowFields: new Map(),
     players: createPlayers(matchOptions.players),
     trainQueues: new Map(),
     garrisons: new Map(),
@@ -324,6 +330,31 @@ function getFlowField(sim: Sim, key: number): FlowField {
     const size = sim.navGrid.size;
     f = computeFlowField(sim.navGrid, key % size, Math.trunc(key / size));
     sim.flowFields.set(key, f);
+  }
+  return f;
+}
+
+/** Naval "passability": one grid where water is the walkable surface. Ships
+ * path with the SAME flow-field machinery land units use — no more wedging
+ * against concave coastlines on the straight line to a target. */
+function buildWaterGrid(terrain: Terrain): NavGrid {
+  const size = terrain.size;
+  const verts = size + 1;
+  const passable = new Uint8Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (terrain.heights[y * verts + x]! < terrain.waterLevelFp) passable[y * size + x] = 1;
+    }
+  }
+  return { size, passable, checksum: 0 };
+}
+
+function getWaterFlowField(sim: Sim, key: number): FlowField {
+  let f = sim.waterFlowFields.get(key);
+  if (!f) {
+    const size = sim.waterGrid.size;
+    f = computeFlowField(sim.waterGrid, key % size, Math.trunc(key / size));
+    sim.waterFlowFields.set(key, f);
   }
   return f;
 }
@@ -584,12 +615,33 @@ function unitMovementSystem(sim: Sim): void {
         if (d <= 400) {
           MoveState.active[eid] = 0;
         } else {
-          const stepX = Math.trunc((dx * st.speedFpPerTick) / (d || 1));
-          const stepY = Math.trunc((dy * st.speedFpPerTick) / (d || 1));
+          // navigation: follow the WATER flow field toward the target tile —
+          // ships round headlands and thread straits like land units round walls.
+          // Same tile (or unreachable water) falls back to the direct line.
+          const ctx = Math.trunc(Position.x[eid]! / 1000);
+          const cty = Math.trunc(Position.y[eid]! / 1000);
+          const ttx = Math.trunc(tX / 1000);
+          const tty = Math.trunc(tY / 1000);
+          let aimX = tX;
+          let aimY = tY;
+          if (ctx !== ttx || cty !== tty) {
+            const field = getWaterFlowField(sim, tty * sim.waterGrid.size + ttx);
+            if (flowDistAt(field, ctx, cty) < UNREACHABLE) {
+              const dir = flowDirAt(field, ctx, cty);
+              if (dir.dx !== 0 || dir.dy !== 0) {
+                aimX = (ctx + dir.dx) * 1000 + 500;
+                aimY = (cty + dir.dy) * 1000 + 500;
+              }
+            }
+          }
+          const adx = aimX - Position.x[eid]!;
+          const ady = aimY - Position.y[eid]!;
+          const ad = isqrt(adx * adx + ady * ady) || 1;
+          const stepX = Math.trunc((adx * st.speedFpPerTick) / ad);
+          const stepY = Math.trunc((ady * st.speedFpPerTick) / ad);
           const nx = Position.x[eid]! + stepX;
           const ny = Position.y[eid]! + stepY;
-          // straight line first; if the bow touches land, slide along one axis
-          // (hug the coast around promontories instead of giving up)
+          // clamp to water; if the bow touches land, slide along one axis
           if (isWaterTile(sim, Math.trunc(nx / 1000), Math.trunc(ny / 1000))) {
             Position.x[eid] = nx;
             Position.y[eid] = ny;
