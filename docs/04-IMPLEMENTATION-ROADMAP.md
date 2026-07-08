@@ -258,3 +258,37 @@ depleted-then-regrown nodes (herds/fish) stayed invisible.
 
 Suite after the round: **169 passed, 0 expected-fail** — every discovery probe now
 enforces its fix.
+
+## Round 8 addendum: verification kept finding — three MORE bugs closed
+
+Fixing under real playthroughs surfaced three findings the round-7 catalog missed:
+
+| # | Finding | Resolution |
+|---|---------|-----------|
+| F16 | Local-avoidance crowd-stop parks a gatherer just outside the 1.7-tile reach; the walk-to-node handler re-approached forever — a whole food crew farmed NOTHING all match (killed campaign M4's economy) | settled/hard-stalled within 2× reach ⇒ start working; hard-stalled beyond ⇒ retarget excluding the futile node |
+| F17 | The 10k-tick determinism gate flaked twice under full-suite load only — 26 standalone reproductions clean, cause unidentified | forensic lane-diff dump armed inside the gate (assertion unchanged); 3+ consecutive full suites green since — **under observation** |
+| F18 | Razing every enemy on a wonder/relic mission showed VICTORY but didn't advance the campaign (objective letter unmet) | match victory completes any mission; objectives remain alternate paths. Mission checks also moved onto the TICK path — background tabs throttle wall-clock intervals and could eat a win |
+
+### Campaign fully played (round 8 exit state)
+
+| Mission | Objective / AI | Result |
+|---------|----------------|--------|
+| M1 Embers of the Forge | conquest / easiest | **WIN @23** |
+| M2 The Grain and the Grave | survive / easy | **WIN @12** |
+| M3 Relics of the High Vale | relics / easy | **WIN @9** |
+| M4 Tides of Bronze | conquest / easy (naval) | **WIN @13** |
+| M5 The Silent Choir | wonder / easy | **WIN @33** (progress advances ✓) |
+| M6 Crown of the Reforged | conquest / medium | campaign driver loses; **fair-fight discriminator (cell 19, exact conditions, matrix macro): WIN @14** — the finale demands a full toolkit, and the toolkit suffices |
+
+Campaign design finalized from playthrough evidence: ramp easiest → easy ×4 →
+medium finale; M4 = the naval teaching mission; M6 moved to proven-fair map
+geometry (seed 1303). The scripted campaign driver (an "average player") wins
+M1–M5 itself; M6 is verified winnable under its exact conditions by the matrix
+macro (cell 19). Skirmish carries hard/titan for veterans.
+
+### Soak re-verification (clean run, post-fixes)
+
+25 game-minutes of continuous synthetic war + 5 post-game: heap FLAT 497→497MB,
+wall 455→636ms/game-min (was 40× degradation), materials 287→320 then plateau
+(lazy unit-pool saturation, not growth), meshes battle-cyclic not monotone,
+zero pageerrors. F11 + F13 verified closed.
