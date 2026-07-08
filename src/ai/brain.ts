@@ -42,7 +42,7 @@ export interface AiState {
   attacking: boolean;
   /** naval invasion machine: 0 idle · 1 boarding · 2 sailing */
   invasionPhase: 0 | 1 | 2;
-  invasionShip: number;
+  invasionShips: number[];
   invasionSince: number;
   /** cached land-path answer to the current enemy TC (BFS is not free) */
   reachCache: { target: number; ok: boolean; tick: number } | null;
@@ -56,7 +56,7 @@ export function createAiState(playerId: number, difficulty: AiDifficulty, _seed:
     lastWaveTick: -100000,
     attacking: false,
     invasionPhase: 0,
-    invasionShip: -1,
+    invasionShips: [],
     invasionSince: 0,
     reachCache: null,
   };
@@ -120,6 +120,12 @@ function landReachable(sim: Sim, ai: AiState, fromEid: number, toEid: number): b
 const AGE_TECHS = ["age_classical", "age_heroic", "age_mythic"] as const;
 const AGE_TIERS = ["classical", "heroic", "mythic"] as const;
 const AGE_PREREQ = ["temple", "armory", "market"] as const;
+const HERO_OF: Record<string, string> = {
+  auryan_dawn: "radiant_champion",
+  verdant_deep: "tide_seer",
+  ashen_forge: "forgeborn",
+  storm_concord: "sky_herald",
+};
 
 export function decideAi(sim: Sim, ai: AiState): Command[] {
   const pid = ai.playerId;
@@ -298,6 +304,49 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
     buildIfMissing("barracks", 10);
     buildIfMissing("armory", 12);
     if (p.age >= 2) buildIfMissing("market", 14);
+    // static defense scales with ambition: medium keeps 1 tower, hard/titan 2
+    const towerTarget = Math.min(2, Math.trunc(knobs.armyTarget / 10));
+    if (towerTarget > 0 && anyOf("tower").length < towerTarget && underConstruction("tower") === 0 &&
+        p.woodMilli >= 250_000 && p.goldMilli >= 180_000) {
+      const builder = idleVillagers[0] ?? villagers[0];
+      if (builder !== undefined) cmds.push({ type: "build", playerId: pid, eids: [builder], building: "tower", x: -1, y: -1 });
+    }
+  }
+  // armory line upgrades from surplus (never starving the troop queue)
+  if (p.age >= 1 && active("armory").length > 0 && p.researchQueue.length === 0 &&
+      p.foodMilli >= 450_000 && p.goldMilli >= 350_000) {
+    const line = p.age >= 2 ? ["bronze_weapons", "bronze_mail", "iron_weapons", "iron_mail"] : ["bronze_weapons", "bronze_mail"];
+    const next = line.find((t) => !p.researchedTechs.includes(t));
+    if (next) cmds.push({ type: "research", playerId: pid, tech: next });
+  }
+  // a hero on relic duty: train one, walk it from relic to relic, bank at the temple
+  {
+    const heroes = myUnits.filter((e) => sim.unitStats(e).unitClass === "hero");
+    const temple = active("temple")[0];
+    if (heroes.length === 0 && p.age >= 1 && temple !== undefined &&
+        canAffordMilli(p, getUnitStats(HERO_OF[p.pantheon] ?? "sky_herald").cost) &&
+        (sim.trainQueues.get(temple)?.length ?? 0) === 0) {
+      cmds.push({ type: "train", playerId: pid, buildingEid: temple, unit: HERO_OF[p.pantheon] ?? "sky_herald" });
+    }
+    const hero = heroes[0];
+    if (hero !== undefined && !sim.garrisonOf.has(hero)) {
+      if (sim.relicHolder.get(hero)) {
+        if (temple !== undefined) cmds.push({ type: "move", playerId: pid, eids: [hero], x: Position.x[temple]!, y: Position.y[temple]! });
+      } else {
+        const { ResourceNode } = sim.stores;
+        let relic = -1;
+        let rd = Number.MAX_SAFE_INTEGER;
+        for (const n of Array.from(query(sim.world, [ResourceNode])).sort((a, b) => a - b)) {
+          if (ResourceNode.resType[n] !== 4 || ResourceNode.amountMilli[n]! <= 0) continue;
+          const dx = Position.x[n]! - Position.x[hero]!;
+          const dy = Position.y[n]! - Position.y[hero]!;
+          if (dx * dx + dy * dy < rd) { rd = dx * dx + dy * dy; relic = n; }
+        }
+        if (relic >= 0 && MoveState.active[hero] !== 1) {
+          cmds.push({ type: "move", playerId: pid, eids: [hero], x: Position.x[relic]!, y: Position.y[relic]! });
+        }
+      }
+    }
   }
   // age-up when possible
   if (p.age < 3 && p.researchQueue.length === 0) {
@@ -370,54 +419,71 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
     } else {
       const barges = myUnits.filter((e) => sim.unitStats(e).id === "transport_barge");
       const dock = active("dock")[0];
-      if (ai.invasionPhase !== 0 && (ai.invasionShip < 0 || !myUnits.includes(ai.invasionShip))) {
-        ai.invasionPhase = 0; // the barge sank — start over
-        ai.invasionShip = -1;
+      // invasion force scales with ambition: enough barges to lift the wave (max 2)
+      const bargeTarget = Math.min(2, Math.max(1, Math.ceil(Math.min(knobs.waveSize, 12) / 6)));
+      ai.invasionShips = ai.invasionShips.filter((s) => myUnits.includes(s));
+      if (ai.invasionPhase !== 0 && ai.invasionShips.length === 0) {
+        ai.invasionPhase = 0; // the flotilla sank — start over
       }
       if (ai.invasionPhase === 0) {
-        if (barges.length === 0) {
+        if (barges.length < bargeTarget) {
           if (dock !== undefined && p.woodMilli >= 100_000 && (sim.trainQueues.get(dock)?.length ?? 0) === 0) {
             cmds.push({ type: "train", playerId: pid, buildingEid: dock, unit: "transport_barge" });
           }
-        } else if (military.length >= Math.min(knobs.waveSize, 6) && sim.tick - ai.lastWaveTick > 15 * 60) {
-          const ship = barges[0]!;
-          const wave = military.filter((e) => !sim.garrisonOf.has(e)).slice(0, 6);
-          if (wave.length > 0) {
-            cmds.push({ type: "garrison", playerId: pid, eids: wave, buildingEid: ship });
+        } else if (military.length >= Math.min(knobs.waveSize, 6 * bargeTarget) && sim.tick - ai.lastWaveTick > 15 * 60) {
+          const free = military.filter((e) => !sim.garrisonOf.has(e));
+          const ships = barges.slice(0, bargeTarget);
+          let boarded = 0;
+          for (const ship of ships) {
+            const squad = free.slice(boarded, boarded + 6);
+            if (squad.length === 0) break;
+            cmds.push({ type: "garrison", playerId: pid, eids: squad, buildingEid: ship });
+            boarded += squad.length;
+          }
+          if (boarded > 0) {
             ai.invasionPhase = 1;
-            ai.invasionShip = ship;
+            ai.invasionShips = ships;
             ai.invasionSince = sim.tick;
           }
         }
       } else if (ai.invasionPhase === 1) {
-        const aboard = sim.garrisons.get(ai.invasionShip)?.length ?? 0;
-        const full = aboard >= Math.min(6, military.length + aboard);
+        const aboard = ai.invasionShips.reduce((n, s) => n + (sim.garrisons.get(s)?.length ?? 0), 0);
+        const capacity = 6 * ai.invasionShips.length;
+        const full = aboard >= Math.min(capacity, military.length + aboard);
         const waited = sim.tick - ai.invasionSince > 15 * 90;
         if (full || (waited && aboard > 0)) {
           const shore = nearestWaterTile(sim, Math.trunc(Position.x[target]! / 1000), Math.trunc(Position.y[target]! / 1000));
           if (shore) {
-            cmds.push({ type: "move", playerId: pid, eids: [ai.invasionShip], x: shore.x * 1000 + 500, y: shore.y * 1000 + 500 });
+            cmds.push({ type: "move", playerId: pid, eids: [...ai.invasionShips], x: shore.x * 1000 + 500, y: shore.y * 1000 + 500 });
             ai.invasionPhase = 2;
             ai.invasionSince = sim.tick;
           }
         } else if (waited) {
           ai.invasionPhase = 0; // nobody made it aboard — re-plan
-          ai.invasionShip = -1;
+          ai.invasionShips = [];
         }
       } else {
-        const dx = Position.x[ai.invasionShip]! - Position.x[target]!;
-        const dy = Position.y[ai.invasionShip]! - Position.y[target]!;
-        const troops = [...(sim.garrisons.get(ai.invasionShip) ?? [])];
-        if (dx * dx + dy * dy < 10_000 * 10_000 && troops.length > 0) {
-          cmds.push({ type: "ungarrison", playerId: pid, buildingEid: ai.invasionShip });
-          cmds.push({ type: "attack_move", playerId: pid, eids: troops, x: Position.x[target]!, y: Position.y[target]! });
+        // each barge unloads as IT arrives; the wave regroups on the beach
+        const landed: number[] = [];
+        let cargo = 0;
+        for (const ship of ai.invasionShips) {
+          const troops = sim.garrisons.get(ship) ?? [];
+          cargo += troops.length;
+          const dx = Position.x[ship]! - Position.x[target]!;
+          const dy = Position.y[ship]! - Position.y[target]!;
+          if (dx * dx + dy * dy < 10_000 * 10_000 && troops.length > 0) {
+            landed.push(...troops);
+            cmds.push({ type: "ungarrison", playerId: pid, buildingEid: ship });
+          }
+        }
+        if (landed.length > 0) {
+          cmds.push({ type: "attack_move", playerId: pid, eids: landed, x: Position.x[target]!, y: Position.y[target]! });
           ai.lastWaveTick = sim.tick;
           ai.attacking = true;
-          ai.invasionPhase = 0;
-          ai.invasionShip = -1;
-        } else if (troops.length === 0 || sim.tick - ai.invasionSince > 15 * 240) {
-          ai.invasionPhase = 0; // lost the cargo or the way — re-plan
-          ai.invasionShip = -1;
+        }
+        if (cargo === 0 || sim.tick - ai.invasionSince > 15 * 240) {
+          ai.invasionPhase = 0; // delivered (or lost) — plan the next lift
+          ai.invasionShips = [];
         }
       }
     }

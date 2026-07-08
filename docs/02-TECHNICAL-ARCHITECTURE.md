@@ -82,3 +82,15 @@ screenshots into `docs/screenshots/`.
 - RawTexture: always RGBA.
 - Headless SwiftShader runs the full scene at ~2fps while `getFps()` claims 60 — assert per-frame deltas, never wall-clock behavior; probe only via `window.__scene` (importing core in-page creates a second Babylon instance with fake shader errors).
 - Terrain textures: ambientCG 1K JPGs vendored in `public/textures/` (CC0, see ATTRIBUTION.md); Fox GLTF from Khronos sample models (CC0) proves the animation pipeline until KayKit units land in Phase 2.
+
+## Determinism scope note (pre-multiplayer)
+
+The sim is bit-deterministic over `{seed + ordered commands}` — that is the
+replay/network contract, and `tests/sim/determinism.test.ts` enforces it.
+A LIVE single-player match is *not* run-to-run reproducible from its seed
+alone: the AI worker's decisions are injected on whatever tick the worker
+answers, which varies with wall-clock scheduling. Replays are exact because
+they record commands *with their ticks*. Lockstep multiplayer must therefore
+ship AI decisions through the same tick-stamped command channel as human
+input (already the case via CommandQueue) — never let a peer run its own
+worker off-schedule.

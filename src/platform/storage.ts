@@ -4,7 +4,10 @@
  */
 const DB = "aogr";
 const STORE = "saves";
-const KEY = "skirmish";
+
+/** Campaign saves live in their own slot — saving a mission must not clobber
+ * the player's skirmish save (and vice versa). */
+export type SaveSlot = "skirmish" | "campaign";
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -15,20 +18,20 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveGame(snapshot: string): Promise<void> {
+export async function saveGame(snapshot: string, slot: SaveSlot = "skirmish"): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(snapshot, KEY);
+    tx.objectStore(STORE).put(snapshot, slot);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
-export async function loadGame(): Promise<string | null> {
+export async function loadGame(slot: SaveSlot = "skirmish"): Promise<string | null> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const req = db.transaction(STORE, "readonly").objectStore(STORE).get(KEY);
+    const req = db.transaction(STORE, "readonly").objectStore(STORE).get(slot);
     req.onsuccess = () => resolve((req.result as string) ?? null);
     req.onerror = () => reject(req.error);
   });

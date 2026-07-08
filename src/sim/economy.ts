@@ -12,7 +12,7 @@ import { computeFlowField, flowDistAt, UNREACHABLE } from "./path/flowfield";
 import { getBuildingStats, getBuildingStatsByIndex, type BuildingStats } from "./buildingdata";
 import { getUnitStats } from "./unitdata";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
-import { isWaterTile, nearestPassableTile, nearestWaterTile, setMoveTarget, spawnUnitEntity, type Sim } from "./sim";
+import { isWaterTile, nearestPassableTile, nearestWaterTile, nudgeOutOfFootprint, setMoveTarget, spawnUnitEntity, type Sim } from "./sim";
 // eslint-disable-next-line import/no-cycle -- runtime-safe
 import { AGE_INDEX, effectiveGatherMicroPerTick, effectiveTrainTicks, type ResearchEntry } from "./research";
 
@@ -152,16 +152,14 @@ function blockFootprint(sim: Sim, tileX: number, tileY: number, size: number): v
     }
   }
   sim.flowFields.clear();
-  // nudge any unit standing inside the footprint to the nearest open tile
+  // nudge any unit standing inside the footprint to open ground on ITS side
   const { Position, UnitRef } = sim.stores;
   const units = Array.from(query(sim.world, [Position, UnitRef])).sort((a, b) => a - b);
   for (const eid of units) {
     const tx = Math.trunc(Position.x[eid]! / 1000);
     const ty = Math.trunc(Position.y[eid]! / 1000);
     if (tx >= tileX && tx < tileX + size && ty >= tileY && ty < tileY + size) {
-      const t = nearestPassableTile(sim, tx, ty);
-      Position.x[eid] = t.x * 1000 + 500;
-      Position.y[eid] = t.y * 1000 + 500;
+      nudgeOutOfFootprint(sim, eid, tileX, tileY, size);
     }
   }
 }

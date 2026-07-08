@@ -328,6 +328,45 @@ function getFlowField(sim: Sim, key: number): FlowField {
   return f;
 }
 
+/** Push a unit standing inside a (newly blocked) footprint to open ground,
+ * preferring the side it was already on — never teleport a defender through
+ * the wall into the enemy's yard (or an attacker into yours). */
+export function nudgeOutOfFootprint(sim: Sim, eid: number, tileX: number, tileY: number, size: number): void {
+  const { Position } = sim.stores;
+  const cx = (tileX + size / 2) * 1000;
+  const cy = (tileY + size / 2) * 1000;
+  const outX = Position.x[eid]! - cx;
+  const outY = Position.y[eid]! - cy;
+  const utx = Math.trunc(Position.x[eid]! / 1000);
+  const uty = Math.trunc(Position.y[eid]! / 1000);
+  for (let r = 1; r < 12; r++) {
+    let best: { x: number; y: number } | null = null;
+    let bestDot = Number.MIN_SAFE_INTEGER;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = utx + dx;
+        const y = uty + dy;
+        if (!isPassable(sim.navGrid, x, y)) continue;
+        // integer alignment with the unit's outward side of the footprint
+        const dot = (x * 1000 + 500 - cx) * outX + (y * 1000 + 500 - cy) * outY;
+        if (dot > bestDot) {
+          bestDot = dot;
+          best = { x, y };
+        }
+      }
+    }
+    if (best) {
+      Position.x[eid] = best.x * 1000 + 500;
+      Position.y[eid] = best.y * 1000 + 500;
+      return;
+    }
+  }
+  const t = nearestPassableTile(sim, utx, uty);
+  Position.x[eid] = t.x * 1000 + 500;
+  Position.y[eid] = t.y * 1000 + 500;
+}
+
 /** Deterministic spiral search for the nearest passable tile (move targets snap here). */
 export function nearestPassableTile(sim: Sim, tx: number, ty: number): { x: number; y: number } {
   if (isPassable(sim.navGrid, tx, ty)) return { x: tx, y: ty };
@@ -375,7 +414,9 @@ export function spawnUnitEntity(sim: Sim, playerId: number, unitId: string, x: n
     addComponent(sim.world, eid, CombatState);
     CombatState.targetEid[eid] = -1;
     CombatState.cooldown[eid] = 0;
-    const passive = stats.unitClass === "villager" || stats.unitClass === "scout" || stats.unitClass === "caravan" || stats.unitClass === "ship";
+    // stance: workers/scouts/caravans hold fire; anything ARMED defends itself —
+    // including warships (an unarmed ship never gets CombatState in the first place)
+    const passive = stats.unitClass === "villager" || stats.unitClass === "scout" || stats.unitClass === "caravan";
     CombatState.aggressive[eid] = passive ? 0 : 1;
   }
   if (stats.gatherMicroPerTick || stats.tradeGoldMilliPerTile > 0) {
@@ -780,9 +821,7 @@ function handleGarrisonCommand(sim: Sim, cmd: Command): boolean {
         const utx = Math.trunc(Position.x[eid]! / 1000);
         const uty = Math.trunc(Position.y[eid]! / 1000);
         if (utx >= tx && utx < tx + stats.size && uty >= ty && uty < ty + stats.size) {
-          const t = nearestPassableTile(sim, utx, uty);
-          Position.x[eid] = t.x * 1000 + 500;
-          Position.y[eid] = t.y * 1000 + 500;
+          nudgeOutOfFootprint(sim, eid, tx, ty, stats.size);
         }
       }
     }

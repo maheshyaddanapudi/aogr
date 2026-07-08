@@ -115,6 +115,7 @@ function renderMenu(): void {
       <div class="menu-actions">
         <button id="m-start" class="age-up-btn">Begin the Age</button>
         <button id="m-continue" class="age-up-btn" disabled>Continue saved match</button>
+        <button id="m-continue-camp" class="age-up-btn" disabled>Continue mission</button>
         <button id="m-replay" class="age-up-btn">Watch replay</button>
         <input id="m-replay-file" type="file" accept=".json" style="display:none" />
       </div>
@@ -215,15 +216,17 @@ function renderMenu(): void {
     });
   });
 
-  void loadGame().then((snapshot) => {
-    if (!snapshot) return;
-    const btn = menu.querySelector("#m-continue") as HTMLButtonElement;
-    btn.disabled = false;
-    btn.addEventListener("click", () => {
-      persist();
-      void startGame({ loadSnapshot: snapshot } as never);
+  for (const [slot, sel] of [["skirmish", "#m-continue"], ["campaign", "#m-continue-camp"]] as const) {
+    void loadGame(slot).then((snapshot) => {
+      if (!snapshot) return;
+      const btn = menu.querySelector(sel) as HTMLButtonElement;
+      btn.disabled = false;
+      btn.addEventListener("click", () => {
+        persist();
+        void startGame({ loadSnapshot: snapshot } as never);
+      });
     });
-  });
+  }
 }
 
 // Headless gates + power users boot straight into the game.

@@ -51,7 +51,7 @@ export interface GameConfig {
   majorGod: string;
   aiDifficulty: "easiest" | "easy" | "medium" | "hard" | "titan" | "off";
   loadSnapshot?: string;
-  replay?: { seed: number; pantheon?: string; majorGod?: string; commands: Array<{ t: number; cmds: unknown[] }> };
+  replay?: { seed: number; pantheon?: string; majorGod?: string; mission?: number; commands: Array<{ t: number; cmds: unknown[] }> };
   mapType?: "island" | "inland" | "archipelago";
   opponents?: 1 | 2;
   /** campaign mission index */
@@ -68,15 +68,19 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   let snapshotJson = config?.loadSnapshot;
   if (snapshotJson) {
     try {
-      const env = JSON.parse(snapshotJson) as { aogrSave?: number; mission?: number; sim?: string };
+      const env = JSON.parse(snapshotJson) as { aogrSave?: number; mission?: number; ai?: GameConfig["aiDifficulty"]; sim?: string };
       if (env && typeof env === "object" && env.aogrSave === 1 && typeof env.sim === "string") {
         if (config && env.mission !== undefined) config.mission = env.mission;
+        // a resumed titan match must NOT quietly become a medium match
+        if (config && env.ai !== undefined && config.aiDifficulty === undefined) config.aiDifficulty = env.ai;
         snapshotJson = env.sim;
       }
     } catch {
       /* legacy raw snapshot — load as-is */
     }
   }
+  // a mission replay replays AS the mission (story + objective context intact)
+  if (config?.replay?.mission !== undefined && config.mission === undefined) config.mission = config.replay.mission;
   const missions = (campaignJson as { missions: Array<Record<string, unknown>> }).missions;
   const mission = config?.mission !== undefined ? (missions[config.mission] as {
     id: string; title: string; pantheon: string; majorGod: string; seed: number;
@@ -720,8 +724,11 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
         })());
       if (won) {
         missionWon = true;
-        const prev = Number(localStorage.getItem("aogr-campaign") ?? 0);
-        localStorage.setItem("aogr-campaign", String(Math.max(prev, (config?.mission ?? 0) + 1)));
+        if (!config?.replay) {
+          // watching a replay of a mission must not advance the campaign
+          const prev = Number(localStorage.getItem("aogr-campaign") ?? 0);
+          localStorage.setItem("aogr-campaign", String(Math.max(prev, (config?.mission ?? 0) + 1)));
+        }
         if (sim.winner < 0) sim.winner = 0; // triggers the victory overlay
       }
     };
@@ -751,7 +758,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     overlay.querySelector("#end-menu")!.addEventListener("click", () => location.assign(location.pathname));
     overlay.querySelector("#end-replay")!.addEventListener("click", () => {
       const blob = new Blob(
-        [JSON.stringify({ seed, pantheon: getPlayer(sim, 0).pantheon, majorGod: getPlayer(sim, 0).majorGod, commands: replayLog })],
+        [JSON.stringify({ seed, pantheon: getPlayer(sim, 0).pantheon, majorGod: getPlayer(sim, 0).majorGod, mission: config?.mission, commands: replayLog })],
         { type: "application/json" },
       );
       const a = document.createElement("a");
@@ -783,9 +790,10 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   saveBtn.className = "age-up-btn save-btn";
   saveBtn.textContent = "Save";
   saveBtn.title = "Save the match (resume from the main menu)";
-  const saveEnvelope = (): string => JSON.stringify({ aogrSave: 1, mission: config?.mission, sim: serializeSim(sim) });
+  const saveEnvelope = (): string =>
+    JSON.stringify({ aogrSave: 1, mission: config?.mission, ai: aiChoice === "off" ? undefined : aiChoice, sim: serializeSim(sim) });
   saveBtn.addEventListener("click", () => {
-    void saveGame(saveEnvelope()).then(() => {
+    void saveGame(saveEnvelope(), config?.mission !== undefined ? "campaign" : "skirmish").then(() => {
       saveBtn.textContent = "Saved ✓";
       setTimeout(() => (saveBtn.textContent = "Save"), 1500);
     });
@@ -857,7 +865,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   menuBtn.textContent = "Menu";
   menuBtn.title = "Save and return to the main menu";
   menuBtn.addEventListener("click", () => {
-    void saveGame(saveEnvelope()).finally(() => location.assign(location.pathname));
+    void saveGame(saveEnvelope(), config?.mission !== undefined ? "campaign" : "skirmish").finally(() => location.assign(location.pathname));
   });
   document.querySelector(".age-wrap")?.appendChild(menuBtn);
   // Debug handles for headless gate probes (harmless in production).
@@ -865,6 +873,8 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
   (window as unknown as Record<string, unknown>).__sim = sim;
   (window as unknown as Record<string, unknown>).__selection = selection;
   (window as unknown as Record<string, unknown>).__audio = audio;
+  (window as unknown as Record<string, unknown>).__aiDifficulty = aiChoice;
+  (window as unknown as Record<string, unknown>).__unitOfMesh = (m: never) => unitRenderer.isUnitMesh(m);
   (window as unknown as Record<string, unknown>).__forceFrame = () => { combatFx.update(120); powerFx.update(120); renderFrame(); };
   (window as unknown as Record<string, unknown>).__cast = (power: string, x: number, y: number) => {
     queue.enqueue(sim.tick + 1, { type: "cast_power", playerId: 0, power, x: x * FP_ONE, y: y * FP_ONE });
@@ -903,6 +913,7 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
     seed,
     pantheon: getPlayer(sim, 0).pantheon,
     majorGod: getPlayer(sim, 0).majorGod,
+    mission: config?.mission,
     commands: replayLog,
   });
   (window as unknown as Record<string, unknown>).__checksum = () => simChecksum(sim);
