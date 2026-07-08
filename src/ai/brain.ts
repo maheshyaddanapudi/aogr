@@ -44,6 +44,7 @@ export interface AiState {
   invasionPhase: 0 | 1 | 2;
   invasionShips: number[];
   invasionSince: number;
+  invasionShore: { x: number; y: number } | null;
   /** cached land-path answer to the current enemy TC (BFS is not free) */
   reachCache: { target: number; ok: boolean; tick: number } | null;
 }
@@ -58,6 +59,7 @@ export function createAiState(playerId: number, difficulty: AiDifficulty, _seed:
     invasionPhase: 0,
     invasionShips: [],
     invasionSince: 0,
+    invasionShore: null,
     reachCache: null,
   };
 }
@@ -472,21 +474,26 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
             cmds.push({ type: "move", playerId: pid, eids: [...ai.invasionShips], x: shore.x * 1000 + 500, y: shore.y * 1000 + 500 });
             ai.invasionPhase = 2;
             ai.invasionSince = sim.tick;
+            ai.invasionShore = shore;
           }
         } else if (waited) {
           ai.invasionPhase = 0; // nobody made it aboard — re-plan
           ai.invasionShips = [];
         }
       } else {
-        // each barge unloads as IT arrives; the wave regroups on the beach
+        // each barge unloads as IT reaches the SHORE (the enemy base may sit
+        // far inland — never measure the landing against the TC itself)
         const landed: number[] = [];
         let cargo = 0;
+        const sx = (ai.invasionShore?.x ?? Math.trunc(Position.x[target]! / 1000)) * 1000 + 500;
+        const sy = (ai.invasionShore?.y ?? Math.trunc(Position.y[target]! / 1000)) * 1000 + 500;
         for (const ship of ai.invasionShips) {
           const troops = sim.garrisons.get(ship) ?? [];
           cargo += troops.length;
-          const dx = Position.x[ship]! - Position.x[target]!;
-          const dy = Position.y[ship]! - Position.y[target]!;
-          if (dx * dx + dy * dy < 10_000 * 10_000 && troops.length > 0) {
+          const dx = Position.x[ship]! - sx;
+          const dy = Position.y[ship]! - sy;
+          const arrived = sim.stores.MoveState.active[ship] !== 1;
+          if ((dx * dx + dy * dy < 6_000 * 6_000 || (arrived && sim.tick - ai.invasionSince > 15 * 20)) && troops.length > 0) {
             landed.push(...troops);
             cmds.push({ type: "ungarrison", playerId: pid, buildingEid: ship });
           }
@@ -499,6 +506,7 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
         if (cargo === 0 || sim.tick - ai.invasionSince > 15 * 240) {
           ai.invasionPhase = 0; // delivered (or lost) — plan the next lift
           ai.invasionShips = [];
+          ai.invasionShore = null;
         }
       }
     }

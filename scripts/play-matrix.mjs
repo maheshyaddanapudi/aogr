@@ -207,8 +207,10 @@ window.__macro = (isWaterMap, strat) => {
         window.__cmd({ type: "garrison", playerId: 0, eids: army.slice(0, 5), buildingEid: barge.eid });
       } else if (loaded >= 3) {
         window.__cmd({ type: "move", playerId: 0, eids: [barge.eid], x: Math.round(foes[0].x * 1000), y: Math.round((foes[0].z + 4) * 1000) });
+        // unload on ARRIVAL at the shore — the enemy base may sit far inland
+        const arrived = S().stores.MoveState.active[barge.eid] !== 1;
         const bd = Math.hypot(barge.x - foes[0].x, barge.z - foes[0].z);
-        if (bd < 12) {
+        if (bd < 12 || (arrived && bd < 60)) {
           window.__cmd({ type: "ungarrison", playerId: 0, buildingEid: barge.eid });
           window.__m.attackMoves++;
         }
