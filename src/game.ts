@@ -706,7 +706,9 @@ export async function boot(config?: Partial<GameConfig>): Promise<void> {
       const o = mission.objective;
       const p = getPlayer(sim, 0);
       const won =
-        (o.type === "conquest" && sim.winner === 0) ||
+        // winning the MATCH outright (razing every foe) completes any mission —
+        // a VICTORY overlay that doesn't advance the campaign is a broken promise
+        sim.winner === 0 ||
         (o.type === "survive" && sim.tick >= (o.minutes ?? 10) * 900 && p.townCenterEid >= 0 && sim.winner !== 1) ||
         (o.type === "relics" && p.relicsStored >= (o.count ?? 3)) ||
         (o.type === "wonder" && (() => {

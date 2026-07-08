@@ -148,7 +148,7 @@ for (let mi = start; mi < missions.length; mi++) {
       }
       // military + defense/attack
       for (const bar of myB("barracks")) {
-        if (P.age >= 1 && food >= 60 && gold >= 50 && P.popUsed < P.popCap && (S.trainQueues.get(bar.eid)?.length ?? 0) < 2) {
+        if (P.age >= 1 && food >= 60 && gold >= 50 && P.popUsed < P.popCap && (S.trainQueues.get(bar.eid)?.length ?? 0) < 4) {
           window.__cmd({ type: "train", playerId: 0, buildingEid: bar.eid, unit: "infantry_base" });
         }
       }
