@@ -12,7 +12,7 @@ import { computeFlowField, flowDistAt, UNREACHABLE } from "./path/flowfield";
 import { getBuildingStats, getBuildingStatsByIndex, type BuildingStats } from "./buildingdata";
 import { getUnitStats } from "./unitdata";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
-import { isWaterTile, nearestPassableTile, nearestWaterTile, nudgeOutOfFootprint, setMoveTarget, spawnUnitEntity, type Sim } from "./sim";
+import { isWaterTile, nearestPassableTile, nearestWaterTile, nudgeOutOfFootprint, setMoveTarget, spawnUnitEntity, waterRegionAt, type Sim } from "./sim";
 // eslint-disable-next-line import/no-cycle -- runtime-safe
 import { AGE_INDEX, effectiveGatherMicroPerTick, effectiveTrainTicks, type ResearchEntry } from "./research";
 
@@ -176,20 +176,27 @@ function footprintClear(sim: Sim, tileX: number, tileY: number, size: number): b
 
 /** Coastal variant: nearest clear footprint that touches water (docks). */
 export function findCoastalSite(sim: Sim, nearX: number, nearY: number, size: number): { x: number; y: number } | null {
-  for (let r = 2; r < 60; r++) {
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        const x = nearX + dx;
-        const y = nearY + dy;
-        if (!footprintClear(sim, x, y, size)) continue;
-        let coastal = false;
-        for (let yy = -2; yy <= size + 1 && !coastal; yy++) {
-          for (let xx = -2; xx <= size + 1; xx++) {
-            if (isWaterTile(sim, x + xx, y + yy)) { coastal = true; break; }
+  // pass 1 wants the MAIN ocean — a dock on a landlocked lagoon can never
+  // sail to the war (round-9 cell-16 autopsy). Pass 2 falls back to any coast.
+  for (const requireMainSea of [true, false]) {
+    for (let r = 2; r < 60; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = nearX + dx;
+          const y = nearY + dy;
+          if (!footprintClear(sim, x, y, size)) continue;
+          let coastal = false;
+          for (let yy = -2; yy <= size + 1 && !coastal; yy++) {
+            for (let xx = -2; xx <= size + 1; xx++) {
+              if (!isWaterTile(sim, x + xx, y + yy)) continue;
+              if (requireMainSea && waterRegionAt(sim, x + xx, y + yy) !== sim.mainWaterRegion) continue;
+              coastal = true;
+              break;
+            }
           }
+          if (coastal) return { x, y };
         }
-        if (coastal) return { x, y };
       }
     }
   }

@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { query } from "bitecs";
 import { createSim, stepSim, spawnUnitEntity, type Sim } from "../../src/sim/sim";
-import { getPlayer } from "../../src/sim/economy";
+import { getPlayer, spawnResourceNode, findCoastalSite } from "../../src/sim/economy";
 import { createAiState, decideAi } from "../../src/ai/brain";
 
 const SKIRMISH = { players: 2, skirmish: true };
@@ -67,6 +67,104 @@ describe("gaps8 — warships fight back", () => {
       banked = getPlayer(sim, 1).relicsStored > 0;
     }
     expect(banked, "a relic reached the AI's temple").toBe(true);
+  });
+
+  it("worldgen guarantees start-to-start reachability by land OR sea (cell-16 autopsy: seed 3777 generated two disconnected oceans)", { timeout: 120_000 }, () => {
+    const reachEither = (sim: Sim): boolean => {
+      const { Position } = sim.stores;
+      const a = getPlayer(sim, 0).townCenterEid;
+      const b = getPlayer(sim, 1).townCenterEid;
+      const bfs = (grid: { size: number; passable: Uint8Array }, sx: number, sy: number, gx: number, gy: number, seedR: number): boolean => {
+        const seen = new Uint8Array(grid.size * grid.size);
+        const qx: number[] = [];
+        const qy: number[] = [];
+        for (let dy = -seedR; dy <= seedR; dy++) for (let dx = -seedR; dx <= seedR; dx++) {
+          const x = sx + dx;
+          const y = sy + dy;
+          if (x < 0 || y < 0 || x >= grid.size || y >= grid.size) continue;
+          const k = y * grid.size + x;
+          if (!grid.passable[k] || seen[k]) continue;
+          seen[k] = 1;
+          qx.push(x);
+          qy.push(y);
+        }
+        let head = 0;
+        while (head < qx.length) {
+          const x = qx[head]!;
+          const y = qy[head]!;
+          head++;
+          if (Math.abs(x - gx) <= seedR && Math.abs(y - gy) <= seedR) return true;
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= grid.size || ny >= grid.size) continue;
+            const k = ny * grid.size + nx;
+            if (seen[k] || !grid.passable[k]) continue;
+            seen[k] = 1;
+            qx.push(nx);
+            qy.push(ny);
+          }
+        }
+        return false;
+      };
+      const ax = Math.trunc(Position.x[a]! / 1000);
+      const ay = Math.trunc(Position.y[a]! / 1000);
+      const bx = Math.trunc(Position.x[b]! / 1000);
+      const by = Math.trunc(Position.y[b]! / 1000);
+      return bfs(sim.navGrid, ax, ay, bx, by, 4) || bfs(sim.waterGrid, ax, ay, bx, by, 8);
+    };
+    for (const [seed, water] of [[3777, 200], [3888, 200], [1404, 200], [9004, 200], [1101, undefined], [42, undefined]] as const) {
+      const sim = createSim(seed, water !== undefined ? { waterLevelFp: water } : undefined, SKIRMISH);
+      expect(reachEither(sim), `seed ${seed}${water !== undefined ? "/archipelago" : "/island"}: some route exists between the starts`).toBe(true);
+    }
+  });
+
+  it("auto-sited docks face the MAIN ocean, not a landlocked lagoon (cell-16 autopsy, seed 3777)", { timeout: 120_000 }, () => {
+    const sim = createSim(3777, { waterLevelFp: 200 }, SKIRMISH);
+    const { Position } = sim.stores;
+    const tc = getPlayer(sim, 0).townCenterEid;
+    const tx = Math.trunc(Position.x[tc]! / 1000);
+    const ty = Math.trunc(Position.y[tc]! / 1000);
+    const site = findCoastalSite(sim, tx, ty, 2);
+    expect(site, "a coastal dock site exists").not.toBeNull();
+    // the water the dock touches must belong to the biggest sea on the map
+    const g = sim.waterGrid;
+    const labels = new Int32Array(g.size * g.size).fill(-1);
+    const sizes: number[] = [];
+    for (let y = 0; y < g.size; y++) for (let x = 0; x < g.size; x++) {
+      if (!g.passable[y * g.size + x] || labels[y * g.size + x]! >= 0) continue;
+      const id = sizes.length;
+      let n = 0;
+      const qx = [x];
+      const qy = [y];
+      labels[y * g.size + x] = id;
+      let head = 0;
+      while (head < qx.length) {
+        const cx = qx[head]!;
+        const cy = qy[head]!;
+        head++;
+        n++;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= g.size || ny >= g.size) continue;
+          const k = ny * g.size + nx;
+          if (labels[k]! >= 0 || !g.passable[k]) continue;
+          labels[k] = id;
+          qx.push(nx);
+          qy.push(ny);
+        }
+      }
+      sizes.push(n);
+    }
+    const main = sizes.indexOf(Math.max(...sizes));
+    let touchesMain = false;
+    for (let dy = -2; dy <= 3 && !touchesMain; dy++) for (let dx = -2; dx <= 3; dx++) {
+      const x = site!.x + dx;
+      const y = site!.y + dy;
+      if (x >= 0 && y >= 0 && x < g.size && y < g.size && labels[y * g.size + x] === main) { touchesMain = true; break; }
+    }
+    expect(touchesMain, `dock site (${site!.x},${site!.y}) touches the main ocean (region ${main}, ${Math.max(...sizes)} tiles)`).toBe(true);
   });
 
   it("fishing boats and transports stay peaceful (no attack data, no aggression)", () => {

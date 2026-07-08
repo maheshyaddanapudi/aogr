@@ -12,7 +12,7 @@ import type { Sim } from "../sim/sim";
 import { getPlayer, findResourceNodes } from "../sim/economy";
 import { getTechStats } from "../sim/techdata";
 import { getMinorPool, getMinor, getPantheon } from "../sim/pantheondata";
-import { isWaterTile, nearestWaterTile } from "../sim/sim";
+import { isWaterTile, nearestWaterTile, nearestMainSeaTile, waterRegionAt } from "../sim/sim";
 import { getPower, nextCastCostMilli } from "../sim/powers";
 import { getUnitStats } from "../sim/unitdata";
 import { getBuildingStats } from "../sim/buildingdata";
@@ -244,13 +244,21 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
     const btx = Math.trunc(Position.x[tc]! / 1000);
     const bty = Math.trunc(Position.y[tc]! / 1000);
     let dockSite: { x: number; y: number } | null = null;
-    outer: for (let r = 4; r < 34; r += 2) {
-      for (let a = 0; a < 12; a++) {
-        const x = btx + Math.trunc(Math.cos((a / 12) * 6.283) * r);
-        const y = bty + Math.trunc(Math.sin((a / 12) * 6.283) * r);
-        let coastal = false;
-        for (let dy = -2; dy <= 3 && !coastal; dy++) for (let dx = -2; dx <= 3; dx++) if (isWaterTile(sim, x + dx, y + dy)) { coastal = true; break; }
-        if (coastal && !isWaterTile(sim, x, y)) { dockSite = { x, y }; break outer; }
+    // prefer the MAIN ocean (a lagoon dock can never sail to the war); fall back to any coast
+    outer: for (const requireMainSea of [true, false]) {
+      for (let r = 4; r < 34; r += 2) {
+        for (let a = 0; a < 12; a++) {
+          const x = btx + Math.trunc(Math.cos((a / 12) * 6.283) * r);
+          const y = bty + Math.trunc(Math.sin((a / 12) * 6.283) * r);
+          let coastal = false;
+          for (let dy = -2; dy <= 3 && !coastal; dy++) for (let dx = -2; dx <= 3; dx++) {
+            if (!isWaterTile(sim, x + dx, y + dy)) continue;
+            if (requireMainSea && waterRegionAt(sim, x + dx, y + dy) !== sim.mainWaterRegion) continue;
+            coastal = true;
+            break;
+          }
+          if (coastal && !isWaterTile(sim, x, y)) { dockSite = { x, y }; break outer; }
+        }
       }
     }
     const builder = idleVillagers[0] ?? villagers[0];
@@ -456,7 +464,10 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
         const full = aboard >= Math.min(capacity, military.length + aboard);
         const waited = sim.tick - ai.invasionSince > 15 * 90;
         if (full || (waited && aboard > 0)) {
-          const shore = nearestWaterTile(sim, Math.trunc(Position.x[target]! / 1000), Math.trunc(Position.y[target]! / 1000));
+          // land on the MAIN ocean's shore near the target — the barge sails there
+          const shore =
+            nearestMainSeaTile(sim, Math.trunc(Position.x[target]! / 1000), Math.trunc(Position.y[target]! / 1000)) ??
+            nearestWaterTile(sim, Math.trunc(Position.x[target]! / 1000), Math.trunc(Position.y[target]! / 1000));
           if (shore) {
             cmds.push({ type: "move", playerId: pid, eids: [...ai.invasionShips], x: shore.x * 1000 + 500, y: shore.y * 1000 + 500 });
             ai.invasionPhase = 2;

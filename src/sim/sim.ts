@@ -150,6 +150,10 @@ export interface Sim {
   readonly flowFields: Map<number, FlowField>;
   /** naval flow fields over the water grid; derived, never serialized */
   readonly waterFlowFields: Map<number, FlowField>;
+  /** connected-water-body labels (derived); -1 = land */
+  readonly waterRegions: Int32Array;
+  /** the biggest sea on the map — where docks and invasions belong */
+  readonly mainWaterRegion: number;
   readonly players: PlayerState[];
   readonly trainQueues: Map<number, TrainEntry[]>;
   /** building eid → garrisoned unit eids (sorted ascending) */
@@ -208,6 +212,8 @@ export function createSim(
   // over the defaults — a bare { waterLevelFp } once crashed terrain gen
   const terrain = generateTerrain(new Prng((seed ^ TERRAIN_SEED_SALT) >>> 0), { ...DEFAULT_TERRAIN_CONFIG, ...terrainConfig });
   const stores = createStores();
+  const waterGrid = buildWaterGrid(terrain);
+  const waterRegionInfo = labelWaterRegions(waterGrid);
   const sim: Sim = {
     world: createWorld(),
     stores,
@@ -215,9 +221,11 @@ export function createSim(
     seed: seed >>> 0,
     terrain,
     navGrid: buildNavGrid(terrain),
-    waterGrid: buildWaterGrid(terrain),
+    waterGrid,
     flowFields: new Map(),
     waterFlowFields: new Map(),
+    waterRegions: waterRegionInfo.labels,
+    mainWaterRegion: waterRegionInfo.main,
     players: createPlayers(matchOptions.players),
     trainQueues: new Map(),
     garrisons: new Map(),
@@ -357,6 +365,68 @@ function getWaterFlowField(sim: Sim, key: number): FlowField {
     sim.waterFlowFields.set(key, f);
   }
   return f;
+}
+
+/** Label connected water bodies (deterministic scan-order flood fill). Docks
+ * and invasions should face the MAIN ocean — a base whose dock sits on a
+ * landlocked lagoon can never sail to the war (round-9 cell-16 autopsy). */
+function labelWaterRegions(grid: NavGrid): { labels: Int32Array; main: number } {
+  const labels = new Int32Array(grid.size * grid.size).fill(-1);
+  let main = -1;
+  let mainSize = 0;
+  let next = 0;
+  for (let y = 0; y < grid.size; y++) {
+    for (let x = 0; x < grid.size; x++) {
+      if (!grid.passable[y * grid.size + x] || labels[y * grid.size + x]! >= 0) continue;
+      const id = next++;
+      let n = 0;
+      const qx = [x];
+      const qy = [y];
+      labels[y * grid.size + x] = id;
+      let head = 0;
+      while (head < qx.length) {
+        const cx = qx[head]!;
+        const cy = qy[head]!;
+        head++;
+        n++;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= grid.size || ny >= grid.size) continue;
+          const k = ny * grid.size + nx;
+          if (labels[k]! >= 0 || !grid.passable[k]) continue;
+          labels[k] = id;
+          qx.push(nx);
+          qy.push(ny);
+        }
+      }
+      if (n > mainSize) {
+        mainSize = n;
+        main = id;
+      }
+    }
+  }
+  return { labels, main };
+}
+
+/** Region id of a water tile (-1 for land / out of bounds). */
+export function waterRegionAt(sim: Sim, tx: number, ty: number): number {
+  if (tx < 0 || ty < 0 || tx >= sim.waterGrid.size || ty >= sim.waterGrid.size) return -1;
+  return sim.waterRegions[ty * sim.waterGrid.size + tx]!;
+}
+
+/** Nearest water tile belonging to the map's MAIN ocean. */
+export function nearestMainSeaTile(sim: Sim, tx: number, ty: number): { x: number; y: number } | null {
+  if (waterRegionAt(sim, tx, ty) === sim.mainWaterRegion) return { x: tx, y: ty };
+  for (let r = 1; r < sim.waterGrid.size; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (waterRegionAt(sim, tx + dx, ty + dy) === sim.mainWaterRegion) return { x: tx + dx, y: ty + dy };
+      }
+    }
+  }
+  return null;
 }
 
 /** Push a unit standing inside a (newly blocked) footprint to open ground,
