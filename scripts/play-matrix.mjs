@@ -198,6 +198,9 @@ window.__macro = (isWaterMap, strat) => {
     }
     const barge = myUnits("transport_barge")[0];
     const foes = window.__view().buildings.filter((b) => b.playerId !== 0 && b.buildingId === "town_center");
+    if (S().tick % 1800 < 76) {
+      window.__log.push(`min ${Math.trunc(S().tick / 900)} NAVAL dock=${myB("dock").length} army=${army.length} barge=${barge ? 1 : 0} loaded=${barge ? (S().garrisons.get(barge.eid) ?? []).length : -1} bd=${barge && foes.length ? Math.round(Math.hypot(barge.x - foes[0].x, barge.z - foes[0].z)) : -1} am=${window.__m.attackMoves}`);
+    }
     if (barge && foes.length > 0) {
       const loaded = (S().garrisons.get(barge.eid) ?? []).length;
       if (loaded < 3 && army.length >= 1) {
@@ -333,6 +336,7 @@ for (const cell of cells) {
     exercised: { raided: fin.m.raided, garrisoned: fin.m.garrisoned || fin.m.raided, hunted: fin.m.hunted, dock: fin.m.dockBuilt, attackMoves: fin.m.attackMoves },
   });
   console.log(`■ cell ${cell.i} ${cell.mode}/${cell.ai}/${cell.map}${cell.strategy ? "/" + cell.strategy : ""}: ${result} @min ${Math.trunc(fin.tick / 900)} | anomalies: ${fin.anomalies.length ? fin.anomalies.join(" ;; ") : "none"}`);
+  if (cell.strategy === "naval") for (const l of (await page.evaluate(() => window.__log)).filter((l) => l.includes("NAVAL"))) console.log("   ", l);
   await page.context().close();
   } catch (err) {
     results.push({ cell: cell.i, mode: cell.mode, ai: cell.ai, map: cell.map, pantheon: cell.pantheon, seed: cell.seed,
