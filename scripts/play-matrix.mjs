@@ -199,7 +199,7 @@ window.__macro = (isWaterMap, strat) => {
     const barge = myUnits("transport_barge")[0];
     const foes = window.__view().buildings.filter((b) => b.playerId !== 0 && b.buildingId === "town_center");
     if (S().tick % 1800 < 76) {
-      window.__log.push(`min ${Math.trunc(S().tick / 900)} NAVAL dock=${myB("dock").length} army=${army.length} barge=${barge ? 1 : 0} loaded=${barge ? (S().garrisons.get(barge.eid) ?? []).length : -1} bd=${barge && foes.length ? Math.round(Math.hypot(barge.x - foes[0].x, barge.z - foes[0].z)) : -1} am=${window.__m.attackMoves}`);
+      window.__log.push("min " + Math.trunc(S().tick / 900) + " NAVAL dock=" + myB("dock").length + " army=" + army.length + " barge=" + (barge ? 1 : 0) + " loaded=" + (barge ? (S().garrisons.get(barge.eid) ?? []).length : -1) + " bd=" + (barge && foes.length ? Math.round(Math.hypot(barge.x - foes[0].x, barge.z - foes[0].z)) : -1) + " am=" + window.__m.attackMoves);
     }
     if (barge && foes.length > 0) {
       const loaded = (S().garrisons.get(barge.eid) ?? []).length;
