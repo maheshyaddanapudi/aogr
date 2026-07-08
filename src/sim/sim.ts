@@ -320,7 +320,11 @@ export function setMoveTarget(sim: Sim, eid: number, xFp: number, yFp: number): 
   const tx = Math.trunc(xFp / 1000);
   const ty = Math.trunc(yFp / 1000);
   const naval = hasComponent(sim.world, eid, UnitRef) && getUnitStatsByIndex(UnitRef.typeIndex[eid]!).naval;
-  const tile = naval ? (nearestWaterTile(sim, tx, ty) ?? { x: tx, y: ty }) : nearestPassableTile(sim, tx, ty);
+  const { Position } = sim.stores;
+  const tile = naval
+    ? (nearestWaterTileInRegion(sim, tx, ty, waterRegionAt(sim, Math.trunc(Position.x[eid]! / 1000), Math.trunc(Position.y[eid]! / 1000))) ??
+       nearestWaterTile(sim, tx, ty) ?? { x: tx, y: ty })
+    : nearestPassableTile(sim, tx, ty);
   MoveState.active[eid] = 1;
   MoveState.targetX[eid] = tile.x * 1000 + 500;
   MoveState.targetY[eid] = tile.y * 1000 + 500;
@@ -417,12 +421,19 @@ export function waterRegionAt(sim: Sim, tx: number, ty: number): number {
 
 /** Nearest water tile belonging to the map's MAIN ocean. */
 export function nearestMainSeaTile(sim: Sim, tx: number, ty: number): { x: number; y: number } | null {
-  if (waterRegionAt(sim, tx, ty) === sim.mainWaterRegion) return { x: tx, y: ty };
+  return nearestWaterTileInRegion(sim, tx, ty, sim.mainWaterRegion);
+}
+
+/** Nearest water tile in a specific water body — a ship's move target must lie
+ * on ITS OWN sea or the voyage is impossible before it starts. */
+export function nearestWaterTileInRegion(sim: Sim, tx: number, ty: number, region: number): { x: number; y: number } | null {
+  if (region < 0) return null;
+  if (waterRegionAt(sim, tx, ty) === region) return { x: tx, y: ty };
   for (let r = 1; r < sim.waterGrid.size; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        if (waterRegionAt(sim, tx + dx, ty + dy) === sim.mainWaterRegion) return { x: tx + dx, y: ty + dy };
+        if (waterRegionAt(sim, tx + dx, ty + dy) === region) return { x: tx + dx, y: ty + dy };
       }
     }
   }
@@ -552,7 +563,7 @@ function applyCommand(sim: Sim, cmd: Command): void {
       return;
     }
     case "move": {
-      const { MoveState, Owner, UnitRef } = sim.stores;
+      const { MoveState, Owner, UnitRef, Position } = sim.stores;
       const rawTx = Math.trunc(cmd.x / fpFromInt(1));
       const rawTy = Math.trunc(cmd.y / fpFromInt(1));
       // land units snap to passable ground, boats snap to water — a mixed
@@ -572,7 +583,12 @@ function applyCommand(sim: Sim, cmd: Command): void {
         if (Owner.playerId[eid] !== cmd.playerId) continue;
         if (!hasComponent(sim.world, eid, UnitRef)) continue;
         const naval = getUnitStatsByIndex(UnitRef.typeIndex[eid]!).naval;
-        const tile = naval ? (waterTile ?? landTile) : landTile;
+        // a ship's target must lie on ITS sea — a point on some other water
+        // body is unreachable before the voyage starts (lagoon-target bug)
+        const shipRegion = naval ? waterRegionAt(sim, Math.trunc(Position.x[eid]! / 1000), Math.trunc(Position.y[eid]! / 1000)) : -1;
+        const tile = naval
+          ? (nearestWaterTileInRegion(sim, rawTx, rawTy, shipRegion) ?? waterTile ?? landTile)
+          : landTile;
         // grid slot for this unit (single units keep the exact target)
         let ux = tile.x * 1000 + 500;
         let uy = tile.y * 1000 + 500;
