@@ -12,7 +12,7 @@ import { computeFlowField, flowDistAt, UNREACHABLE } from "./path/flowfield";
 import { getBuildingStats, getBuildingStatsByIndex, type BuildingStats } from "./buildingdata";
 import { getUnitStats } from "./unitdata";
 // eslint-disable-next-line import/no-cycle -- runtime-safe: functions called post-init
-import { isWaterTile, nearestPassableTile, nearestWaterTile, nudgeOutOfFootprint, setMoveTarget, spawnUnitEntity, waterRegionAt, type Sim } from "./sim";
+import { isWaterTile, nearestMainSeaTile, nearestPassableTile, nearestWaterTile, nudgeOutOfFootprint, setMoveTarget, spawnUnitEntity, waterRegionAt, type Sim } from "./sim";
 // eslint-disable-next-line import/no-cycle -- runtime-safe
 import { AGE_INDEX, effectiveGatherMicroPerTick, effectiveTrainTicks, type ResearchEntry } from "./research";
 
@@ -872,7 +872,10 @@ export function economySystem(sim: Sim): void {
       const naval = getUnitStats(head.unitId).naval;
       let t: { x: number; y: number };
       if (naval) {
-        const w = nearestWaterTile(sim, bx, by);
+        // launch onto the MAIN ocean when the dock touches several waters —
+        // a ship born on the lagoon side can never sail to the war
+        const wMain = nearestMainSeaTile(sim, bx, by);
+        const w = wMain && Math.max(Math.abs(wMain.x - bx), Math.abs(wMain.y - by)) <= 6 ? wMain : nearestWaterTile(sim, bx, by);
         if (!w || Math.max(Math.abs(w.x - bx), Math.abs(w.y - by)) > 6) {
           // landlocked dock: refund rather than beach a ship on grass
           const cost = getUnitStats(head.unitId).cost;
