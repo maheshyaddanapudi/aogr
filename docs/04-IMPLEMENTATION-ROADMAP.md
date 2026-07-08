@@ -292,3 +292,31 @@ macro (cell 19). Skirmish carries hard/titan for veterans.
 wall 455→636ms/game-min (was 40× degradation), materials 287→320 then plateau
 (lazy unit-pool saturation, not growth), meshes battle-cyclic not monotone,
 zero pageerrors. F11 + F13 verified closed.
+
+## Round 9: the cockroach purge — 13 more findings closed
+
+The user asked for every remaining bug or gap, however small. Verified list,
+every item fixed and verified (or confirmed already-correct):
+
+| Finding | Fix | Verified |
+|---------|-----|----------|
+| Resumed saves always fought MEDIUM (envelope lost difficulty) | envelope carries aiDifficulty | E2E: titan save resumes titan |
+| Warships combat-passive by default | armed units default aggressive; unarmed hulls have no CombatState | TDD gaps8 |
+| One save slot — mission saves clobbered skirmish saves | campaign slot + "Continue mission" menu button | E2E: slots coexist, mission re-arms |
+| Mission replays played as objective-less skirmish | replays carry mission index; replays never advance progress | code + suite |
+| Gate/footprint nudge could teleport units through walls | outward-biased nudge (unit stays on ITS side) | suite |
+| AI never built towers / researched armory techs / collected relics | towers by ambition, armory line from surplus, hero relic duty — all gated behind the AGE and FAVOR reserves after two regressions caught by the balance gate | TDD gaps8 + balance gate green |
+| AI invasions fixed at one 6-man barge | flotilla sized by waveSize (≤2 barges), per-ship beach unloading | gaps7 |
+| Touch+navy never tested together | real touch-tap E2E: tap open water orders a boat; tap a transport boards troops | 8/8 checks |
+| Transport HUD | verified already-correct (occupant count + Unload wired) | code-read + E2E |
+| "Determinism flake" (F17) | ROOT-CAUSED: vitest 5s default timeout under parallel CPU load — never a divergence; global 120s timeout | 176/176 across loaded reruns |
+| Ships wedged on concave coasts | WATER FLOW FIELDS: ships path like land units over a water grid | P4 + naval cells |
+| Docks/launches/targets on the wrong water body | water-region labeling: docks, ship launches, and naval move targets prefer the main ocean / the ship's own sea | TDD gaps8 (lagoon dock) |
+| Amphibious unload measured against an inland TC | unload on SHORE arrival (macro + AI) | cell 16: troops landed, 2 assaults |
+
+Cell 16's four-layer autopsy (lagoon dock → lagoon launch → lagoon target →
+TC-distance unload) ended with a scripted player shipping an army 170 tiles
+across the ocean and assaulting the enemy island. Full suite: **176 passed,
+0 failed, 0 expected-fail**; purity gate green. Live single-player seed
+reproducibility documented as replay-only (docs/02 note) — the one accepted
+non-goal, required for lockstep multiplayer later.

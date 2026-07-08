@@ -140,6 +140,9 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
   const myUnits = Array.from(query(sim.world, [UnitRef])).filter((e) => Owner.playerId[e] === pid).sort((a, b) => a - b);
   const villagers = myUnits.filter((e) => sim.unitStats(e).id === "villager");
   const military = myUnits.filter((e) => ["infantry", "archer", "cavalry", "myth", "hero"].includes(sim.unitStats(e).unitClass));
+  // the hero is on relic duty — it neither counts toward the army targets nor
+  // marches with waves (counting it launched understrength waves, round-9 bug)
+  const fighters = military.filter((e) => sim.unitStats(e).unitClass !== "hero");
   const myth = myUnits.filter((e) => sim.unitStats(e).unitClass === "myth");
   const myBuildings = Array.from(query(sim.world, [Building])).filter((e) => Owner.playerId[e] === pid).sort((a, b) => a - b);
   const active = (id: string) => myBuildings.filter((e) => Building.active[e] === 1 && sim.buildingIdOf(e) === id);
@@ -338,6 +341,7 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
     const heroes = myUnits.filter((e) => sim.unitStats(e).unitClass === "hero");
     const temple = active("temple")[0];
     if (heroes.length === 0 && p.age >= 1 && villagers.length >= 12 && temple !== undefined &&
+        myth.length >= Math.min(knobs.mythTarget, 1) && p.favorMilli >= 12_000 && // favor feeds MYTH first; the hero waits for surplus
         canAffordMilli(p, getUnitStats(HERO_OF[p.pantheon] ?? "sky_herald").cost) &&
         (sim.trainQueues.get(temple)?.length ?? 0) === 0) {
       cmds.push({ type: "train", playerId: pid, buildingEid: temple, unit: HERO_OF[p.pantheon] ?? "sky_herald" });
@@ -383,8 +387,8 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
 
   // ── military production ──
   const barracks = active("barracks")[0];
-  if (barracks !== undefined && military.length < knobs.armyTarget) {
-    const unit = military.length % 3 === 2 ? "spearman" : "infantry_base";
+  if (barracks !== undefined && fighters.length < knobs.armyTarget) {
+    const unit = fighters.length % 3 === 2 ? "spearman" : "infantry_base";
     if (canAffordMilli(p, getUnitStats(unit).cost)) {
       if ((sim.trainQueues.get(barracks)?.length ?? 0) < 3) {
         cmds.push({ type: "train", playerId: pid, buildingEid: barracks, unit });
@@ -425,8 +429,8 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
   if (enemyTc && warTime) {
     const target = enemyTc.pp.townCenterEid;
     if (landReachable(sim, ai, tc, target)) {
-      if (military.length >= knobs.waveSize && sim.tick - ai.lastWaveTick > 15 * 60) {
-        cmds.push({ type: "move", playerId: pid, eids: military, x: Position.x[target]!, y: Position.y[target]! });
+      if (fighters.length >= knobs.waveSize && sim.tick - ai.lastWaveTick > 15 * 60) {
+        cmds.push({ type: "move", playerId: pid, eids: fighters, x: Position.x[target]!, y: Position.y[target]! });
         ai.lastWaveTick = sim.tick;
         ai.attacking = true;
       }
@@ -444,8 +448,8 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
           if (dock !== undefined && p.woodMilli >= 100_000 && (sim.trainQueues.get(dock)?.length ?? 0) === 0) {
             cmds.push({ type: "train", playerId: pid, buildingEid: dock, unit: "transport_barge" });
           }
-        } else if (military.length >= Math.min(knobs.waveSize, 6 * bargeTarget) && sim.tick - ai.lastWaveTick > 15 * 60) {
-          const free = military.filter((e) => !sim.garrisonOf.has(e));
+        } else if (fighters.length >= Math.min(knobs.waveSize, 6 * bargeTarget) && sim.tick - ai.lastWaveTick > 15 * 60) {
+          const free = fighters.filter((e) => !sim.garrisonOf.has(e));
           const ships = barges.slice(0, bargeTarget);
           let boarded = 0;
           for (const ship of ships) {
@@ -463,7 +467,7 @@ export function decideAi(sim: Sim, ai: AiState): Command[] {
       } else if (ai.invasionPhase === 1) {
         const aboard = ai.invasionShips.reduce((n, s) => n + (sim.garrisons.get(s)?.length ?? 0), 0);
         const capacity = 6 * ai.invasionShips.length;
-        const full = aboard >= Math.min(capacity, military.length + aboard);
+        const full = aboard >= Math.min(capacity, fighters.length + aboard);
         const waited = sim.tick - ai.invasionSince > 15 * 90;
         if (full || (waited && aboard > 0)) {
           // land on the MAIN ocean's shore near the target — the barge sails there
