@@ -89,7 +89,7 @@ for (let mi = start; mi < missions.length; mi++) {
         else if (P.age >= 1 && myB("tower", false).length < 2 && wood >= 110 && gold >= 90) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "tower", x: -1, y: -1 });
         else if (obj === "wonder" && P.age >= 2 && myB("market", false).length === 0 && wood >= 160) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "market", x: -1, y: -1 });
         else if (obj === "wonder" && P.age >= 3 && myB("wonder", false).length === 0 && food >= 1050 && wood >= 1050 && gold >= 1050 && my().filter((u) => ["infantry", "archer", "cavalry"].includes(S.unitStats(u.eid).unitClass)).length >= 14) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "wonder", x: -1, y: -1 });
-        else if ((obj === "conquest" || obj === "naval") && window.__isWaterMission && myB("dock", false).length === 0 && wood >= 140) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "dock", x: -1, y: -1 });
+        else if (window.__isWaterMission && myB("dock", false).length === 0 && wood >= 140) window.__cmd({ type: "build", playerId: 0, eids: [builder.eid], building: "dock", x: -1, y: -1 });
       }
       const FIRST = { ashen_forge: "vulkar", verdant_deep: "thalassa", auryan_dawn: "aurel", storm_concord: "zephyrion" };
       if (P.age === 0 && food >= 420 && myB("temple").length > 0 && !P.researchQueue.some((r) => r.techId === "age_classical")) {
@@ -153,12 +153,30 @@ for (let mi = start; mi < missions.length; mi++) {
         }
       }
       const army = my().filter((u) => ["infantry", "archer", "cavalry"].includes(window.__sim.unitStats(u.eid).unitClass)).map((u) => u.eid);
-      // water missions: a small picket of galleys meets seaborne raiders
+      // water missions: fish for steady food + a small galley picket
       if (window.__isWaterMission) {
         const dock = myB("dock")[0];
+        if (dock && my("fishing_boat").length < 2 && wood >= 80) {
+          window.__cmd({ type: "train", playerId: 0, buildingEid: dock.eid, unit: "fishing_boat" });
+        }
+        for (const boat of my("fishing_boat")) {
+          if (S.stores.GatherTask.phase[boat.eid] !== 0) continue;
+          let bestFish = null, bfd = 1e18;
+          for (const n of view.nodes) {
+            if (n.resType !== 6 || n.depleted) continue;
+            const dd = (n.x - boat.x) ** 2 + (n.z - boat.z) ** 2;
+            if (dd < bfd) { bfd = dd; bestFish = n; }
+          }
+          if (bestFish) window.__cmd({ type: "gather", playerId: 0, eids: [boat.eid], nodeEid: bestFish.eid });
+        }
         if (dock && wood >= 130 && gold >= 70 && my("war_galley").length < 2 && P.age >= 1) {
           window.__cmd({ type: "train", playerId: 0, buildingEid: dock.eid, unit: "war_galley" });
         }
+      }
+      // one mender keeps the standing army alive between waves
+      if (!window.__camp.mender && P.age >= 1 && myB("temple").length > 0 && food >= 70 && gold >= 45) {
+        window.__cmd({ type: "train", playerId: 0, buildingEid: myB("temple")[0].eid, unit: "mender" });
+        window.__camp.mender = true;
       }
       const intruders = view.units.filter((u) => u.playerId !== 0 && Math.hypot(u.x - tc.x, u.z - tc.z) < 20);
       if (intruders.length > 0 && army.length > 0) {
